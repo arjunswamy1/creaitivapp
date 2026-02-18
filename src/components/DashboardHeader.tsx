@@ -1,5 +1,6 @@
-import { BarChart3, Calendar } from "lucide-react";
+import { BarChart3, Calendar, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
 
 const DashboardHeader = () => {
   return (
@@ -13,10 +14,17 @@ const DashboardHeader = () => {
           <p className="text-sm text-muted-foreground">Cross-channel marketing analytics</p>
         </div>
       </div>
-      <Button variant="outline" className="gap-2 text-sm">
-        <Calendar className="w-4 h-4" />
-        Feb 1 – Feb 14, 2025
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" className="gap-2 text-sm">
+          <Calendar className="w-4 h-4" />
+          Feb 1 – Feb 14, 2025
+        </Button>
+        <Link to="/settings">
+          <Button variant="ghost" size="icon">
+            <Settings className="w-5 h-5" />
+          </Button>
+        </Link>
+      </div>
     </header>
   );
 };
