@@ -1,8 +1,38 @@
-import { BarChart3, Calendar, Settings } from "lucide-react";
+import { BarChart3, Calendar, Settings, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const DashboardHeader = () => {
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLastSync = async () => {
+      const { data } = await supabase
+        .from("ad_sync_log")
+        .select("completed_at")
+        .eq("status", "success")
+        .order("completed_at", { ascending: false })
+        .limit(1);
+      if (data && data.length > 0 && data[0].completed_at) {
+        setLastSynced(data[0].completed_at);
+      }
+    };
+    fetchLastSync();
+  }, []);
+
+  const formatRelativeTime = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
   return (
     <header className="flex items-center justify-between py-6">
       <div className="flex items-center gap-4">
@@ -14,7 +44,22 @@ const DashboardHeader = () => {
           <p className="text-sm text-muted-foreground">Cross-channel marketing analytics</p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {lastSynced && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span className="font-mono">{formatRelativeTime(lastSynced)}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Last synced: {new Date(lastSynced).toLocaleString()}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <Button variant="outline" className="gap-2 text-sm">
           <Calendar className="w-4 h-4" />
           Feb 1 – Feb 14, 2025
