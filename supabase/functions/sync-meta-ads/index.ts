@@ -84,7 +84,6 @@ async function syncMetaForUser(
   accessToken: string,
   metadata: any
 ) {
-  // Create sync log entry
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "meta", status: "running" })
@@ -100,7 +99,6 @@ async function syncMetaForUser(
       return { error: "No ad accounts found" };
     }
 
-    // Calculate date range (last 7 days)
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - 7);
@@ -109,111 +107,75 @@ async function syncMetaForUser(
 
     let totalRecords = 0;
 
-    for (const account of adAccounts) {
+    // Process all accounts in parallel
+    const accountPromises = adAccounts.map(async (account: any) => {
       const accountId = account.id || account.account_id;
-      if (!accountId) continue;
+      if (!accountId) return 0;
 
-      // Fetch account-level daily insights
-      const dailyInsights = await fetchMetaInsights(
-        accountId, accessToken, since, until, "1"
-      );
+      let records = 0;
+
+      // Fetch all 3 levels in parallel per account
+      const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
+        fetchMetaInsights(accountId, accessToken, since, until, "account"),
+        fetchMetaCampaignInsights(accountId, accessToken, since, until),
+        fetchMetaAdsetInsights(accountId, accessToken, since, until),
+      ]);
 
       if (dailyInsights) {
         for (const day of dailyInsights) {
-          const spend = parseFloat(day.spend || "0");
-          const impressions = parseInt(day.impressions || "0");
-          const clicks = parseInt(day.clicks || "0");
-          const conversions = parseInt(day.actions?.find((a: any) => a.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-          const revenue = parseFloat(day.action_values?.find((a: any) => a.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-
+          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(day);
           await supabase
             .from("ad_daily_metrics")
             .upsert({
-              user_id: userId,
-              platform: "meta",
-              date: day.date_start,
-              spend,
-              revenue,
-              impressions,
-              clicks,
-              conversions,
+              user_id: userId, platform: "meta", date: day.date_start,
+              spend, revenue, impressions, clicks, conversions,
               cpc: clicks > 0 ? spend / clicks : null,
               ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
               cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
               roas: spend > 0 ? revenue / spend : null,
             }, { onConflict: "user_id,platform,date" });
-          totalRecords++;
+          records++;
         }
       }
-
-      // Fetch campaign-level insights
-      const campaignInsights = await fetchMetaCampaignInsights(
-        accountId, accessToken, since, until
-      );
 
       if (campaignInsights) {
         for (const c of campaignInsights) {
-          const spend = parseFloat(c.spend || "0");
-          const impressions = parseInt(c.impressions || "0");
-          const clicks = parseInt(c.clicks || "0");
-          const conversions = parseInt(c.actions?.find((a: any) => a.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-          const revenue = parseFloat(c.action_values?.find((a: any) => a.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-
+          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(c);
           await supabase
             .from("ad_campaigns")
             .upsert({
-              user_id: userId,
-              platform: "meta",
-              platform_campaign_id: c.campaign_id,
-              campaign_name: c.campaign_name,
-              status: c.campaign_status || "unknown",
-              date: c.date_start,
-              spend,
-              revenue,
-              impressions,
-              clicks,
-              conversions,
+              user_id: userId, platform: "meta",
+              platform_campaign_id: c.campaign_id, campaign_name: c.campaign_name,
+              status: "active", date: c.date_start,
+              spend, revenue, impressions, clicks, conversions,
               roas: spend > 0 ? revenue / spend : null,
             }, { onConflict: "user_id,platform,platform_campaign_id,date" });
-          totalRecords++;
+          records++;
         }
       }
-
-      // Fetch adset-level insights
-      const adsetInsights = await fetchMetaAdsetInsights(
-        accountId, accessToken, since, until
-      );
 
       if (adsetInsights) {
         for (const a of adsetInsights) {
-          const spend = parseFloat(a.spend || "0");
-          const impressions = parseInt(a.impressions || "0");
-          const clicks = parseInt(a.clicks || "0");
-          const conversions = parseInt(a.actions?.find((act: any) => act.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-          const revenue = parseFloat(a.action_values?.find((act: any) => act.action_type === "offsite_conversion.fb_pixel_purchase")?.value || "0");
-
+          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(a);
           await supabase
             .from("ad_sets")
             .upsert({
-              user_id: userId,
-              platform: "meta",
-              platform_campaign_id: a.campaign_id,
-              platform_adset_id: a.adset_id,
-              adset_name: a.adset_name,
-              campaign_name: a.campaign_name,
-              status: a.adset_status || "unknown",
-              date: a.date_start,
-              spend,
-              revenue,
-              impressions,
-              clicks,
-              conversions,
+              user_id: userId, platform: "meta",
+              platform_campaign_id: a.campaign_id, platform_adset_id: a.adset_id,
+              adset_name: a.adset_name, campaign_name: a.campaign_name,
+              status: "active", date: a.date_start,
+              spend, revenue, impressions, clicks, conversions,
               roas: spend > 0 ? revenue / spend : null,
             }, { onConflict: "user_id,platform,platform_adset_id,date" });
-          totalRecords++;
+          records++;
         }
       }
-    }
+
+      return records;
+    });
+
+    const recordCounts = await Promise.all(accountPromises);
+    totalRecords = recordCounts.reduce((sum, r) => sum + r, 0);
 
     await updateSyncLog(supabase, syncId, "success", totalRecords);
     return { success: true, records_synced: totalRecords };
@@ -227,24 +189,30 @@ async function syncMetaForUser(
 async function fetchMetaInsights(accountId: string, accessToken: string, since: string, until: string, level: string) {
   const fields = "spend,impressions,clicks,actions,action_values";
   const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}`;
+  console.log(`Fetching insights for ${accountId}, level=${level}, since=${since}, until=${until}`);
   const res = await fetch(url);
   const data = await res.json();
+  console.log(`Response for ${accountId}: ${JSON.stringify(data).substring(0, 500)}`);
   return data.data || null;
 }
 
 async function fetchMetaCampaignInsights(accountId: string, accessToken: string, since: string, until: string) {
-  const fields = "campaign_id,campaign_name,campaign_status,spend,impressions,clicks,actions,action_values";
+  const fields = "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values";
   const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=campaign&access_token=${accessToken}&limit=500`;
   const res = await fetch(url);
   const data = await res.json();
+  if (data.data?.length) console.log(`Campaigns for ${accountId}: ${data.data.length} rows`);
+  if (data.error) console.error(`Campaign error ${accountId}: ${data.error.message}`);
   return data.data || null;
 }
 
 async function fetchMetaAdsetInsights(accountId: string, accessToken: string, since: string, until: string) {
-  const fields = "campaign_id,campaign_name,adset_id,adset_name,adset_status,spend,impressions,clicks,actions,action_values";
+  const fields = "campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,actions,action_values";
   const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=adset&access_token=${accessToken}&limit=500`;
   const res = await fetch(url);
   const data = await res.json();
+  if (data.data?.length) console.log(`Adsets for ${accountId}: ${data.data.length} rows`);
+  if (data.error) console.error(`Adset error ${accountId}: ${data.error.message}`);
   return data.data || null;
 }
 
@@ -263,4 +231,38 @@ async function updateSyncLog(supabase: any, syncId: string, status: string, reco
       completed_at: new Date().toISOString(),
     })
     .eq("id", syncId);
+}
+
+const PURCHASE_ACTIONS = [
+  "purchase", "omni_purchase", "web_in_store_purchase",
+  "offsite_conversion.fb_pixel_purchase",
+  "offsite_conversion.custom.purchase",
+];
+
+function extractMetrics(row: any) {
+  const spend = parseFloat(row.spend || "0");
+  const impressions = parseInt(row.impressions || "0");
+  const clicks = parseInt(row.clicks || "0");
+
+  let conversions = 0;
+  let revenue = 0;
+
+  if (row.actions) {
+    for (const a of row.actions) {
+      if (PURCHASE_ACTIONS.includes(a.action_type)) {
+        conversions += parseInt(a.value || "0");
+        break; // avoid double counting
+      }
+    }
+  }
+  if (row.action_values) {
+    for (const a of row.action_values) {
+      if (PURCHASE_ACTIONS.includes(a.action_type)) {
+        revenue += parseFloat(a.value || "0");
+        break;
+      }
+    }
+  }
+
+  return { spend, impressions, clicks, conversions, revenue };
 }
