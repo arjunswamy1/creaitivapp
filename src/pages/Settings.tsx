@@ -158,6 +158,30 @@ const Settings = () => {
     }
   };
 
+  const handleConnectGoogle = async () => {
+    setConnecting("google");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const res = await supabase.functions.invoke("google-oauth-initiate", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (res.error) throw res.error;
+      if (res.data?.url) {
+        window.location.href = res.data.url;
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to start Google connection",
+        variant: "destructive",
+      });
+      setConnecting(null);
+    }
+  };
+
   const handleConnectPlaceholder = (platform: string) => {
     toast({
       title: "Coming soon",
@@ -244,7 +268,7 @@ const Settings = () => {
                 connection={getConnection("google")}
                 gradientClass="platform-google"
                 glowClass="glow-google"
-                onConnect={() => handleConnectPlaceholder("Google")}
+                onConnect={handleConnectGoogle}
                 connecting={connecting === "google"}
               />
               <PlatformCard
