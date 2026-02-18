@@ -61,30 +61,37 @@ Deno.serve(async (req) => {
     const expiresIn = tokenData.expires_in;
 
     // Fetch accessible Google Ads customer accounts
-    const developerToken = Deno.env.get("GOOGLE_DEVELOPER_TOKEN")!;
+    const developerToken = Deno.env.get("GOOGLE_DEVELOPER_TOKEN");
     let customers: any[] = [];
     let accountName = "Google Ads";
 
-    try {
-      const customersRes = await fetch(
-        "https://googleads.googleapis.com/v18/customers:listAccessibleCustomers",
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "developer-token": developerToken,
-          },
+    if (developerToken) {
+      try {
+        const customersRes = await fetch(
+          "https://googleads.googleapis.com/v18/customers:listAccessibleCustomers",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "developer-token": developerToken,
+            },
+          }
+        );
+        const responseText = await customersRes.text();
+        try {
+          const customersData = JSON.parse(responseText);
+          customers = customersData.resourceNames || [];
+          if (customers.length > 0) {
+            const firstCustomerId = customers[0].replace("customers/", "");
+            accountName = `Google Ads (${firstCustomerId})`;
+          }
+        } catch {
+          console.error("Google Ads API returned non-JSON:", responseText.substring(0, 200));
         }
-      );
-      const customersData = await customersRes.json();
-      customers = customersData.resourceNames || [];
-
-      if (customers.length > 0) {
-        // Extract the first customer ID for the account name
-        const firstCustomerId = customers[0].replace("customers/", "");
-        accountName = `Google Ads (${firstCustomerId})`;
+      } catch (err) {
+        console.error("Failed to fetch Google Ads customers:", err);
       }
-    } catch (err) {
-      console.error("Failed to fetch Google Ads customers:", err);
+    } else {
+      console.warn("GOOGLE_DEVELOPER_TOKEN not set, skipping customer discovery");
     }
 
     // Store connection

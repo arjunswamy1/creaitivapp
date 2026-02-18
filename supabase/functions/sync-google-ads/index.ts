@@ -124,11 +124,43 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
 
   try {
     const developerToken = Deno.env.get("GOOGLE_DEVELOPER_TOKEN")!;
-    const customers = metadata?.customers || [];
+    let customers = metadata?.customers || [];
+
+    // If no cached customers, try fetching them live
+    if (customers.length === 0) {
+      try {
+        const customersRes = await fetch(
+          "https://googleads.googleapis.com/v18/customers:listAccessibleCustomers",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "developer-token": developerToken,
+            },
+          }
+        );
+        const responseText = await customersRes.text();
+        try {
+          const customersData = JSON.parse(responseText);
+          customers = customersData.resourceNames || [];
+          // Update metadata with discovered customers
+          if (customers.length > 0) {
+            await supabase
+              .from("platform_connections")
+              .update({ metadata: { customers } })
+              .eq("user_id", userId)
+              .eq("platform", "google");
+          }
+        } catch {
+          console.error("Google Ads API returned non-JSON:", responseText.substring(0, 500));
+        }
+      } catch (err) {
+        console.error("Failed to fetch customers:", err);
+      }
+    }
 
     if (customers.length === 0) {
-      await updateSyncLog(supabase, syncId, "error", 0, "No customer accounts found");
-      return { error: "No customer accounts found" };
+      await updateSyncLog(supabase, syncId, "error", 0, "No customer accounts found. Your Google Ads developer token may need approval.");
+      return { error: "No customer accounts found. Your Google Ads developer token may need approval." };
     }
 
     // Date range: last 7 days
