@@ -146,7 +146,7 @@ const Settings = () => {
 
       if (res.error) throw res.error;
       if (res.data?.url) {
-        window.location.href = res.data.url;
+        window.open(res.data.url, "_self");
       }
     } catch (err: any) {
       toast({
@@ -170,7 +170,7 @@ const Settings = () => {
 
       if (res.error) throw res.error;
       if (res.data?.url) {
-        window.location.href = res.data.url;
+        window.open(res.data.url, "_self");
       }
     } catch (err: any) {
       toast({
