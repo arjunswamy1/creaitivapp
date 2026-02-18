@@ -47,6 +47,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        meta: {
+          DEFAULT: "hsl(var(--meta))",
+          foreground: "hsl(var(--meta-foreground))",
+        },
+        google: {
+          DEFAULT: "hsl(var(--google))",
+          foreground: "hsl(var(--google-foreground))",
+        },
+        shopify: {
+          DEFAULT: "hsl(var(--shopify))",
+          foreground: "hsl(var(--shopify-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
