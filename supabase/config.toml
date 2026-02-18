@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.google-oauth-callback]
 verify_jwt = false
+
+[functions.sync-meta-ads]
+verify_jwt = false
+
+[functions.sync-google-ads]
+verify_jwt = false
+
+[functions.sync-ads]
+verify_jwt = false

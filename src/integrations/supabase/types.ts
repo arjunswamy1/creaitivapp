@@ -14,6 +14,207 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_campaigns: {
+        Row: {
+          campaign_name: string
+          clicks: number
+          conversions: number
+          created_at: string
+          date: string
+          id: string
+          impressions: number
+          platform: string
+          platform_campaign_id: string
+          revenue: number
+          roas: number | null
+          spend: number
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_name: string
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date: string
+          id?: string
+          impressions?: number
+          platform: string
+          platform_campaign_id: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_name?: string
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date?: string
+          id?: string
+          impressions?: number
+          platform?: string
+          platform_campaign_id?: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ad_daily_metrics: {
+        Row: {
+          clicks: number
+          conversions: number
+          cpc: number | null
+          cpm: number | null
+          created_at: string
+          ctr: number | null
+          date: string
+          id: string
+          impressions: number
+          platform: string
+          revenue: number
+          roas: number | null
+          spend: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          clicks?: number
+          conversions?: number
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          date: string
+          id?: string
+          impressions?: number
+          platform: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          clicks?: number
+          conversions?: number
+          cpc?: number | null
+          cpm?: number | null
+          created_at?: string
+          ctr?: number | null
+          date?: string
+          id?: string
+          impressions?: number
+          platform?: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ad_sets: {
+        Row: {
+          adset_name: string
+          campaign_name: string | null
+          clicks: number
+          conversions: number
+          created_at: string
+          date: string
+          id: string
+          impressions: number
+          platform: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          revenue: number
+          roas: number | null
+          spend: number
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adset_name: string
+          campaign_name?: string | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date: string
+          id?: string
+          impressions?: number
+          platform: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adset_name?: string
+          campaign_name?: string | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date?: string
+          id?: string
+          impressions?: number
+          platform?: string
+          platform_adset_id?: string
+          platform_campaign_id?: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ad_sync_log: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          platform: string
+          records_synced: number | null
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          platform: string
+          records_synced?: number | null
+          started_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          platform?: string
+          records_synced?: number | null
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token: string
