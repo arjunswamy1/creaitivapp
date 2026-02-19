@@ -18,6 +18,7 @@ import {
   Save,
   SendHorizonal,
   Hash,
+  Trash2,
 } from "lucide-react";
 import {
   Select,
@@ -50,7 +51,9 @@ interface PlatformCardProps {
   gradientClass: string;
   glowClass: string;
   onConnect: () => void;
+  onDisconnect: () => void;
   connecting: boolean;
+  disconnecting: boolean;
 }
 
 const PlatformCard = ({
@@ -60,7 +63,9 @@ const PlatformCard = ({
   gradientClass,
   glowClass,
   onConnect,
+  onDisconnect,
   connecting,
+  disconnecting,
 }: PlatformCardProps) => (
   <div className="glass-card p-6 flex items-center justify-between">
     <div className="flex items-center gap-4">
@@ -75,9 +80,15 @@ const PlatformCard = ({
       </div>
     </div>
     {connection ? (
-      <div className="flex items-center gap-2 text-accent text-sm font-medium">
-        <CheckCircle2 className="w-4 h-4" />
-        Connected
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 text-accent text-sm font-medium">
+          <CheckCircle2 className="w-4 h-4" />
+          Connected
+        </div>
+        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive gap-1 text-xs" onClick={onDisconnect} disabled={disconnecting}>
+          {disconnecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+          Disconnect
+        </Button>
       </div>
     ) : (
       <Button size="sm" variant="outline" className="gap-1.5" onClick={onConnect} disabled={connecting}>
@@ -94,6 +105,7 @@ const Settings = () => {
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
 
   // Alert settings state
   const [alertEnabled, setAlertEnabled] = useState(true);
@@ -261,6 +273,20 @@ const Settings = () => {
     }
   };
 
+  const handleDisconnect = async (platform: string) => {
+    setDisconnecting(platform);
+    try {
+      const { error } = await supabase.from("platform_connections").delete().eq("platform", platform);
+      if (error) throw error;
+      setConnections((prev) => prev.filter((c) => c.platform !== platform));
+      toast({ title: "Disconnected", description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account disconnected.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to disconnect", variant: "destructive" });
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
   const getConnection = (platform: string) => connections.find((c) => c.platform === platform);
 
   return (
@@ -300,9 +326,9 @@ const Settings = () => {
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div className="space-y-3">
-              <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} connecting={connecting === "meta"} />
-              <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} connecting={connecting === "google"} />
-              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} connecting={connecting === "shopify"} />
+              <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} onDisconnect={() => handleDisconnect("meta")} connecting={connecting === "meta"} disconnecting={disconnecting === "meta"} />
+              <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
+              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
             </div>
           )}
         </section>
