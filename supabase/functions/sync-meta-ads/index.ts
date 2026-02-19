@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
   // Single user sync
   const { data: connection } = await supabaseAdmin
     .from("platform_connections")
-    .select("access_token, metadata")
+    .select("access_token, metadata, selected_ad_account")
     .eq("user_id", userId)
     .eq("platform", "meta")
     .single();
@@ -72,7 +72,13 @@ Deno.serve(async (req) => {
     });
   }
 
-  const result = await syncMetaForUser(supabaseAdmin, userId!, connection.access_token, connection.metadata);
+  // If user has a selected account, only sync that one
+  const selectedAccount = connection.selected_ad_account as any;
+  const metadata = selectedAccount?.id
+    ? { ...connection.metadata, ad_accounts: [selectedAccount] }
+    : connection.metadata;
+
+  const result = await syncMetaForUser(supabaseAdmin, userId!, connection.access_token, metadata);
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DateRangePicker from "@/components/DateRangePicker";
+import AccountSelector from "@/components/AccountSelector";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -46,6 +47,7 @@ const DashboardHeader = () => {
         </div>
       </div>
       <div className="flex items-center gap-3">
+        <AccountSelector />
         {lastSynced && (
           <TooltipProvider>
             <Tooltip>
