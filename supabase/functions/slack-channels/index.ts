@@ -52,11 +52,15 @@ Deno.serve(async (req) => {
     });
   }
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action") || "list";
+  let action = "list";
+  let body: any = {};
+  
+  if (req.method === "POST") {
+    body = await req.json();
+    action = body.action || "test";
+  }
 
   if (action === "list") {
-    // Fetch public channels
     const channels: { id: string; name: string }[] = [];
     let cursor: string | undefined;
 
@@ -95,7 +99,6 @@ Deno.serve(async (req) => {
   }
 
   if (action === "test") {
-    const body = await req.json();
     const channel = body.channel;
     if (!channel) {
       return new Response(JSON.stringify({ error: "No channel specified" }), {
@@ -105,6 +108,17 @@ Deno.serve(async (req) => {
     }
 
     const message = `✅ *Test Alert from Performance Dashboard*\n\nYour Slack integration is working! Performance alerts will be posted to this channel when campaigns breach your CAC or ROAS targets.`;
+
+    // Try to join the channel first (works for public channels)
+    await fetch(`${GATEWAY_URL}/conversations.join`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "X-Connection-Api-Key": SLACK_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ channel }),
+    });
 
     const res = await fetch(`${GATEWAY_URL}/chat.postMessage`, {
       method: "POST",
@@ -118,7 +132,10 @@ Deno.serve(async (req) => {
 
     const data = await res.json();
     if (!data.ok) {
-      return new Response(JSON.stringify({ error: `Slack error: ${data.error}` }), {
+      const hint = data.error === "not_in_channel" 
+        ? ". The bot needs to be invited to this channel first. Type /invite @Lovable App in the channel."
+        : "";
+      return new Response(JSON.stringify({ error: `Slack error: ${data.error}${hint}` }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
