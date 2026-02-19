@@ -370,6 +370,59 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
           } catch (err) {
             console.error(`Ad metrics error for ${cid} ${since}-${until}:`, err);
           }
+
+          // Keyword-level metrics (Google Search only)
+          try {
+            const kwRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                campaign.id,
+                campaign.name,
+                ad_group.id,
+                ad_group.name,
+                ad_group_criterion.keyword.text,
+                ad_group_criterion.keyword.match_type,
+                ad_group_criterion.status,
+                ad_group_criterion.quality_info.quality_score,
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+              FROM keyword_view
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
+
+            if (kwRows.length > 0) {
+              const batch = kwRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  platform_campaign_id: String(row.campaign?.id),
+                  platform_adset_id: String(row.adGroup?.id),
+                  keyword_text: row.adGroupCriterion?.keyword?.text || "Unknown",
+                  match_type: (row.adGroupCriterion?.keyword?.matchType || "UNSPECIFIED").toLowerCase(),
+                  campaign_name: row.campaign?.name || "Unknown",
+                  adset_name: row.adGroup?.name || "Unknown",
+                  status: (row.adGroupCriterion?.status || "UNKNOWN").toLowerCase(),
+                  quality_score: row.adGroupCriterion?.qualityInfo?.qualityScore ?? null,
+                  date: row.segments?.date,
+                  spend, revenue,
+                  impressions: parseInt(row.metrics?.impressions || "0"),
+                  clicks: parseInt(row.metrics?.clicks || "0"),
+                  conversions: Math.round(row.metrics?.conversions || 0),
+                  roas: spend > 0 ? revenue / spend : null,
+                };
+              });
+              await supabase.from("keywords").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,keyword_text,match_type,date" });
+              totalRecords += batch.length;
+            }
+          } catch (err) {
+            console.error(`Keyword metrics error for ${cid} ${since}-${until}:`, err);
+          }
         }
       }
     }
