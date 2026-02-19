@@ -1,20 +1,24 @@
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-interface KPICardProps {
+export interface KPICardProps {
   title: string;
   value: string;
   change?: number | null;
   invertColor?: boolean;
+  subtitle?: string;
 }
 
-const KPICard = ({ title, value, change, invertColor }: KPICardProps) => {
+const KPICard = ({ title, value, change, invertColor, subtitle }: KPICardProps) => {
   const hasChange = change !== undefined && change !== null;
   // For cost metrics (spend, cpc, cpm), going down is good
   const isPositive = invertColor ? (change ?? 0) <= 0 : (change ?? 0) >= 0;
 
   return (
     <div className="glass-card p-5 flex flex-col gap-2 hover:border-primary/30 transition-colors">
-      <span className="text-sm text-muted-foreground font-medium">{title}</span>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">{title}</span>
+        {subtitle && <span className="text-xs text-muted-foreground/60">({subtitle})</span>}
+      </div>
       <span className="text-2xl font-bold font-mono tracking-tight">{value}</span>
       {hasChange && (
         <div className="flex items-center gap-1">
