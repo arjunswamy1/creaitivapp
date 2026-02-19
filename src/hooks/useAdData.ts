@@ -535,6 +535,44 @@ export function useGoogleKPIsWithSubblyRevenue() {
   });
 }
 
+export function useMetaKPIsWithSubblyRevenue() {
+  const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
+
+  return useQuery({
+    queryKey: ["meta-kpis-subbly-revenue", fromStr, toStr, clientId],
+    queryFn: async () => {
+      let currentRevQuery = supabase.from("subbly_invoices")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("invoice_date", fromStr).lte("invoice_date", toStr);
+      let previousRevQuery = supabase.from("subbly_invoices")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("invoice_date", prevFrom).lte("invoice_date", prevTo);
+
+      if (clientId) {
+        currentRevQuery = currentRevQuery.eq("client_id", clientId);
+        previousRevQuery = previousRevQuery.eq("client_id", clientId);
+      }
+
+      const [{ data: currentRev }, { data: previousRev }] = await Promise.all([
+        currentRevQuery,
+        previousRevQuery,
+      ]);
+
+      const curRevenue = (currentRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
+      const prevRevenue = (previousRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
+
+      return {
+        subblyRevenue: Math.round(curRevenue),
+        subblyRevenueChange: pctChange(Math.round(curRevenue), Math.round(prevRevenue)),
+      };
+    },
+  });
+}
+
 export function useForecast() {
   return useQuery({
     queryKey: ["forecast-monthly"],
