@@ -224,7 +224,9 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const domain = shopDomain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+      let domain = shopDomain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").replace(/^www\./, "");
+      // If user entered a custom domain (e.g. phantasmagorical.co), they need to provide the myshopify.com domain
+      // If it already contains .myshopify.com, use as-is; otherwise append it
       const fullDomain = domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
       const res = await supabase.functions.invoke("shopify-oauth-initiate", {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -408,7 +410,7 @@ const Settings = () => {
           <DialogHeader>
             <DialogTitle>Connect Shopify Store</DialogTitle>
             <DialogDescription>
-              Enter your Shopify store domain to begin the connection. This is usually your-store.myshopify.com.
+              Enter your Shopify store's <strong>.myshopify.com</strong> domain (e.g. your-store.myshopify.com). This is not your custom domain.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -420,7 +422,7 @@ const Settings = () => {
               onChange={(e) => setShopDomain(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleConnectShopify()}
             />
-            <p className="text-[10px] text-muted-foreground">You can enter just the store name (e.g. "your-store") or the full domain.</p>
+            <p className="text-[10px] text-muted-foreground">Enter your myshopify.com domain, not a custom domain like yourstore.com.</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShopifyDialogOpen(false)}>Cancel</Button>
