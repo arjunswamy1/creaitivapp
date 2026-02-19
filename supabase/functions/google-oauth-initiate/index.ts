@@ -36,10 +36,18 @@ Deno.serve(async (req) => {
     }
 
     const userId = claimsData.claims.sub;
-    const clientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
+    
+    // Parse body to get client_id if provided
+    let bodyClientId: string | null = null;
+    try {
+      const body = await req.json();
+      bodyClientId = body?.client_id || null;
+    } catch { /* no body */ }
+
+    const googleClientId = Deno.env.get("GOOGLE_CLIENT_ID")!;
     const redirectUri = `${Deno.env.get("SUPABASE_URL")}/functions/v1/google-oauth-callback`;
 
-    const state = btoa(JSON.stringify({ user_id: userId }));
+    const state = btoa(JSON.stringify({ user_id: userId, client_id: bodyClientId }));
 
     const scopes = [
       "https://www.googleapis.com/auth/adwords",
@@ -47,7 +55,7 @@ Deno.serve(async (req) => {
 
     const authUrl =
       `https://accounts.google.com/o/oauth2/v2/auth` +
-      `?client_id=${encodeURIComponent(clientId)}` +
+      `?client_id=${encodeURIComponent(googleClientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&response_type=code` +
       `&scope=${encodeURIComponent(scopes)}` +
