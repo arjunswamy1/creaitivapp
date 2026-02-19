@@ -35,8 +35,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Parse shop domain from request body
-    const { shop } = await req.json();
+    const { shop, client_id: bodyClientId } = await req.json();
     if (!shop) {
       return new Response(JSON.stringify({ error: "Shop domain is required (e.g. mystore.myshopify.com)" }), {
         status: 400,
@@ -57,7 +56,7 @@ Deno.serve(async (req) => {
     const clientId = Deno.env.get("SHOPIFY_CLIENT_ID")!;
     const redirectUri = `${Deno.env.get("SUPABASE_URL")}/functions/v1/shopify-oauth-callback`;
 
-    const state = btoa(JSON.stringify({ user_id: userId, shop: shopDomain }));
+    const state = btoa(JSON.stringify({ user_id: userId, shop: shopDomain, client_id: bodyClientId || null }));
 
     const scopes = "read_orders,read_products";
 

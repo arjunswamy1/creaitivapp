@@ -37,11 +37,19 @@ Deno.serve(async (req) => {
     }
 
     const userId = claimsData.claims.sub;
+    
+    // Parse body to get client_id
+    let bodyClientId: string | null = null;
+    try {
+      const body = await req.json();
+      bodyClientId = body?.client_id || null;
+    } catch { /* no body */ }
+
     const appId = Deno.env.get("META_APP_ID");
     const redirectUri = `${Deno.env.get("SUPABASE_URL")}/functions/v1/meta-oauth-callback`;
 
-    // Encode user_id in state for the callback
-    const state = btoa(JSON.stringify({ user_id: userId }));
+    // Encode user_id and client_id in state for the callback
+    const state = btoa(JSON.stringify({ user_id: userId, client_id: bodyClientId }));
 
     const scopes = [
       "ads_read",

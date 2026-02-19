@@ -101,7 +101,7 @@ const PlatformCard = ({
 
 const Settings = () => {
   const { user, signOut } = useAuth();
-  const { activeClient } = useClient();
+  const { activeClient, dashboardConfig } = useClient();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
@@ -123,12 +123,17 @@ const Settings = () => {
   const [shopDomain, setShopDomain] = useState("");
   useEffect(() => {
     const fetchData = async () => {
+      let connQuery = supabase.from("platform_connections").select("platform, account_name, connected_at, client_id");
+      if (activeClient?.id) {
+        connQuery = connQuery.eq("client_id", activeClient.id);
+      }
       const [connRes, alertRes] = await Promise.all([
-        supabase.from("platform_connections").select("platform, account_name, connected_at"),
+        connQuery,
         supabase.from("alert_settings").select("*").maybeSingle(),
       ]);
 
       if (connRes.data) setConnections(connRes.data);
+      else setConnections([]);
       if (alertRes.data) {
         setAlertEnabled(alertRes.data.enabled);
         setMaxCac(alertRes.data.max_cac?.toString() || "");
@@ -138,7 +143,7 @@ const Settings = () => {
       setLoading(false);
     };
     fetchData();
-  }, []);
+  }, [activeClient?.id]);
 
   // Fetch Slack channels
   useEffect(() => {
@@ -192,7 +197,9 @@ const Settings = () => {
 
     if (connected) {
       toast({ title: "Connected!", description: `${connected.charAt(0).toUpperCase() + connected.slice(1)} account connected successfully.` });
-      supabase.from("platform_connections").select("platform, account_name, connected_at").then(({ data }) => { if (data) setConnections(data); });
+      let connQuery = supabase.from("platform_connections").select("platform, account_name, connected_at, client_id");
+      if (activeClient?.id) connQuery = connQuery.eq("client_id", activeClient.id);
+      connQuery.then(({ data }) => { if (data) setConnections(data); });
       setSearchParams({}, { replace: true });
     }
     if (error) {
@@ -206,7 +213,10 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const res = await supabase.functions.invoke("meta-oauth-initiate", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const res = await supabase.functions.invoke("meta-oauth-initiate", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { client_id: activeClient?.id || null },
+      });
       if (res.error) throw res.error;
       if (res.data?.url) window.open(res.data.url, "_self");
     } catch (err: any) {
@@ -248,7 +258,7 @@ const Settings = () => {
       const fullDomain = domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
       const res = await supabase.functions.invoke("shopify-oauth-initiate", {
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: { shop: fullDomain },
+        body: { shop: fullDomain, client_id: activeClient?.id || null },
       });
       if (res.error) throw res.error;
       if (res.data?.url) window.open(res.data.url, "_self");
@@ -308,7 +318,9 @@ const Settings = () => {
   const handleDisconnect = async (platform: string) => {
     setDisconnecting(platform);
     try {
-      const { error } = await supabase.from("platform_connections").delete().eq("platform", platform);
+      let query = supabase.from("platform_connections").delete().eq("platform", platform);
+      if (activeClient?.id) query = query.eq("client_id", activeClient.id);
+      const { error } = await query;
       if (error) throw error;
       setConnections((prev) => prev.filter((c) => c.platform !== platform));
       toast({ title: "Disconnected", description: `${platform.charAt(0).toUpperCase() + platform.slice(1)} account disconnected.` });
@@ -353,31 +365,39 @@ const Settings = () => {
 
         {/* Platform connections */}
         <section className="mb-8">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Platform Connections</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Platform Connections {activeClient ? `— ${activeClient.name}` : ""}
+          </h2>
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div className="space-y-3">
               <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} onDisconnect={() => handleDisconnect("meta")} connecting={connecting === "meta"} disconnecting={disconnecting === "meta"} />
-              <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
-              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
+              {dashboardConfig?.enabled_platforms?.includes("google") && (
+                <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
+              )}
+              {dashboardConfig?.enabled_platforms?.includes("shopify") && (
+                <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
+              )}
 
-              {/* Subbly - sync via API key */}
-              <div className="glass-card p-6 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-primary/80 flex items-center justify-center">
-                    <span className="text-sm font-bold text-white">S</span>
+              {/* Subbly - sync via API key (only for subbly revenue source) */}
+              {dashboardConfig?.revenue_source === "subbly" && (
+                <div className="glass-card p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-primary/80 flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">S</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">Subbly</h3>
+                      <p className="text-xs text-muted-foreground">Sync subscription &amp; invoice data</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm">Subbly</h3>
-                    <p className="text-xs text-muted-foreground">Sync subscription &amp; invoice data</p>
-                  </div>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={handleSyncSubbly} disabled={syncingSubbly}>
+                    {syncingSubbly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                    {syncingSubbly ? "Syncing..." : "Sync Now"}
+                  </Button>
                 </div>
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={handleSyncSubbly} disabled={syncingSubbly}>
-                  {syncingSubbly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-                  {syncingSubbly ? "Syncing..." : "Sync Now"}
-                </Button>
-              </div>
+              )}
             </div>
           )}
         </section>

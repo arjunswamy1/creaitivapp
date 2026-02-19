@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
       return redirectWithError("Missing code or state parameter");
     }
 
-    let parsedState: { user_id: string; shop: string };
+    let parsedState: { user_id: string; shop: string; client_id?: string | null };
     try {
       parsedState = JSON.parse(atob(state));
     } catch {
@@ -72,11 +72,12 @@ Deno.serve(async (req) => {
           access_token: accessToken,
           account_id: shopDomain,
           account_name: shopName,
+          client_id: parsedState.client_id || null,
           metadata: { shop_domain: shopDomain, scope: tokenData.scope },
           connected_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id,platform" }
+        { onConflict: "user_id,platform,client_id" }
       );
 
     if (dbError) {

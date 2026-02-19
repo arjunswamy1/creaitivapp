@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
     }
 
     // Decode state
-    let state: { user_id: string };
+    let state: { user_id: string; client_id?: string | null };
     try {
       state = JSON.parse(atob(stateParam));
     } catch {
@@ -96,11 +96,12 @@ Deno.serve(async (req) => {
           account_id: meData.id,
           account_name: meData.name,
           token_expires_at: tokenExpiresAt,
+          client_id: state.client_id || null,
           metadata: {
             ad_accounts: adAccountsData.data || [],
           },
         },
-        { onConflict: "user_id,platform" }
+        { onConflict: "user_id,platform,client_id" }
       );
 
     if (upsertError) {
