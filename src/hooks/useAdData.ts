@@ -438,6 +438,103 @@ export function useAdGroupKeywords(adsetId: string | null) {
   });
 }
 
+export function useGoogleKPIsWithSubblyRevenue() {
+  const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
+
+  return useQuery({
+    queryKey: ["google-kpis-subbly-revenue", fromStr, toStr, clientId],
+    queryFn: async (): Promise<KPIWithChange> => {
+      // Fetch Google ad metrics (spend, clicks, impressions, conversions)
+      let currentAdQuery = supabase.from("ad_daily_metrics")
+        .select("spend, impressions, clicks, conversions")
+        .eq("platform", "google")
+        .gte("date", fromStr).lte("date", toStr);
+      let previousAdQuery = supabase.from("ad_daily_metrics")
+        .select("spend, impressions, clicks, conversions")
+        .eq("platform", "google")
+        .gte("date", prevFrom).lte("date", prevTo);
+
+      // Fetch Subbly invoice revenue
+      let currentRevQuery = supabase.from("subbly_invoices")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("invoice_date", fromStr).lte("invoice_date", toStr);
+      let previousRevQuery = supabase.from("subbly_invoices")
+        .select("amount")
+        .eq("status", "paid")
+        .gte("invoice_date", prevFrom).lte("invoice_date", prevTo);
+
+      if (clientId) {
+        currentAdQuery = currentAdQuery.eq("client_id", clientId);
+        previousAdQuery = previousAdQuery.eq("client_id", clientId);
+        currentRevQuery = currentRevQuery.eq("client_id", clientId);
+        previousRevQuery = previousRevQuery.eq("client_id", clientId);
+      }
+
+      const [
+        { data: currentAd },
+        { data: previousAd },
+        { data: currentRev },
+        { data: previousRev },
+      ] = await Promise.all([currentAdQuery, previousAdQuery, currentRevQuery, previousRevQuery]);
+
+      const sumField = (rows: any[] | null, field: string) =>
+        (rows || []).reduce((s, r) => s + Number(r[field] || 0), 0);
+
+      const curSpend = sumField(currentAd, "spend");
+      const curClicks = sumField(currentAd, "clicks");
+      const curImpressions = sumField(currentAd, "impressions");
+      const curConversions = sumField(currentAd, "conversions");
+      // Subbly amounts are in cents
+      const curRevenue = (currentRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
+
+      const prevSpend = sumField(previousAd, "spend");
+      const prevClicks = sumField(previousAd, "clicks");
+      const prevImpressions = sumField(previousAd, "impressions");
+      const prevConversions = sumField(previousAd, "conversions");
+      const prevRevenue = (previousRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
+
+      const cur = {
+        totalSpend: Math.round(curSpend),
+        totalRevenue: Math.round(curRevenue),
+        blendedROAS: curSpend > 0 ? Math.round((curRevenue / curSpend) * 100) / 100 : 0,
+        totalConversions: curConversions,
+        cpc: curClicks > 0 ? Math.round((curSpend / curClicks) * 100) / 100 : 0,
+        ctr: curImpressions > 0 ? Math.round((curClicks / curImpressions) * 10000) / 100 : 0,
+        cpm: curImpressions > 0 ? Math.round((curSpend / curImpressions) * 1000 * 100) / 100 : 0,
+        impressions: curImpressions,
+      };
+
+      const prev = {
+        totalSpend: Math.round(prevSpend),
+        totalRevenue: Math.round(prevRevenue),
+        blendedROAS: prevSpend > 0 ? Math.round((prevRevenue / prevSpend) * 100) / 100 : 0,
+        totalConversions: prevConversions,
+        cpc: prevClicks > 0 ? Math.round((prevSpend / prevClicks) * 100) / 100 : 0,
+        ctr: prevImpressions > 0 ? Math.round((prevClicks / prevImpressions) * 10000) / 100 : 0,
+        cpm: prevImpressions > 0 ? Math.round((prevSpend / prevImpressions) * 1000 * 100) / 100 : 0,
+        impressions: prevImpressions,
+      };
+
+      return {
+        ...cur,
+        changes: {
+          spend: pctChange(cur.totalSpend, prev.totalSpend),
+          revenue: pctChange(cur.totalRevenue, prev.totalRevenue),
+          roas: pctChange(cur.blendedROAS, prev.blendedROAS),
+          conversions: pctChange(cur.totalConversions, prev.totalConversions),
+          cpc: pctChange(cur.cpc, prev.cpc),
+          ctr: pctChange(cur.ctr, prev.ctr),
+          cpm: pctChange(cur.cpm, prev.cpm),
+          impressions: pctChange(cur.impressions, prev.impressions),
+        },
+      };
+    },
+  });
+}
+
 export function useForecast() {
   return useQuery({
     queryKey: ["forecast-monthly"],

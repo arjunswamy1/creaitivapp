@@ -1,11 +1,10 @@
 import KPICard from "@/components/KPICard";
 import CampaignTable from "@/components/CampaignTable";
-import FunnelChart from "@/components/FunnelChart";
-import { useKPIs } from "@/hooks/useAdData";
+import { useGoogleKPIsWithSubblyRevenue } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const GoogleDashboard = () => {
-  const { data: kpis, isLoading } = useKPIs("google");
+  const { data: kpis, isLoading } = useGoogleKPIsWithSubblyRevenue();
 
   return (
     <>
@@ -16,8 +15,8 @@ const GoogleDashboard = () => {
         ) : (
           <>
             <KPICard title="Google Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} change={kpis?.changes.spend} invertColor />
-            <KPICard title="Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} change={kpis?.changes.revenue} />
-            <KPICard title="ROAS" value={`${kpis?.blendedROAS ?? 0}x`} change={kpis?.changes.roas} />
+            <KPICard title="Subbly Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} change={kpis?.changes.revenue} />
+            <KPICard title="Blended ROAS" value={`${kpis?.blendedROAS ?? 0}x`} change={kpis?.changes.roas} />
             <KPICard title="Conversions" value={(kpis?.totalConversions ?? 0).toLocaleString()} change={kpis?.changes.conversions} />
           </>
         )}
@@ -35,11 +34,6 @@ const GoogleDashboard = () => {
             <KPICard title="Impressions" value={`${((kpis?.impressions ?? 0) / 1000000).toFixed(1)}M`} change={kpis?.changes.impressions} />
           </>
         )}
-      </div>
-
-      {/* Funnel */}
-      <div className="mb-6">
-        <FunnelChart platform="google" />
       </div>
 
       {/* Campaign Table */}
