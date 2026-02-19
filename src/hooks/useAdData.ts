@@ -346,21 +346,21 @@ export function useAdSetAds(adsetId: string | null) {
   });
 }
 
-export function useForecast(forecastDays = 30) {
+export function useForecast() {
   return useQuery({
-    queryKey: ["forecast", forecastDays],
+    queryKey: ["forecast-monthly"],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
       const { data, error } = await supabase.functions.invoke("forecast", {
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: { forecast_days: forecastDays },
+        body: {},
       });
 
       if (error) throw error;
       return data;
     },
-    staleTime: 1000 * 60 * 10, // 10 min
+    staleTime: 1000 * 60 * 10,
   });
 }

@@ -98,7 +98,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
+    startDate.setDate(startDate.getDate() - 90);
     const since = formatDate(startDate);
     const until = formatDate(endDate);
 
