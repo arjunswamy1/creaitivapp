@@ -51,7 +51,8 @@ export function useSubblyKPIs() {
 
       if (invErr) throw invErr;
 
-      const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0);
+      // Subbly amounts are in cents, convert to dollars
+      const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
       const activeCount = activeSubs.length;
       const totalCount = (subs || []).length;
 
