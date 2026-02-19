@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub as string;
 
-    // Get Shopify connection
+    // Get Shopify connection (scoped to user's clients)
     const { data: conn, error: connError } = await supabase
       .from("platform_connections")
       .select("*")
@@ -53,8 +53,9 @@ Deno.serve(async (req) => {
 
     const shopDomain = conn.account_id;
     const accessToken = conn.access_token;
+    const clientId = conn.client_id;
 
-    // Use service role for writing sync logs and data
+    // Use service role for writing data
     const adminSupabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -99,51 +100,61 @@ Deno.serve(async (req) => {
 
         if (orders.length === 0) break;
 
-        // Aggregate orders by date for daily metrics
-        const dailyMap: Record<string, { revenue: number; orders: number; cogs: number }> = {};
+        // Upsert individual orders into shopify_orders table
+        const orderRows = orders.map((order: any) => ({
+          client_id: clientId,
+          shopify_order_id: order.id,
+          order_number: order.name || `#${order.order_number}`,
+          total_price: parseFloat(order.total_price || "0"),
+          subtotal_price: parseFloat(order.subtotal_price || "0"),
+          total_tax: parseFloat(order.total_tax || "0"),
+          total_discounts: parseFloat(order.total_discounts || "0"),
+          currency: order.currency || "USD",
+          financial_status: order.financial_status || "unknown",
+          fulfillment_status: order.fulfillment_status || null,
+          order_date: order.created_at,
+          customer_id: order.customer?.id || null,
+          line_items_count: (order.line_items || []).length,
+        }));
 
-        for (const order of orders) {
-          const date = order.created_at.split("T")[0];
-          if (!dailyMap[date]) {
-            dailyMap[date] = { revenue: 0, orders: 0, cogs: 0 };
+        if (orderRows.length > 0) {
+          const { error: upsertError } = await adminSupabase
+            .from("shopify_orders")
+            .upsert(orderRows, { onConflict: "shopify_order_id,client_id" });
+
+          if (upsertError) {
+            console.error("Shopify orders upsert error:", upsertError);
           }
-
-          // Revenue = total price minus refunds
-          const orderRevenue = parseFloat(order.total_price || "0");
-          dailyMap[date].revenue += orderRevenue;
-          dailyMap[date].orders += 1;
-
-          // Calculate COGS from line items (cost per item)
-          for (const item of order.line_items || []) {
-            // Shopify doesn't expose COGS directly on orders; 
-            // we use variant cost if available via inventory item cost
-            // For now, track quantity for later enrichment
-            const costPerItem = parseFloat(item.price || "0") * 0; // placeholder
-            dailyMap[date].cogs += costPerItem;
-          }
+          totalRecords += orderRows.length;
         }
 
-        // Upsert daily metrics as shopify platform entries
-        const rows = Object.entries(dailyMap).map(([date, metrics]) => ({
+        // Also aggregate daily metrics for ad_daily_metrics
+        const dailyMap: Record<string, { revenue: number; orders: number }> = {};
+        for (const order of orders) {
+          const date = order.created_at.split("T")[0];
+          if (!dailyMap[date]) dailyMap[date] = { revenue: 0, orders: 0 };
+          dailyMap[date].revenue += parseFloat(order.total_price || "0");
+          dailyMap[date].orders += 1;
+        }
+
+        const metricRows = Object.entries(dailyMap).map(([date, metrics]) => ({
           user_id: userId,
+          client_id: clientId,
           platform: "shopify",
           date,
           revenue: metrics.revenue,
-          spend: metrics.cogs, // COGS as "spend" for ROAS calculation
+          spend: 0,
           impressions: 0,
           clicks: 0,
           conversions: metrics.orders,
         }));
 
-        if (rows.length > 0) {
-          const { error: upsertError } = await adminSupabase
+        if (metricRows.length > 0) {
+          const { error: metricsErr } = await adminSupabase
             .from("ad_daily_metrics")
-            .upsert(rows, { onConflict: "user_id,platform,date" });
+            .upsert(metricRows, { onConflict: "user_id,platform,date" });
 
-          if (upsertError) {
-            console.error("Upsert error:", upsertError);
-          }
-          totalRecords += rows.length;
+          if (metricsErr) console.error("Metrics upsert error:", metricsErr);
         }
 
         // Check for next page
@@ -161,7 +172,7 @@ Deno.serve(async (req) => {
       if (syncLog) {
         await adminSupabase
           .from("ad_sync_log")
-          .update({ status: "completed", records_synced: totalRecords, completed_at: new Date().toISOString() })
+          .update({ status: "success", records_synced: totalRecords, completed_at: new Date().toISOString() })
           .eq("id", syncLog.id);
       }
 

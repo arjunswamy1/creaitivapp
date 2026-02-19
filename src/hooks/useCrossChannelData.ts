@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { format, differenceInDays, subDays, addDays } from "date-fns";
+import { getClientRevenue, getClientOrders } from "@/hooks/useClientRevenue";
 
 function useDateStrings() {
   const { dateRange } = useDateRange();
@@ -38,28 +39,13 @@ export interface CrossChannelKPIs {
   };
 }
 
-async function fetchSubblySubs(clientId: string, fromStr: string, toStr: string, dateRange: { from: Date; to: Date }) {
-  const fromUTC = fromStr + "T05:00:00.000Z";
-  const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-  const toUTC = toNextDay + "T04:59:59.999Z";
-
-  const { data, error } = await supabase
-    .from("subbly_subscriptions")
-    .select("id")
-    .eq("client_id", clientId)
-    .gte("subbly_created_at", fromUTC)
-    .lte("subbly_created_at", toUTC);
-
-  if (error) throw error;
-  return (data || []).length;
-}
-
 async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: string, toStr: string) {
   let query = supabase
     .from("ad_daily_metrics")
     .select("platform, spend")
     .gte("date", fromStr)
-    .lte("date", toStr);
+    .lte("date", toStr)
+    .neq("platform", "shopify"); // Exclude shopify from ad spend
 
   if (clientId) query = query.eq("client_id", clientId);
   const { data, error } = await query;
@@ -74,53 +60,35 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
   return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend) };
 }
 
-async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: string, dateRange: { from: Date; to: Date }) {
-  const fromUTC = fromStr + "T05:00:00.000Z";
-  const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-  const toUTC = toNextDay + "T04:59:59.999Z";
-
-  const { data, error } = await supabase
-    .from("subbly_invoices")
-    .select("amount")
-    .eq("client_id", clientId)
-    .eq("status", "paid")
-    .gte("invoice_date", fromUTC)
-    .lte("invoice_date", toUTC);
-
-  if (error) throw error;
-  // Subbly amounts are in cents
-  return (data || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
-}
-
 export function useCrossChannelKPIs() {
   const { fromStr, toStr, prevFrom, prevTo, dateRange } = useDateStrings();
   const { activeClient, dashboardConfig } = useClient();
   const clientId = activeClient?.id;
-  const subblyEnabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
 
   return useQuery({
-    queryKey: ["cross-channel-kpis", fromStr, toStr, clientId],
+    queryKey: ["cross-channel-kpis", fromStr, toStr, clientId, revenueSource],
     enabled: !!clientId,
     queryFn: async (): Promise<CrossChannelKPIs> => {
       if (!clientId) throw new Error("No client");
 
       // Current period
-      const [currentAds, currentSubs, currentRevenue] = await Promise.all([
+      const [currentAds, currentOrders, currentRevenue] = await Promise.all([
         fetchAdSpendByPlatform(clientId, fromStr, toStr),
-        subblyEnabled ? fetchSubblySubs(clientId, fromStr, toStr, dateRange) : Promise.resolve(0),
-        subblyEnabled ? fetchSubblyRevenue(clientId, fromStr, toStr, dateRange) : Promise.resolve(0),
+        getClientOrders(clientId, revenueSource, fromStr, toStr, dateRange),
+        getClientRevenue(clientId, revenueSource, fromStr, toStr, dateRange),
       ]);
 
       // Previous period
       const prevDateRange = { from: subDays(dateRange.from, differenceInDays(dateRange.to, dateRange.from) + 1), to: subDays(dateRange.from, 1) };
-      const [prevAds, prevSubs, prevRevenue] = await Promise.all([
+      const [prevAds, prevOrders, prevRevenue] = await Promise.all([
         fetchAdSpendByPlatform(clientId, prevFrom, prevTo),
-        subblyEnabled ? fetchSubblySubs(clientId, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
-        subblyEnabled ? fetchSubblyRevenue(clientId, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
+        getClientOrders(clientId, revenueSource, prevFrom, prevTo, prevDateRange),
+        getClientRevenue(clientId, revenueSource, prevFrom, prevTo, prevDateRange),
       ]);
 
-      const currentCAC = currentSubs > 0 ? Math.round((currentAds.totalSpend / currentSubs) * 100) / 100 : 0;
-      const prevCAC = prevSubs > 0 ? Math.round((prevAds.totalSpend / prevSubs) * 100) / 100 : 0;
+      const currentCAC = currentOrders > 0 ? Math.round((currentAds.totalSpend / currentOrders) * 100) / 100 : 0;
+      const prevCAC = prevOrders > 0 ? Math.round((prevAds.totalSpend / prevOrders) * 100) / 100 : 0;
       const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentRevenue / currentAds.totalSpend) * 100) / 100 : 0;
       const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevRevenue / prevAds.totalSpend) * 100) / 100 : 0;
 
@@ -128,7 +96,7 @@ export function useCrossChannelKPIs() {
         totalSpend: currentAds.totalSpend,
         googleSpend: currentAds.googleSpend,
         metaSpend: currentAds.metaSpend,
-        newSubscriptions: currentSubs,
+        newSubscriptions: currentOrders,
         totalCAC: currentCAC,
         totalRevenue: Math.round(currentRevenue * 100) / 100,
         blendedROAS: currentROAS,
@@ -136,7 +104,7 @@ export function useCrossChannelKPIs() {
           totalSpend: pctChange(currentAds.totalSpend, prevAds.totalSpend),
           googleSpend: pctChange(currentAds.googleSpend, prevAds.googleSpend),
           metaSpend: pctChange(currentAds.metaSpend, prevAds.metaSpend),
-          newSubscriptions: pctChange(currentSubs, prevSubs),
+          newSubscriptions: pctChange(currentOrders, prevOrders),
           totalCAC: pctChange(currentCAC, prevCAC),
           totalRevenue: pctChange(currentRevenue, prevRevenue),
           blendedROAS: pctChange(currentROAS, prevROAS),
@@ -150,28 +118,44 @@ export function useSpendSubsDaily() {
   const { fromStr, toStr, dateRange } = useDateStrings();
   const { activeClient, dashboardConfig } = useClient();
   const clientId = activeClient?.id;
-  const subblyEnabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
 
   return useQuery({
-    queryKey: ["spend-subs-daily", fromStr, toStr, clientId],
+    queryKey: ["spend-subs-daily", fromStr, toStr, clientId, revenueSource],
     enabled: !!clientId,
     queryFn: async () => {
       if (!clientId) return [];
 
-      // Fetch ad spend by day
+      // Fetch ad spend by day (exclude shopify platform)
       const { data: adData, error: adErr } = await supabase
         .from("ad_daily_metrics")
         .select("date, platform, spend")
         .eq("client_id", clientId)
+        .neq("platform", "shopify")
         .gte("date", fromStr)
         .lte("date", toStr)
         .order("date", { ascending: true });
 
       if (adErr) throw adErr;
 
-      // Fetch daily new subscriptions
-      let subsByDay = new Map<string, number>();
-      if (subblyEnabled) {
+      // Fetch daily orders/subscriptions based on revenue source
+      let ordersByDay = new Map<string, number>();
+      if (revenueSource === "shopify") {
+        const { data: orders, error: ordErr } = await supabase
+          .from("shopify_orders" as any)
+          .select("order_date")
+          .eq("client_id", clientId)
+          .in("financial_status", ["paid", "partially_refunded"])
+          .gte("order_date", fromStr + "T00:00:00.000Z")
+          .lte("order_date", toStr + "T23:59:59.999Z");
+
+        if (ordErr) throw ordErr;
+        for (const row of (orders || []) as any[]) {
+          if (!row.order_date) continue;
+          const day = row.order_date.split("T")[0];
+          ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
+        }
+      } else {
         const fromUTC = fromStr + "T00:00:00.000Z";
         const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
         const toUTC = toNextDay + "T23:59:59.999Z";
@@ -184,27 +168,24 @@ export function useSpendSubsDaily() {
           .lte("subbly_created_at", toUTC);
 
         if (subsErr) throw subsErr;
-
         for (const row of subsData || []) {
           if (!row.subbly_created_at) continue;
           const day = row.subbly_created_at.split("T")[0];
-          subsByDay.set(day, (subsByDay.get(day) || 0) + 1);
+          ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       }
 
       // Merge by date
       const byDate = new Map<string, { metaSpend: number; googleSpend: number; newSubs: number }>();
-
-      // Initialize all dates in range
       let d = new Date(dateRange.from);
       while (d <= dateRange.to) {
         const key = format(d, "yyyy-MM-dd");
-        byDate.set(key, { metaSpend: 0, googleSpend: 0, newSubs: subsByDay.get(key) || 0 });
+        byDate.set(key, { metaSpend: 0, googleSpend: 0, newSubs: ordersByDay.get(key) || 0 });
         d = addDays(d, 1);
       }
 
       for (const row of adData || []) {
-        const existing = byDate.get(row.date) || { metaSpend: 0, googleSpend: 0, newSubs: subsByDay.get(row.date) || 0 };
+        const existing = byDate.get(row.date) || { metaSpend: 0, googleSpend: 0, newSubs: ordersByDay.get(row.date) || 0 };
         if (row.platform === "meta") existing.metaSpend += Number(row.spend);
         else if (row.platform === "google") existing.googleSpend += Number(row.spend);
         byDate.set(row.date, existing);

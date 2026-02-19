@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { format, differenceInDays, subDays } from "date-fns";
+import { getClientRevenue } from "@/hooks/useClientRevenue";
 
 export interface KPIData {
   totalSpend: number;
@@ -440,13 +441,15 @@ export function useAdGroupKeywords(adsetId: string | null) {
 
 export function useGoogleKPIsWithSubblyRevenue() {
   const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
-  const { activeClient } = useClient();
+  const { dateRange } = useDateRange();
+  const { activeClient, dashboardConfig } = useClient();
   const clientId = activeClient?.id;
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
 
   return useQuery({
-    queryKey: ["google-kpis-subbly-revenue", fromStr, toStr, clientId],
+    queryKey: ["google-kpis-revenue", fromStr, toStr, clientId, revenueSource],
     queryFn: async (): Promise<KPIWithChange> => {
-      // Fetch Google ad metrics (spend, clicks, impressions, conversions)
+      // Fetch Google ad metrics
       let currentAdQuery = supabase.from("ad_daily_metrics")
         .select("spend, impressions, clicks, conversions")
         .eq("platform", "google")
@@ -456,29 +459,24 @@ export function useGoogleKPIsWithSubblyRevenue() {
         .eq("platform", "google")
         .gte("date", prevFrom).lte("date", prevTo);
 
-      // Fetch Subbly invoice revenue
-      let currentRevQuery = supabase.from("subbly_invoices")
-        .select("amount")
-        .eq("status", "paid")
-        .gte("invoice_date", fromStr).lte("invoice_date", toStr);
-      let previousRevQuery = supabase.from("subbly_invoices")
-        .select("amount")
-        .eq("status", "paid")
-        .gte("invoice_date", prevFrom).lte("invoice_date", prevTo);
-
       if (clientId) {
         currentAdQuery = currentAdQuery.eq("client_id", clientId);
         previousAdQuery = previousAdQuery.eq("client_id", clientId);
-        currentRevQuery = currentRevQuery.eq("client_id", clientId);
-        previousRevQuery = previousRevQuery.eq("client_id", clientId);
       }
 
+      // Fetch revenue from the correct source
+      const prevDateRange = { from: subDays(dateRange.from, differenceInDays(dateRange.to, dateRange.from) + 1), to: subDays(dateRange.from, 1) };
       const [
         { data: currentAd },
         { data: previousAd },
-        { data: currentRev },
-        { data: previousRev },
-      ] = await Promise.all([currentAdQuery, previousAdQuery, currentRevQuery, previousRevQuery]);
+        curRevenue,
+        prevRevenue,
+      ] = await Promise.all([
+        currentAdQuery,
+        previousAdQuery,
+        clientId ? getClientRevenue(clientId, revenueSource, fromStr, toStr, dateRange) : Promise.resolve(0),
+        clientId ? getClientRevenue(clientId, revenueSource, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
+      ]);
 
       const sumField = (rows: any[] | null, field: string) =>
         (rows || []).reduce((s, r) => s + Number(r[field] || 0), 0);
@@ -487,14 +485,11 @@ export function useGoogleKPIsWithSubblyRevenue() {
       const curClicks = sumField(currentAd, "clicks");
       const curImpressions = sumField(currentAd, "impressions");
       const curConversions = sumField(currentAd, "conversions");
-      // Subbly amounts are in cents
-      const curRevenue = (currentRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
 
       const prevSpend = sumField(previousAd, "spend");
       const prevClicks = sumField(previousAd, "clicks");
       const prevImpressions = sumField(previousAd, "impressions");
       const prevConversions = sumField(previousAd, "conversions");
-      const prevRevenue = (previousRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
 
       const cur = {
         totalSpend: Math.round(curSpend),
@@ -537,37 +532,27 @@ export function useGoogleKPIsWithSubblyRevenue() {
 
 export function useMetaKPIsWithSubblyRevenue() {
   const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
-  const { activeClient } = useClient();
+  const { dateRange } = useDateRange();
+  const { activeClient, dashboardConfig } = useClient();
   const clientId = activeClient?.id;
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
 
   return useQuery({
-    queryKey: ["meta-kpis-subbly-revenue", fromStr, toStr, clientId],
+    queryKey: ["meta-kpis-revenue", fromStr, toStr, clientId, revenueSource],
     queryFn: async () => {
-      let currentRevQuery = supabase.from("subbly_invoices")
-        .select("amount")
-        .eq("status", "paid")
-        .gte("invoice_date", fromStr).lte("invoice_date", toStr);
-      let previousRevQuery = supabase.from("subbly_invoices")
-        .select("amount")
-        .eq("status", "paid")
-        .gte("invoice_date", prevFrom).lte("invoice_date", prevTo);
+      const prevDateRange = { from: subDays(dateRange.from, differenceInDays(dateRange.to, dateRange.from) + 1), to: subDays(dateRange.from, 1) };
 
-      if (clientId) {
-        currentRevQuery = currentRevQuery.eq("client_id", clientId);
-        previousRevQuery = previousRevQuery.eq("client_id", clientId);
-      }
-
-      const [{ data: currentRev }, { data: previousRev }] = await Promise.all([
-        currentRevQuery,
-        previousRevQuery,
+      const [curRevenue, prevRevenue] = await Promise.all([
+        clientId ? getClientRevenue(clientId, revenueSource, fromStr, toStr, dateRange) : Promise.resolve(0),
+        clientId ? getClientRevenue(clientId, revenueSource, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
       ]);
 
-      const curRevenue = (currentRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
-      const prevRevenue = (previousRev || []).reduce((s, r) => s + Number(r.amount || 0), 0) / 100;
+      const revenueLabel = revenueSource === "shopify" ? "Shopify" : "Subbly";
 
       return {
         subblyRevenue: Math.round(curRevenue),
         subblyRevenueChange: pctChange(Math.round(curRevenue), Math.round(prevRevenue)),
+        revenueLabel,
       };
     },
   });
