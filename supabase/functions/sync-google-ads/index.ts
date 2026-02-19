@@ -35,10 +35,10 @@ Deno.serve(async (req) => {
   if (userId) {
     const { data: conn } = await supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, refresh_token, metadata, token_expires_at")
+      .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id")
       .eq("user_id", userId)
       .eq("platform", "google")
-      .single();
+      .maybeSingle();
     if (!conn) {
       return new Response(JSON.stringify({ error: "No Google connection found" }), {
         status: 404,
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     // Cron mode
     const { data: connections } = await supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, refresh_token, metadata, token_expires_at")
+      .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id")
       .eq("platform", "google");
     if (!connections || connections.length === 0) {
       return new Response(JSON.stringify({ message: "No google connections found" }), {
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata);
+    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id);
     results.push(result);
   }
 
@@ -114,7 +114,7 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
   }
 }
 
-async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any) {
+async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null) {
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "google", status: "running" })
@@ -204,6 +204,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               .from("ad_daily_metrics")
               .upsert({
                 user_id: userId,
+                client_id: clientId,
                 platform: "google",
                 date: row.segments?.date,
                 spend,
@@ -247,6 +248,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               .from("ad_campaigns")
               .upsert({
                 user_id: userId,
+                client_id: clientId,
                 platform: "google",
                 platform_campaign_id: String(row.campaign?.id),
                 campaign_name: row.campaign?.name || "Unknown",
@@ -292,6 +294,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               .from("ad_sets")
               .upsert({
                 user_id: userId,
+                client_id: clientId,
                 platform: "google",
                 platform_campaign_id: String(row.campaign?.id),
                 platform_adset_id: String(row.adGroup?.id),

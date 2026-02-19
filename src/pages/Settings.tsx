@@ -220,7 +220,10 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const res = await supabase.functions.invoke("google-oauth-initiate", { headers: { Authorization: `Bearer ${session.access_token}` } });
+      const res = await supabase.functions.invoke("google-oauth-initiate", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { client_id: activeClient?.id || null },
+      });
       if (res.error) throw res.error;
       if (res.data?.url) window.open(res.data.url, "_self");
     } catch (err: any) {

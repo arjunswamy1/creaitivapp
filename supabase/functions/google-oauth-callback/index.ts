@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
       return redirect("/settings?error=missing_params");
     }
 
-    let state: { user_id: string };
+    let state: { user_id: string; client_id?: string };
     try {
       state = JSON.parse(atob(stateParam));
     } catch {
@@ -115,6 +115,7 @@ Deno.serve(async (req) => {
           account_name: accountName,
           token_expires_at: tokenExpiresAt,
           metadata: { customers },
+          client_id: state.client_id || null,
         },
         { onConflict: "user_id,platform" }
       );
