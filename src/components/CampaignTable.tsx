@@ -8,6 +8,7 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
   const { data: campaigns, isLoading } = useTopCampaigns(platform);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
+  const isGoogle = platform === "google";
 
   const toggleExpand = (name: string, plat: string) => {
     if (expandedCampaign === name) {
@@ -37,11 +38,11 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                 <th className="text-left py-3 text-muted-foreground font-medium">Campaign</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Channel</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
-                <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>
-                <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>
+                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>}
+                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>
-                <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Status</th>
               </tr>
             </thead>
@@ -67,24 +68,26 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                       </Badge>
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
-                    <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>
-                    <td className="py-3 text-right font-mono">{c.roas}x</td>
+                    {!isGoogle && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
+                    {!isGoogle && <td className="py-3 text-right font-mono">{c.roas}x</td>}
                     <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>
                     <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>
-                    <td className="py-3 text-right font-mono">
-                      {c.impressionShare != null ? (
-                        <span className={c.impressionShare < 0.5 ? "text-destructive" : ""}>{(c.impressionShare * 100).toFixed(0)}%</span>
-                      ) : "—"}
-                    </td>
+                    {isGoogle && (
+                      <td className="py-3 text-right font-mono">
+                        {c.impressionShare != null ? (
+                          <span className={c.impressionShare < 0.5 ? "text-destructive" : ""}>{(c.impressionShare * 100).toFixed(0)}%</span>
+                        ) : "—"}
+                      </td>
+                    )}
                     <td className="py-3 text-right">
-                      <Badge variant={c.status === "active" ? "default" : "secondary"} className={c.status === "active" ? "bg-accent/20 text-accent border-accent/30" : ""}>
+                      <Badge variant={c.status === "active" || c.status === "enabled" ? "default" : "secondary"} className={c.status === "active" || c.status === "enabled" ? "bg-accent/20 text-accent border-accent/30" : ""}>
                         {c.status}
                       </Badge>
                     </td>
                   </tr>
                   {expandedCampaign === c.name && (
                     <tr key={`${c.name}-detail`}>
-                       <td colSpan={10} className="p-0">
+                       <td colSpan={isGoogle ? 8 : 9} className="p-0">
                         <AdSetDetail campaignName={c.name} platform={c.platform} />
                       </td>
                     </tr>
@@ -102,6 +105,7 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
 function AdSetDetail({ campaignName, platform }: { campaignName: string; platform: string }) {
   const { data: adSets, isLoading } = useCampaignAdSets(campaignName, platform);
   const [expandedAdSet, setExpandedAdSet] = useState<{ name: string; id: string } | null>(null);
+  const isGoogle = platform === "google";
 
   if (isLoading) {
     return <div className="p-4"><Skeleton className="h-20 rounded-lg" /></div>;
@@ -124,8 +128,8 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
             <th className="text-left py-2 pl-10 text-muted-foreground font-medium text-xs">Ad Set</th>
             <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Spend</th>
-            <th className="text-right py-2 text-muted-foreground font-medium text-xs">Revenue</th>
-            <th className="text-right py-2 text-muted-foreground font-medium text-xs">ROAS</th>
+            {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">Revenue</th>}
+            {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">ROAS</th>}
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Conv.</th>
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Status</th>
           </tr>
@@ -148,8 +152,8 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
                 <td className="py-2 pl-10 font-medium text-xs max-w-[260px] truncate">{as.name}</td>
                 <td></td>
                 <td className="py-2 text-right font-mono text-xs">${as.spend.toLocaleString()}</td>
-                <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>
-                <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>
+                {!isGoogle && <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>}
+                {!isGoogle && <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>}
                 <td className="py-2 text-right font-mono text-xs">{as.conversions.toLocaleString()}</td>
                 <td className="py-2 text-right">
                   <Badge variant="secondary" className="text-xs">{as.status}</Badge>
@@ -157,7 +161,7 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
               </tr>
               {expandedAdSet?.name === as.name && (
                 <tr key={`${as.name}-detail`}>
-                  <td colSpan={10} className="p-0">
+                  <td colSpan={isGoogle ? 6 : 8} className="p-0">
                     {platform === "google" ? (
                       <KeywordDetail adsetId={expandedAdSet.id} />
                     ) : (
@@ -198,8 +202,6 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
             <th className="text-left py-1.5 pl-16 text-muted-foreground font-medium">Keyword</th>
             <th className="text-left py-1.5 text-muted-foreground font-medium">Match</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">Spend</th>
-            <th className="text-right py-1.5 text-muted-foreground font-medium">Revenue</th>
-            <th className="text-right py-1.5 text-muted-foreground font-medium">ROAS</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">Conv.</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">CTR</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">CPA</th>
@@ -215,8 +217,6 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
                 <Badge variant="outline" className="text-[10px] capitalize">{kw.matchType}</Badge>
               </td>
               <td className="py-1.5 text-right font-mono">${kw.spend.toLocaleString()}</td>
-              <td className="py-1.5 text-right font-mono">${kw.revenue.toLocaleString()}</td>
-              <td className="py-1.5 text-right font-mono">{kw.roas}x</td>
               <td className="py-1.5 text-right font-mono">{kw.conversions.toLocaleString()}</td>
               <td className="py-1.5 text-right font-mono">{kw.ctr}%</td>
               <td className="py-1.5 text-right font-mono">{kw.cpa != null ? `$${kw.cpa}` : "—"}</td>
