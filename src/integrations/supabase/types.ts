@@ -552,6 +552,121 @@ export type Database = {
         }
         Relationships: []
       }
+      subbly_invoices: {
+        Row: {
+          amount: number
+          client_id: string | null
+          created_at: string
+          currency_code: string | null
+          customer_id: number
+          id: string
+          invoice_date: string | null
+          status: string
+          subbly_id: number
+          subscription_id: number | null
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string
+          currency_code?: string | null
+          customer_id: number
+          id?: string
+          invoice_date?: string | null
+          status: string
+          subbly_id: number
+          subscription_id?: number | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          client_id?: string | null
+          created_at?: string
+          currency_code?: string | null
+          customer_id?: number
+          id?: string
+          invoice_date?: string | null
+          status?: string
+          subbly_id?: number
+          subscription_id?: number | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subbly_invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subbly_subscriptions: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          currency_code: string | null
+          customer_id: number
+          id: string
+          last_payment_at: string | null
+          next_payment_date: string | null
+          past_due: boolean | null
+          product_id: number
+          quantity: number
+          status: string
+          subbly_id: number
+          successful_charges_count: number | null
+          synced_at: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          currency_code?: string | null
+          customer_id: number
+          id?: string
+          last_payment_at?: string | null
+          next_payment_date?: string | null
+          past_due?: boolean | null
+          product_id: number
+          quantity?: number
+          status: string
+          subbly_id: number
+          successful_charges_count?: number | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          currency_code?: string | null
+          customer_id?: number
+          id?: string
+          last_payment_at?: string | null
+          next_payment_date?: string | null
+          past_due?: boolean | null
+          product_id?: number
+          quantity?: number
+          status?: string
+          subbly_id?: number
+          successful_charges_count?: number | null
+          synced_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subbly_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

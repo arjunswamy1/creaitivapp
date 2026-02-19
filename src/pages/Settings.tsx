@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useClient } from "@/contexts/ClientContext";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -100,12 +101,14 @@ const PlatformCard = ({
 
 const Settings = () => {
   const { user, signOut } = useAuth();
+  const { activeClient } = useClient();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
+  const [syncingSubbly, setSyncingSubbly] = useState(false);
 
   // Alert settings state
   const [alertEnabled, setAlertEnabled] = useState(true);
@@ -252,6 +255,32 @@ const Settings = () => {
     }
   };
 
+  const handleSyncSubbly = async () => {
+    if (!activeClient?.id) {
+      toast({ title: "No client selected", description: "Select a client first.", variant: "destructive" });
+      return;
+    }
+    setSyncingSubbly(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const res = await supabase.functions.invoke("sync-subbly", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { client_id: activeClient.id },
+      });
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      toast({
+        title: "Subbly synced!",
+        description: `${res.data.subscriptions_synced} subscriptions and ${res.data.invoices_synced} invoices synced.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err.message || "Could not sync Subbly data", variant: "destructive" });
+    } finally {
+      setSyncingSubbly(false);
+    }
+  };
+
   const handleSaveAlerts = async () => {
     setSavingAlerts(true);
     try {
@@ -329,6 +358,23 @@ const Settings = () => {
               <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} onDisconnect={() => handleDisconnect("meta")} connecting={connecting === "meta"} disconnecting={disconnecting === "meta"} />
               <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
               <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
+
+              {/* Subbly - sync via API key */}
+              <div className="glass-card p-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/80 flex items-center justify-center">
+                    <span className="text-sm font-bold text-white">S</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Subbly</h3>
+                    <p className="text-xs text-muted-foreground">Sync subscription &amp; invoice data</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={handleSyncSubbly} disabled={syncingSubbly}>
+                  {syncingSubbly ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                  {syncingSubbly ? "Syncing..." : "Sync Now"}
+                </Button>
+              </div>
             </div>
           )}
         </section>

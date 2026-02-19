@@ -4,6 +4,7 @@ import SpendRevenueChart from "@/components/SpendRevenueChart";
 import ChannelBreakdown from "@/components/ChannelBreakdown";
 import CampaignTable from "@/components/CampaignTable";
 import ForecastCard from "@/components/ForecastCard";
+import SubblyKPIRow from "@/components/SubblyKPIRow";
 import { useKPIs } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
@@ -43,6 +44,9 @@ const DashboardContent = () => {
             </>
           )}
         </div>
+
+        {/* Subscription Metrics (Subbly) */}
+        <SubblyKPIRow />
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
