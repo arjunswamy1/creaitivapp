@@ -14,6 +14,7 @@ export interface ClientDashboardConfig {
   enabled_platforms: string[];
   enabled_kpis: string[];
   custom_metrics: any[];
+  revenue_source: string; // 'subbly' | 'shopify'
 }
 
 interface ClientContextType {
@@ -98,7 +99,7 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
     const fetchConfig = async () => {
       const { data } = await supabase
         .from("client_dashboard_config")
-        .select("enabled_platforms, enabled_kpis, custom_metrics")
+        .select("enabled_platforms, enabled_kpis, custom_metrics, revenue_source")
         .eq("client_id", activeClientId)
         .maybeSingle();
 
@@ -108,11 +109,13 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
               enabled_platforms: data.enabled_platforms || [],
               enabled_kpis: data.enabled_kpis || [],
               custom_metrics: data.custom_metrics as any[] || [],
+              revenue_source: (data as any).revenue_source || "subbly",
             }
           : {
               enabled_platforms: ["meta", "google", "shopify"],
               enabled_kpis: ["totalSpend", "totalRevenue", "blendedROAS", "conversions", "cpc", "ctr", "cpm", "impressions"],
               custom_metrics: [],
+              revenue_source: "subbly",
             }
       );
     };
