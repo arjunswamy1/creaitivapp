@@ -98,7 +98,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 90);
+    startDate.setFullYear(startDate.getFullYear() - 1);
     const since = formatDate(startDate);
     const until = formatDate(endDate);
 
@@ -117,68 +117,74 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
       if (!accountId) return 0;
       let records = 0;
 
-      const [dailyInsights, campaignInsights, adsetInsights, adInsights] = await Promise.all([
+      const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
         fetchInsights(accountId, accessToken, since, until, "account"),
         fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,"),
         fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,"),
-        fetchInsights(accountId, accessToken, since, until, "ad", "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,"),
       ]);
 
+      // Fetch ad-level data in monthly chunks to avoid Meta's data size limit
+      const adInsights = await fetchInsightsChunked(accountId, accessToken, since, until, "ad", "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,");
+
       if (dailyInsights) {
-        for (const day of dailyInsights) {
+        const batch = dailyInsights.map((day: any) => {
           const m = extractMetrics(day);
-          await supabase.from("ad_daily_metrics").upsert({
+          return {
             user_id: userId, platform: "meta", date: day.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             cpc: m.clicks > 0 ? m.spend / m.clicks : null,
             ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : null,
             cpm: m.impressions > 0 ? (m.spend / m.impressions) * 1000 : null,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
-          }, { onConflict: "user_id,platform,date" });
-          records++;
-        }
+          };
+        });
+        await batchUpsert(supabase, "ad_daily_metrics", batch, "user_id,platform,date");
+        records += batch.length;
       }
 
       if (campaignInsights) {
-        for (const c of campaignInsights) {
+        const batch = campaignInsights.map((c: any) => {
           const m = extractMetrics(c);
-          await supabase.from("ad_campaigns").upsert({
+          return {
             user_id: userId, platform: "meta", platform_campaign_id: c.campaign_id,
             campaign_name: c.campaign_name, status: "active", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
-          }, { onConflict: "user_id,platform,platform_campaign_id,date" });
-          records++;
-        }
+          };
+        });
+        await batchUpsert(supabase, "ad_campaigns", batch, "user_id,platform,platform_campaign_id,date");
+        records += batch.length;
       }
 
       if (adsetInsights) {
-        for (const a of adsetInsights) {
+        const batch = adsetInsights.map((a: any) => {
           const m = extractMetrics(a);
-          await supabase.from("ad_sets").upsert({
+          return {
             user_id: userId, platform: "meta", platform_campaign_id: a.campaign_id,
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
             status: "active", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
-          }, { onConflict: "user_id,platform,platform_adset_id,date" });
-          records++;
-        }
+          };
+        });
+        await batchUpsert(supabase, "ad_sets", batch, "user_id,platform,platform_adset_id,date");
+        records += batch.length;
       }
 
       if (adInsights) {
-        for (const ad of adInsights) {
+        const batch = adInsights.map((ad: any) => {
           const m = extractMetrics(ad);
-          await supabase.from("ads").upsert({
+          return {
             user_id: userId, platform: "meta", platform_ad_id: ad.ad_id,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
             status: "active", date: ad.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
-          }, { onConflict: "user_id,platform,platform_ad_id,date" });
-          records++;
-        }
+          };
+        });
+        await batchUpsert(supabase, "ads", batch, "user_id,platform,platform_ad_id,date");
+        records += batch.length;
       }
 
       return records;
@@ -198,13 +204,56 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
 async function fetchInsights(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "") {
   const fields = `${extraFields}spend,impressions,clicks,actions,action_values`;
-  const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}&limit=500`;
+  let allData: any[] = [];
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}&limit=500`;
   console.log(`Fetching ${level} for ${accountId}`);
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) console.error(`${level} error ${accountId}: ${data.error.message}`);
-  if (data.data?.length) console.log(`${level} for ${accountId}: ${data.data.length} rows`);
-  return data.data || null;
+
+  while (url) {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) {
+      console.error(`${level} error ${accountId}: ${data.error.message}`);
+      break;
+    }
+    if (data.data) allData = allData.concat(data.data);
+    url = data.paging?.next || null;
+  }
+
+  if (allData.length) console.log(`${level} for ${accountId}: ${allData.length} rows`);
+  return allData.length > 0 ? allData : null;
+}
+
+async function fetchInsightsChunked(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "") {
+  // Split into 30-day chunks to avoid Meta's "reduce the amount of data" error
+  const chunks: { since: string; until: string }[] = [];
+  const start = new Date(since);
+  const end = new Date(until);
+  let chunkStart = new Date(start);
+
+  while (chunkStart <= end) {
+    const chunkEnd = new Date(chunkStart);
+    chunkEnd.setDate(chunkEnd.getDate() + 29);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+    chunks.push({ since: formatDate(chunkStart), until: formatDate(chunkEnd) });
+    chunkStart = new Date(chunkEnd);
+    chunkStart.setDate(chunkStart.getDate() + 1);
+  }
+
+  let allData: any[] = [];
+  for (const chunk of chunks) {
+    const data = await fetchInsights(accountId, accessToken, chunk.since, chunk.until, level, extraFields);
+    if (data) allData = allData.concat(data);
+  }
+
+  console.log(`${level} chunked total for ${accountId}: ${allData.length} rows`);
+  return allData.length > 0 ? allData : null;
+}
+async function batchUpsert(supabase: any, table: string, rows: any[], onConflict: string, batchSize = 200) {
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const chunk = rows.slice(i, i + batchSize);
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict });
+    if (error) console.error(`Batch upsert error on ${table}:`, error.message);
+  }
 }
 
 function formatDate(d: Date): string {
