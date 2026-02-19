@@ -138,7 +138,9 @@ Deno.serve(async (req) => {
   const last3 = mtdSeries.slice(-3);
   const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
   const overallAvgSubs = actualSubs / daysWithData;
-  const trendMultiplier = overallAvgSubs > 0 ? Math.min(1.5, Math.max(0.7, last3AvgSubs / overallAvgSubs)) : 1;
+  // Use a dampened trend: blend 70% base projection with 30% recent trend
+  const rawTrend = overallAvgSubs > 0 ? last3AvgSubs / overallAvgSubs : 1;
+  const trendMultiplier = Math.min(1.25, Math.max(0.8, 0.7 + 0.3 * rawTrend));
 
   const adjustedDailySubs = projDailySubs * trendMultiplier;
 
