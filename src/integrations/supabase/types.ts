@@ -502,6 +502,86 @@ export type Database = {
         }
         Relationships: []
       }
+      keywords: {
+        Row: {
+          adset_name: string | null
+          campaign_name: string | null
+          clicks: number
+          client_id: string | null
+          conversions: number
+          created_at: string
+          date: string
+          id: string
+          impressions: number
+          keyword_text: string
+          match_type: string | null
+          platform: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          quality_score: number | null
+          revenue: number
+          roas: number | null
+          spend: number
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          adset_name?: string | null
+          campaign_name?: string | null
+          clicks?: number
+          client_id?: string | null
+          conversions?: number
+          created_at?: string
+          date: string
+          id?: string
+          impressions?: number
+          keyword_text: string
+          match_type?: string | null
+          platform?: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          quality_score?: number | null
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          adset_name?: string | null
+          campaign_name?: string | null
+          clicks?: number
+          client_id?: string | null
+          conversions?: number
+          created_at?: string
+          date?: string
+          id?: string
+          impressions?: number
+          keyword_text?: string
+          match_type?: string | null
+          platform?: string
+          platform_adset_id?: string
+          platform_campaign_id?: string
+          quality_score?: number | null
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keywords_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_connections: {
         Row: {
           access_token: string

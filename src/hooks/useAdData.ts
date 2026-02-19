@@ -386,6 +386,58 @@ export function useAdSetAds(adsetId: string | null) {
   });
 }
 
+export function useAdGroupKeywords(adsetId: string | null) {
+  const { fromStr, toStr } = useDateStrings();
+
+  return useQuery({
+    queryKey: ["adgroup-keywords", adsetId, fromStr, toStr],
+    enabled: !!adsetId,
+    queryFn: async () => {
+      if (!adsetId) return [];
+
+      const { data, error } = await supabase
+        .from("keywords" as any)
+        .select("keyword_text, match_type, spend, revenue, impressions, clicks, conversions, roas, status, quality_score, date")
+        .eq("platform_adset_id", adsetId)
+        .gte("date", fromStr).lte("date", toStr);
+
+      if (error) throw error;
+      if (!data) return [];
+
+      const byKw = new Map<string, { matchType: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number; status: string; qualityScore: number | null }>();
+      for (const row of data as any[]) {
+        const key = `${row.keyword_text}__${row.match_type}`;
+        const existing = byKw.get(key) || { matchType: row.match_type || "unknown", spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, status: row.status || "unknown", qualityScore: row.quality_score };
+        existing.spend += Number(row.spend);
+        existing.revenue += Number(row.revenue);
+        existing.impressions += Number(row.impressions);
+        existing.clicks += Number(row.clicks);
+        existing.conversions += Number(row.conversions);
+        if (row.status === "enabled") existing.status = "enabled";
+        if (row.quality_score != null) existing.qualityScore = row.quality_score;
+        byKw.set(key, existing);
+      }
+
+      return Array.from(byKw.entries())
+        .map(([key, vals]) => ({
+          keyword: key.split("__")[0],
+          matchType: vals.matchType,
+          spend: Math.round(vals.spend),
+          revenue: Math.round(vals.revenue),
+          roas: vals.spend > 0 ? Math.round((vals.revenue / vals.spend) * 100) / 100 : 0,
+          impressions: vals.impressions,
+          clicks: vals.clicks,
+          conversions: vals.conversions,
+          ctr: vals.impressions > 0 ? Math.round((vals.clicks / vals.impressions) * 10000) / 100 : 0,
+          cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
+          qualityScore: vals.qualityScore,
+          status: vals.status,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+    },
+  });
+}
+
 export function useForecast() {
   return useQuery({
     queryKey: ["forecast-monthly"],
