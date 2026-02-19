@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
     await sleep(1000);
 
     // Sync invoices (paid only for revenue tracking)
-    const invoices = await fetchAllPages("/invoices", SUBBLY_API_KEY, { statuses: "paid" });
+    const invoices = await fetchAllPages("/invoices", SUBBLY_API_KEY, { "statuses[]": "paid" });
     let invoicesUpserted = 0;
 
     if (invoices.length > 0) {
