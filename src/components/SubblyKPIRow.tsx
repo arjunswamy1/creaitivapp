@@ -19,7 +19,7 @@ const SubblyKPIRow = () => {
         ) : (
           <>
             <KPICard
-              title="Active Subscriptions"
+              title="New Subscriptions"
               value={(data?.activeSubscriptions ?? 0).toLocaleString()}
             />
             <KPICard
