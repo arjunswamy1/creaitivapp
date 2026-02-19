@@ -147,10 +147,10 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-      const res = await supabase.functions.invoke("slack-channels?action=test", {
+      const res = await supabase.functions.invoke("slack-channels", {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: { channel: slackChannel },
+        body: { action: "test", channel: slackChannel },
       });
       if (res.error) throw res.error;
       if (res.data?.error) throw new Error(res.data.error);
