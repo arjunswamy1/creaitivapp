@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const isCron = token === serviceRoleKey;
+    const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
+    const isCron = cronSecret && token === cronSecret;
 
     if (!isCron) {
       // Normal user auth flow
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       }
       console.log("sync-subbly: user verified", user.id);
     } else {
-      console.log("sync-subbly: cron/service-role invocation");
+      console.log("sync-subbly: cron invocation");
     }
 
     const body = await req.json().catch(() => ({}));
