@@ -32,6 +32,11 @@ export interface BudgetPlan {
   recent_30d_cac: number;
   cac_trend_pct: number;
   total_budget: number;
+  last_year_baseline: {
+    month: string;
+    new_subscribers: number;
+    suggested_goal: number;
+  };
   platform_budgets: PlatformBudget[];
   campaign_budgets: CampaignBudget[];
   lookback_stats: {
@@ -42,6 +47,23 @@ export interface BudgetPlan {
     active_campaigns: number;
   };
   ai_insight: string;
+}
+
+// Fetch baseline (no target_subs needed)
+export function useBudgetBaseline(clientId: string | undefined) {
+  return useQuery<BudgetPlan>({
+    queryKey: ["budget-baseline", clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("budget-planner", {
+        body: { client_id: clientId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data as BudgetPlan;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
 }
 
 export function useBudgetPlanner(targetSubs: number | null, clientId: string | undefined) {
