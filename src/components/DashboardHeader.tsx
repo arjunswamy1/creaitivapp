@@ -6,12 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DateRangePicker from "@/components/DateRangePicker";
 import AccountSelector from "@/components/AccountSelector";
+import ClientSwitcher from "@/components/ClientSwitcher";
+import { useClient } from "@/contexts/ClientContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const { activeClient } = useClient();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -61,12 +64,14 @@ const DashboardHeader = () => {
           <BarChart3 className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold tracking-tight">Performance Dashboard</h1>
+          <h1 className="text-xl font-bold tracking-tight">
+            {activeClient ? activeClient.name : "Performance Dashboard"}
+          </h1>
           <p className="text-sm text-muted-foreground">Cross-channel marketing analytics</p>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <AccountSelector />
+        <ClientSwitcher />
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
