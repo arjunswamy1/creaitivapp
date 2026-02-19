@@ -3,9 +3,12 @@ import KPICard from "@/components/KPICard";
 import SpendRevenueChart from "@/components/SpendRevenueChart";
 import ChannelBreakdown from "@/components/ChannelBreakdown";
 import CampaignTable from "@/components/CampaignTable";
-import { mockKPIs } from "@/data/mockData";
+import { useKPIs } from "@/hooks/useAdData";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Index = () => {
+  const { data: kpis, isLoading } = useKPIs();
+
   return (
     <div className="min-h-screen bg-background px-6 pb-12">
       <div className="max-w-7xl mx-auto">
@@ -13,18 +16,30 @@ const Index = () => {
 
         {/* KPI Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <KPICard title="Total Spend" value={`$${mockKPIs.totalSpend.toLocaleString()}`} change={-2.4} />
-          <KPICard title="Total Revenue" value={`$${mockKPIs.totalRevenue.toLocaleString()}`} change={12.8} />
-          <KPICard title="Blended ROAS" value={`${mockKPIs.blendedROAS}x`} change={8.3} />
-          <KPICard title="Conversions" value={mockKPIs.totalConversions.toLocaleString()} change={5.1} />
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          ) : (
+            <>
+              <KPICard title="Total Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} />
+              <KPICard title="Total Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} />
+              <KPICard title="Blended ROAS" value={`${kpis?.blendedROAS ?? 0}x`} />
+              <KPICard title="Conversions" value={(kpis?.totalConversions ?? 0).toLocaleString()} />
+            </>
+          )}
         </div>
 
         {/* Secondary KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <KPICard title="Avg CPC" value={`$${mockKPIs.cpc}`} change={-5.2} />
-          <KPICard title="CTR" value={`${mockKPIs.ctr}%`} change={1.7} />
-          <KPICard title="CPM" value={`$${mockKPIs.cpm}`} change={-3.1} />
-          <KPICard title="Impressions" value={`${(mockKPIs.impressions / 1000000).toFixed(1)}M`} change={9.4} />
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          ) : (
+            <>
+              <KPICard title="Avg CPC" value={`$${kpis?.cpc ?? 0}`} />
+              <KPICard title="CTR" value={`${kpis?.ctr ?? 0}%`} />
+              <KPICard title="CPM" value={`$${kpis?.cpm ?? 0}`} />
+              <KPICard title="Impressions" value={`${((kpis?.impressions ?? 0) / 1000000).toFixed(1)}M`} />
+            </>
+          )}
         </div>
 
         {/* Charts Row */}

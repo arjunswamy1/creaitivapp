@@ -1,7 +1,16 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { dailyPerformance } from "@/data/mockData";
+import { useDailyMetrics } from "@/hooks/useAdData";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const SpendRevenueChart = () => {
+  const { data: dailyData, isLoading } = useDailyMetrics();
+
+  if (isLoading) {
+    return <Skeleton className="h-[380px] rounded-xl" />;
+  }
+
+  const hasGoogle = dailyData?.some((d) => d.googleSpend > 0);
+
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
@@ -11,10 +20,12 @@ const SpendRevenueChart = () => {
             <div className="w-3 h-3 rounded-full bg-meta" />
             <span className="text-muted-foreground">Meta Spend</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-google" />
-            <span className="text-muted-foreground">Google Spend</span>
-          </div>
+          {hasGoogle && (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-google" />
+              <span className="text-muted-foreground">Google Spend</span>
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-accent" />
             <span className="text-muted-foreground">Revenue</span>
@@ -22,7 +33,7 @@ const SpendRevenueChart = () => {
         </div>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={dailyPerformance} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+        <AreaChart data={dailyData || []} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
           <defs>
             <linearGradient id="metaGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="hsl(214, 89%, 52%)" stopOpacity={0.3} />
@@ -39,7 +50,7 @@ const SpendRevenueChart = () => {
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 18%)" />
           <XAxis dataKey="date" stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} />
-          <YAxis stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} tickFormatter={(v) => `$${v}`} />
+          <YAxis stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
           <Tooltip
             contentStyle={{
               backgroundColor: "hsl(220, 18%, 12%)",
@@ -52,7 +63,7 @@ const SpendRevenueChart = () => {
             formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
           />
           <Area type="monotone" dataKey="metaSpend" stroke="hsl(214, 89%, 52%)" fill="url(#metaGradient)" strokeWidth={2} />
-          <Area type="monotone" dataKey="googleSpend" stroke="hsl(36, 100%, 55%)" fill="url(#googleGradient)" strokeWidth={2} />
+          {hasGoogle && <Area type="monotone" dataKey="googleSpend" stroke="hsl(36, 100%, 55%)" fill="url(#googleGradient)" strokeWidth={2} />}
           <Area type="monotone" dataKey="revenue" stroke="hsl(150, 62%, 48%)" fill="url(#revenueGradient)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
