@@ -56,6 +56,7 @@ export interface CampaignRow {
   impressions: number;
   clicks: number;
   conversions: number;
+  impressionShare: number | null;
 }
 
 function calcKPIs(data: any[]): KPIData {
@@ -239,7 +240,7 @@ export function useTopCampaigns() {
     queryFn: async (): Promise<CampaignRow[]> => {
       let query = supabase
         .from("ad_campaigns")
-        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions")
+        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share")
         .gte("date", fromStr).lte("date", toStr);
 
       if (clientId) query = query.eq("client_id", clientId);
@@ -249,14 +250,18 @@ export function useTopCampaigns() {
       if (error) throw error;
       if (!data) return [];
 
-      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number }>();
+      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number }>();
       for (const row of data) {
-        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0 };
+        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0 };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);
         existing.impressions += Number(row.impressions);
         existing.clicks += Number(row.clicks);
         existing.conversions += Number(row.conversions);
+        if ((row as any).impression_share != null) {
+          existing.impressionShareSum += Number((row as any).impression_share);
+          existing.impressionShareCount++;
+        }
         if (row.status === "active") existing.status = "active";
         byCampaign.set(row.campaign_name, existing);
       }
@@ -275,6 +280,7 @@ export function useTopCampaigns() {
           impressions: vals.impressions,
           clicks: vals.clicks,
           conversions: vals.conversions,
+          impressionShare: vals.impressionShareCount > 0 ? vals.impressionShareSum / vals.impressionShareCount : null,
         }))
         .sort((a, b) => b.spend - a.spend)
         .slice(0, 15);

@@ -40,6 +40,8 @@ const CampaignTable = () => {
                 <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
+                <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>
+                <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Status</th>
               </tr>
             </thead>
@@ -68,6 +70,12 @@ const CampaignTable = () => {
                     <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>
                     <td className="py-3 text-right font-mono">{c.roas}x</td>
                     <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>
+                    <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>
+                    <td className="py-3 text-right font-mono">
+                      {c.impressionShare != null ? (
+                        <span className={c.impressionShare < 0.5 ? "text-destructive" : ""}>{(c.impressionShare * 100).toFixed(0)}%</span>
+                      ) : "—"}
+                    </td>
                     <td className="py-3 text-right">
                       <Badge variant={c.status === "active" ? "default" : "secondary"} className={c.status === "active" ? "bg-accent/20 text-accent border-accent/30" : ""}>
                         {c.status}
@@ -76,7 +84,7 @@ const CampaignTable = () => {
                   </tr>
                   {expandedCampaign === c.name && (
                     <tr key={`${c.name}-detail`}>
-                      <td colSpan={8} className="p-0">
+                       <td colSpan={10} className="p-0">
                         <AdSetDetail campaignName={c.name} platform={c.platform} />
                       </td>
                     </tr>
@@ -149,7 +157,7 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
               </tr>
               {expandedAdSet?.name === as.name && (
                 <tr key={`${as.name}-ads`}>
-                  <td colSpan={8} className="p-0">
+                  <td colSpan={10} className="p-0">
                     <AdsDetail adsetId={expandedAdSet.id} />
                   </td>
                 </tr>

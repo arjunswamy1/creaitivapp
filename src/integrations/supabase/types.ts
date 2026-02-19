@@ -23,7 +23,10 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          impression_share: number | null
           impressions: number
+          lost_is_budget: number | null
+          lost_is_rank: number | null
           platform: string
           platform_campaign_id: string
           revenue: number
@@ -41,7 +44,10 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          impression_share?: number | null
           impressions?: number
+          lost_is_budget?: number | null
+          lost_is_rank?: number | null
           platform: string
           platform_campaign_id: string
           revenue?: number
@@ -59,7 +65,10 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          impression_share?: number | null
           impressions?: number
+          lost_is_budget?: number | null
+          lost_is_rank?: number | null
           platform?: string
           platform_campaign_id?: string
           revenue?: number
