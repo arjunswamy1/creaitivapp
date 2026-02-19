@@ -6,9 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import DateRangePicker from "@/components/DateRangePicker";
 import AccountSelector from "@/components/AccountSelector";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchLastSync = async () => {
@@ -24,6 +28,21 @@ const DashboardHeader = () => {
     };
     fetchLastSync();
   }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-meta-ads");
+      if (error) throw error;
+      setLastSynced(new Date().toISOString());
+      queryClient.invalidateQueries();
+      toast.success(`Synced ${data?.records_synced || 0} records`);
+    } catch (err: any) {
+      toast.error("Sync failed: " + (err.message || "Unknown error"));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const formatRelativeTime = (iso: string) => {
     const diff = Date.now() - new Date(iso).getTime();
@@ -48,21 +67,25 @@ const DashboardHeader = () => {
       </div>
       <div className="flex items-center gap-3">
         <AccountSelector />
-        {lastSynced && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span className="font-mono">{formatRelativeTime(lastSynced)}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Last synced: {new Date(lastSynced).toLocaleString()}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSync}
+                disabled={syncing}
+                className="gap-1.5 text-xs text-muted-foreground"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                {lastSynced ? formatRelativeTime(lastSynced) : "Sync"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{syncing ? "Syncing..." : lastSynced ? `Last synced: ${new Date(lastSynced).toLocaleString()}` : "Click to sync"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <DateRangePicker />
         <Link to="/settings">
           <Button variant="ghost" size="icon">

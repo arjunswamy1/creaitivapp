@@ -113,6 +113,13 @@ async function syncMetaForUser(
 
     let totalRecords = 0;
 
+    // Clear existing data for this user/platform so only selected account data remains
+    await Promise.all([
+      supabase.from("ad_daily_metrics").delete().eq("user_id", userId).eq("platform", "meta"),
+      supabase.from("ad_campaigns").delete().eq("user_id", userId).eq("platform", "meta"),
+      supabase.from("ad_sets").delete().eq("user_id", userId).eq("platform", "meta"),
+    ]);
+
     // Process all accounts in parallel
     const accountPromises = adAccounts.map(async (account: any) => {
       const accountId = account.id || account.account_id;
