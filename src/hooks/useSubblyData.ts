@@ -27,20 +27,13 @@ export function useSubblyKPIs() {
     queryFn: async (): Promise<SubblyKPIs> => {
       if (!clientId) throw new Error("No client");
 
-      // Fetch all subscriptions for the client
-      const { data: allSubs, error: subErr } = await supabase
+      // Fetch subscriptions created within the date range (server-side filter)
+      const { data: subs, error: subErr } = await supabase
         .from("subbly_subscriptions")
         .select("status, quantity, successful_charges_count, subbly_created_at")
-        .eq("client_id", clientId);
-
-      if (subErr) throw subErr;
-
-      // Filter to subscriptions created within the date range (using original Subbly date)
-      const subs = (allSubs || []).filter((s) => {
-        if (!s.subbly_created_at) return false;
-        const d = s.subbly_created_at.slice(0, 10);
-        return d >= fromStr && d <= toStr;
-      });
+        .eq("client_id", clientId)
+        .gte("subbly_created_at", fromStr)
+        .lte("subbly_created_at", toStr + "T23:59:59.999Z");
 
       if (subErr) throw subErr;
 
