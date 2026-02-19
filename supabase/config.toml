@@ -20,3 +20,12 @@ verify_jwt = false
 
 [functions.sync-ads]
 verify_jwt = false
+
+[functions.shopify-oauth-initiate]
+verify_jwt = false
+
+[functions.shopify-oauth-callback]
+verify_jwt = false
+
+[functions.sync-shopify-orders]
+verify_jwt = false

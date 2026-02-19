@@ -26,6 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Link } from "react-router-dom";
 
 interface PlatformConnection {
@@ -96,7 +104,8 @@ const Settings = () => {
   const [slackChannels, setSlackChannels] = useState<{ id: string; name: string }[]>([]);
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [testingSlack, setTestingSlack] = useState(false);
-
+  const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
+  const [shopDomain, setShopDomain] = useState("");
   useEffect(() => {
     const fetchData = async () => {
       const [connRes, alertRes] = await Promise.all([
@@ -205,6 +214,30 @@ const Settings = () => {
     }
   };
 
+  const handleConnectShopify = async () => {
+    if (!shopDomain.trim()) {
+      toast({ title: "Error", description: "Please enter your Shopify store domain", variant: "destructive" });
+      return;
+    }
+    setConnecting("shopify");
+    setShopifyDialogOpen(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const domain = shopDomain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
+      const fullDomain = domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
+      const res = await supabase.functions.invoke("shopify-oauth-initiate", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { shop: fullDomain },
+      });
+      if (res.error) throw res.error;
+      if (res.data?.url) window.open(res.data.url, "_self");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to start Shopify connection", variant: "destructive" });
+      setConnecting(null);
+    }
+  };
+
   const handleSaveAlerts = async () => {
     setSavingAlerts(true);
     try {
@@ -267,7 +300,7 @@ const Settings = () => {
             <div className="space-y-3">
               <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} connecting={connecting === "meta"} />
               <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} connecting={connecting === "google"} />
-              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => toast({ title: "Coming soon", description: "Shopify integration will be connected shortly." })} connecting={connecting === "shopify"} />
+              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} connecting={connecting === "shopify"} />
             </div>
           )}
         </section>
@@ -368,8 +401,38 @@ const Settings = () => {
           </div>
         </section>
       </div>
+
+      {/* Shopify Domain Dialog */}
+      <Dialog open={shopifyDialogOpen} onOpenChange={setShopifyDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Shopify Store</DialogTitle>
+            <DialogDescription>
+              Enter your Shopify store domain to begin the connection. This is usually your-store.myshopify.com.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="shop-domain" className="text-xs">Store Domain</Label>
+            <Input
+              id="shop-domain"
+              placeholder="your-store.myshopify.com"
+              value={shopDomain}
+              onChange={(e) => setShopDomain(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleConnectShopify()}
+            />
+            <p className="text-[10px] text-muted-foreground">You can enter just the store name (e.g. "your-store") or the full domain.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShopifyDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleConnectShopify} disabled={!shopDomain.trim()}>
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" /> Connect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
 };
 
 export default Settings;
