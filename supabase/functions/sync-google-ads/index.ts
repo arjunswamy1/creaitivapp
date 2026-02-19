@@ -126,7 +126,6 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
     const developerToken = Deno.env.get("GOOGLE_DEVELOPER_TOKEN")!;
     let customers = metadata?.customers || [];
 
-    // If no cached customers, try fetching them live
     if (customers.length === 0) {
       try {
         const customersRes = await fetch(
@@ -142,7 +141,6 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
         try {
           const customersData = JSON.parse(responseText);
           customers = customersData.resourceNames || [];
-          // Update metadata with discovered customers
           if (customers.length > 0) {
             await supabase
               .from("platform_connections")
@@ -159,160 +157,159 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
     }
 
     if (customers.length === 0) {
-      await updateSyncLog(supabase, syncId, "error", 0, "No customer accounts found. Your Google Ads developer token may need approval.");
-      return { error: "No customer accounts found. Your Google Ads developer token may need approval." };
+      await updateSyncLog(supabase, syncId, "error", 0, "No customer accounts found.");
+      return { error: "No customer accounts found." };
     }
 
-    // Date range: last 7 days
+    // 12-month rolling window with 30-day chunks
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 7);
-    const since = formatDate(startDate);
-    const until = formatDate(endDate);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    const chunks = buildDateChunks(startDate, endDate, 30);
 
     let totalRecords = 0;
 
     for (const customerResource of customers) {
       const customerId = customerResource.replace("customers/", "");
-
-      // First try to find accessible MCC child accounts, fallback to direct query
       const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
 
       for (const cid of customerIds) {
-        // Fetch daily account metrics
-        try {
-          const dailyRows = await queryGoogleAds(cid, accessToken, developerToken, `
-            SELECT
-              segments.date,
-              metrics.cost_micros,
-              metrics.impressions,
-              metrics.clicks,
-              metrics.conversions,
-              metrics.conversions_value
-            FROM customer
-            WHERE segments.date BETWEEN '${since}' AND '${until}'
-          `);
+        for (const { since, until } of chunks) {
+          // Daily account metrics
+          try {
+            const dailyRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+              FROM customer
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
 
-          for (const row of dailyRows) {
-            const spend = (row.metrics?.costMicros || 0) / 1_000_000;
-            const revenue = row.metrics?.conversionsValue || 0;
-            const impressions = parseInt(row.metrics?.impressions || "0");
-            const clicks = parseInt(row.metrics?.clicks || "0");
-            const conversions = Math.round(row.metrics?.conversions || 0);
-
-            await supabase
-              .from("ad_daily_metrics")
-              .upsert({
-                user_id: userId,
-                client_id: clientId,
-                platform: "google",
-                date: row.segments?.date,
-                spend,
-                revenue,
-                impressions,
-                clicks,
-                conversions,
-                cpc: clicks > 0 ? spend / clicks : null,
-                ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
-                cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
-                roas: spend > 0 ? revenue / spend : null,
-              }, { onConflict: "user_id,platform,date" });
-            totalRecords++;
+            if (dailyRows.length > 0) {
+              const batch = dailyRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                const impressions = parseInt(row.metrics?.impressions || "0");
+                const clicks = parseInt(row.metrics?.clicks || "0");
+                const conversions = Math.round(row.metrics?.conversions || 0);
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  date: row.segments?.date,
+                  spend, revenue, impressions, clicks, conversions,
+                  cpc: clicks > 0 ? spend / clicks : null,
+                  ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+                  cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
+                  roas: spend > 0 ? revenue / spend : null,
+                };
+              });
+              await supabase.from("ad_daily_metrics").upsert(batch, { onConflict: "user_id,platform,date" });
+              totalRecords += batch.length;
+            }
+          } catch (err) {
+            console.error(`Daily metrics error for ${cid} ${since}-${until}:`, err);
           }
-        } catch (err) {
-          console.error(`Daily metrics error for ${cid}:`, err);
-        }
 
-        // Fetch campaign-level metrics
-        try {
-          const campaignRows = await queryGoogleAds(cid, accessToken, developerToken, `
-            SELECT
-              campaign.id,
-              campaign.name,
-              campaign.status,
-              segments.date,
-              metrics.cost_micros,
-              metrics.impressions,
-              metrics.clicks,
-              metrics.conversions,
-              metrics.conversions_value
-            FROM campaign
-            WHERE segments.date BETWEEN '${since}' AND '${until}'
-          `);
+          // Campaign metrics with impression share
+          try {
+            const campaignRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                campaign.id,
+                campaign.name,
+                campaign.status,
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value,
+                metrics.search_impression_share,
+                metrics.search_budget_lost_impression_share,
+                metrics.search_rank_lost_impression_share
+              FROM campaign
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
 
-          for (const row of campaignRows) {
-            const spend = (row.metrics?.costMicros || 0) / 1_000_000;
-            const revenue = row.metrics?.conversionsValue || 0;
-
-            await supabase
-              .from("ad_campaigns")
-              .upsert({
-                user_id: userId,
-                client_id: clientId,
-                platform: "google",
-                platform_campaign_id: String(row.campaign?.id),
-                campaign_name: row.campaign?.name || "Unknown",
-                status: (row.campaign?.status || "UNKNOWN").toLowerCase(),
-                date: row.segments?.date,
-                spend,
-                revenue,
-                impressions: parseInt(row.metrics?.impressions || "0"),
-                clicks: parseInt(row.metrics?.clicks || "0"),
-                conversions: Math.round(row.metrics?.conversions || 0),
-                roas: spend > 0 ? revenue / spend : null,
-              }, { onConflict: "user_id,platform,platform_campaign_id,date" });
-            totalRecords++;
+            if (campaignRows.length > 0) {
+              const batch = campaignRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  platform_campaign_id: String(row.campaign?.id),
+                  campaign_name: row.campaign?.name || "Unknown",
+                  status: (row.campaign?.status || "UNKNOWN").toLowerCase(),
+                  date: row.segments?.date,
+                  spend, revenue,
+                  impressions: parseInt(row.metrics?.impressions || "0"),
+                  clicks: parseInt(row.metrics?.clicks || "0"),
+                  conversions: Math.round(row.metrics?.conversions || 0),
+                  roas: spend > 0 ? revenue / spend : null,
+                  impression_share: row.metrics?.searchImpressionShare ?? null,
+                  lost_is_budget: row.metrics?.searchBudgetLostImpressionShare ?? null,
+                  lost_is_rank: row.metrics?.searchRankLostImpressionShare ?? null,
+                };
+              });
+              await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
+              totalRecords += batch.length;
+            }
+          } catch (err) {
+            console.error(`Campaign metrics error for ${cid} ${since}-${until}:`, err);
           }
-        } catch (err) {
-          console.error(`Campaign metrics error for ${cid}:`, err);
-        }
 
-        // Fetch ad group level metrics
-        try {
-          const adGroupRows = await queryGoogleAds(cid, accessToken, developerToken, `
-            SELECT
-              campaign.id,
-              campaign.name,
-              ad_group.id,
-              ad_group.name,
-              ad_group.status,
-              segments.date,
-              metrics.cost_micros,
-              metrics.impressions,
-              metrics.clicks,
-              metrics.conversions,
-              metrics.conversions_value
-            FROM ad_group
-            WHERE segments.date BETWEEN '${since}' AND '${until}'
-          `);
+          // Ad group metrics
+          try {
+            const adGroupRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                campaign.id,
+                campaign.name,
+                ad_group.id,
+                ad_group.name,
+                ad_group.status,
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+              FROM ad_group
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
 
-          for (const row of adGroupRows) {
-            const spend = (row.metrics?.costMicros || 0) / 1_000_000;
-            const revenue = row.metrics?.conversionsValue || 0;
-
-            await supabase
-              .from("ad_sets")
-              .upsert({
-                user_id: userId,
-                client_id: clientId,
-                platform: "google",
-                platform_campaign_id: String(row.campaign?.id),
-                platform_adset_id: String(row.adGroup?.id),
-                adset_name: row.adGroup?.name || "Unknown",
-                campaign_name: row.campaign?.name || "Unknown",
-                status: (row.adGroup?.status || "UNKNOWN").toLowerCase(),
-                date: row.segments?.date,
-                spend,
-                revenue,
-                impressions: parseInt(row.metrics?.impressions || "0"),
-                clicks: parseInt(row.metrics?.clicks || "0"),
-                conversions: Math.round(row.metrics?.conversions || 0),
-                roas: spend > 0 ? revenue / spend : null,
-              }, { onConflict: "user_id,platform,platform_adset_id,date" });
-            totalRecords++;
+            if (adGroupRows.length > 0) {
+              const batch = adGroupRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  platform_campaign_id: String(row.campaign?.id),
+                  platform_adset_id: String(row.adGroup?.id),
+                  adset_name: row.adGroup?.name || "Unknown",
+                  campaign_name: row.campaign?.name || "Unknown",
+                  status: (row.adGroup?.status || "UNKNOWN").toLowerCase(),
+                  date: row.segments?.date,
+                  spend, revenue,
+                  impressions: parseInt(row.metrics?.impressions || "0"),
+                  clicks: parseInt(row.metrics?.clicks || "0"),
+                  conversions: Math.round(row.metrics?.conversions || 0),
+                  roas: spend > 0 ? revenue / spend : null,
+                };
+              });
+              await supabase.from("ad_sets").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,date" });
+              totalRecords += batch.length;
+            }
+          } catch (err) {
+            console.error(`Ad group metrics error for ${cid} ${since}-${until}:`, err);
           }
-        } catch (err) {
-          console.error(`Ad group metrics error for ${cid}:`, err);
         }
       }
     }
@@ -324,6 +321,20 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
     await updateSyncLog(supabase, syncId, "error", 0, err.message);
     return { error: err.message };
   }
+}
+
+function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: string; until: string }[] {
+  const chunks: { since: string; until: string }[] = [];
+  let current = new Date(start);
+  while (current <= end) {
+    const chunkEnd = new Date(current);
+    chunkEnd.setDate(chunkEnd.getDate() + chunkDays - 1);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+    chunks.push({ since: formatDate(current), until: formatDate(chunkEnd) });
+    current = new Date(chunkEnd);
+    current.setDate(current.getDate() + 1);
+  }
+  return chunks;
 }
 
 async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<string[]> {
