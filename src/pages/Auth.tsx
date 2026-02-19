@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { BarChart3, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
+import tfcLogo from "@/assets/tfc-logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -66,11 +67,9 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex items-center gap-3 mb-10 justify-center">
-          <div className="w-11 h-11 rounded-lg bg-primary/20 flex items-center justify-center">
-            <BarChart3 className="w-6 h-6 text-primary" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">AdPilot</span>
+        <div className="flex flex-col items-center gap-3 mb-10">
+          <img src={tfcLogo} alt="Tinned Fish Club" className="h-20 w-auto" />
+          <p className="text-sm text-muted-foreground font-medium">Performance Dashboard</p>
         </div>
 
         {/* Card */}
@@ -80,8 +79,8 @@ const Auth = () => {
           </h2>
           <p className="text-sm text-muted-foreground mb-6">
             {isLogin
-              ? "Sign in to your dashboard"
-              : "Start tracking your ad performance"}
+              ? "Sign in to view your performance data"
+              : "Get access to your marketing dashboard"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
