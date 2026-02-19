@@ -410,6 +410,7 @@ export type Database = {
           enabled_kpis: string[] | null
           enabled_platforms: string[] | null
           id: string
+          revenue_source: string
           updated_at: string
         }
         Insert: {
@@ -419,6 +420,7 @@ export type Database = {
           enabled_kpis?: string[] | null
           enabled_platforms?: string[] | null
           id?: string
+          revenue_source?: string
           updated_at?: string
         }
         Update: {
@@ -428,6 +430,7 @@ export type Database = {
           enabled_kpis?: string[] | null
           enabled_platforms?: string[] | null
           id?: string
+          revenue_source?: string
           updated_at?: string
         }
         Relationships: [
@@ -664,6 +667,74 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      shopify_orders: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          currency: string | null
+          customer_id: number | null
+          financial_status: string
+          fulfillment_status: string | null
+          id: string
+          line_items_count: number | null
+          order_date: string | null
+          order_number: string | null
+          shopify_order_id: number
+          subtotal_price: number
+          synced_at: string
+          total_discounts: number
+          total_price: number
+          total_tax: number
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: number | null
+          financial_status: string
+          fulfillment_status?: string | null
+          id?: string
+          line_items_count?: number | null
+          order_date?: string | null
+          order_number?: string | null
+          shopify_order_id: number
+          subtotal_price?: number
+          synced_at?: string
+          total_discounts?: number
+          total_price?: number
+          total_tax?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: number | null
+          financial_status?: string
+          fulfillment_status?: string | null
+          id?: string
+          line_items_count?: number | null
+          order_date?: string | null
+          order_number?: string | null
+          shopify_order_id?: number
+          subtotal_price?: number
+          synced_at?: string
+          total_discounts?: number
+          total_price?: number
+          total_tax?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subbly_invoices: {
         Row: {
