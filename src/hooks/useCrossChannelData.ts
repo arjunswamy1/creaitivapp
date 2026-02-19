@@ -57,7 +57,7 @@ async function fetchSubblySubs(clientId: string, fromStr: string, toStr: string,
 async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: string, toStr: string) {
   let query = supabase
     .from("ad_daily_metrics")
-    .select("platform, spend, revenue")
+    .select("platform, spend")
     .gte("date", fromStr)
     .lte("date", toStr);
 
@@ -65,15 +65,31 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
   const { data, error } = await query;
   if (error) throw error;
 
-  let googleSpend = 0, metaSpend = 0, totalRevenue = 0;
+  let googleSpend = 0, metaSpend = 0;
   for (const row of data || []) {
     const spend = Number(row.spend);
-    const rev = Number(row.revenue);
     if (row.platform === "google") googleSpend += spend;
     else if (row.platform === "meta") metaSpend += spend;
-    totalRevenue += rev;
   }
-  return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend), totalRevenue: Math.round(totalRevenue) };
+  return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend) };
+}
+
+async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: string, dateRange: { from: Date; to: Date }) {
+  const fromUTC = fromStr + "T05:00:00.000Z";
+  const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
+  const toUTC = toNextDay + "T04:59:59.999Z";
+
+  const { data, error } = await supabase
+    .from("subbly_invoices")
+    .select("amount")
+    .eq("client_id", clientId)
+    .eq("status", "paid")
+    .gte("invoice_date", fromUTC)
+    .lte("invoice_date", toUTC);
+
+  if (error) throw error;
+  // Subbly amounts are in cents
+  return (data || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
 }
 
 export function useCrossChannelKPIs() {
@@ -89,22 +105,24 @@ export function useCrossChannelKPIs() {
       if (!clientId) throw new Error("No client");
 
       // Current period
-      const [currentAds, currentSubs] = await Promise.all([
+      const [currentAds, currentSubs, currentRevenue] = await Promise.all([
         fetchAdSpendByPlatform(clientId, fromStr, toStr),
         subblyEnabled ? fetchSubblySubs(clientId, fromStr, toStr, dateRange) : Promise.resolve(0),
+        subblyEnabled ? fetchSubblyRevenue(clientId, fromStr, toStr, dateRange) : Promise.resolve(0),
       ]);
 
       // Previous period
       const prevDateRange = { from: subDays(dateRange.from, differenceInDays(dateRange.to, dateRange.from) + 1), to: subDays(dateRange.from, 1) };
-      const [prevAds, prevSubs] = await Promise.all([
+      const [prevAds, prevSubs, prevRevenue] = await Promise.all([
         fetchAdSpendByPlatform(clientId, prevFrom, prevTo),
         subblyEnabled ? fetchSubblySubs(clientId, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
+        subblyEnabled ? fetchSubblyRevenue(clientId, prevFrom, prevTo, prevDateRange) : Promise.resolve(0),
       ]);
 
       const currentCAC = currentSubs > 0 ? Math.round((currentAds.totalSpend / currentSubs) * 100) / 100 : 0;
       const prevCAC = prevSubs > 0 ? Math.round((prevAds.totalSpend / prevSubs) * 100) / 100 : 0;
-      const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentAds.totalRevenue / currentAds.totalSpend) * 100) / 100 : 0;
-      const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevAds.totalRevenue / prevAds.totalSpend) * 100) / 100 : 0;
+      const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentRevenue / currentAds.totalSpend) * 100) / 100 : 0;
+      const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevRevenue / prevAds.totalSpend) * 100) / 100 : 0;
 
       return {
         totalSpend: currentAds.totalSpend,
@@ -112,7 +130,7 @@ export function useCrossChannelKPIs() {
         metaSpend: currentAds.metaSpend,
         newSubscriptions: currentSubs,
         totalCAC: currentCAC,
-        totalRevenue: currentAds.totalRevenue,
+        totalRevenue: Math.round(currentRevenue * 100) / 100,
         blendedROAS: currentROAS,
         changes: {
           totalSpend: pctChange(currentAds.totalSpend, prevAds.totalSpend),
@@ -120,7 +138,7 @@ export function useCrossChannelKPIs() {
           metaSpend: pctChange(currentAds.metaSpend, prevAds.metaSpend),
           newSubscriptions: pctChange(currentSubs, prevSubs),
           totalCAC: pctChange(currentCAC, prevCAC),
-          totalRevenue: pctChange(currentAds.totalRevenue, prevAds.totalRevenue),
+          totalRevenue: pctChange(currentRevenue, prevRevenue),
           blendedROAS: pctChange(currentROAS, prevROAS),
         },
       };
