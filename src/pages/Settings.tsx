@@ -16,7 +16,16 @@ import {
   Loader2,
   Bell,
   Save,
+  SendHorizonal,
+  Hash,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Link } from "react-router-dom";
 
 interface PlatformConnection {
@@ -84,6 +93,9 @@ const Settings = () => {
   const [minRoas, setMinRoas] = useState("");
   const [slackChannel, setSlackChannel] = useState("");
   const [savingAlerts, setSavingAlerts] = useState(false);
+  const [slackChannels, setSlackChannels] = useState<{ id: string; name: string }[]>([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
+  const [testingSlack, setTestingSlack] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -103,6 +115,52 @@ const Settings = () => {
     };
     fetchData();
   }, []);
+
+  // Fetch Slack channels
+  useEffect(() => {
+    const fetchChannels = async () => {
+      setLoadingChannels(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await supabase.functions.invoke("slack-channels", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.data?.channels) {
+          setSlackChannels(res.data.channels);
+        }
+      } catch (err) {
+        console.error("Failed to fetch Slack channels:", err);
+      } finally {
+        setLoadingChannels(false);
+      }
+    };
+    fetchChannels();
+  }, []);
+
+  const handleTestSlack = async () => {
+    if (!slackChannel) {
+      toast({ title: "No channel selected", description: "Select a Slack channel first.", variant: "destructive" });
+      return;
+    }
+    setTestingSlack(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+      const res = await supabase.functions.invoke("slack-channels?action=test", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { channel: slackChannel },
+      });
+      if (res.error) throw res.error;
+      if (res.data?.error) throw new Error(res.data.error);
+      toast({ title: "Test sent!", description: "Check your Slack channel for the test message." });
+    } catch (err: any) {
+      toast({ title: "Test failed", description: err.message || "Could not send test message", variant: "destructive" });
+    } finally {
+      setTestingSlack(false);
+    }
+  };
 
   useEffect(() => {
     const connected = searchParams.get("connected");
@@ -261,20 +319,52 @@ const Settings = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="slack-channel" className="text-xs">Slack Channel ID</Label>
-              <Input
-                id="slack-channel"
-                placeholder="C0123456789"
-                value={slackChannel}
-                onChange={(e) => setSlackChannel(e.target.value)}
-              />
-              <p className="text-[10px] text-muted-foreground">The Slack channel where alerts will be posted. Connect Slack first in your workspace settings.</p>
+              <Label className="text-xs flex items-center gap-1.5">
+                <Hash className="w-3 h-3" /> Slack Channel
+              </Label>
+              {loadingChannels ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading channels...
+                </div>
+              ) : slackChannels.length > 0 ? (
+                <Select value={slackChannel} onValueChange={setSlackChannel}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a channel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {slackChannels.map((ch) => (
+                      <SelectItem key={ch.id} value={ch.id}>
+                        #{ch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  placeholder="C0123456789"
+                  value={slackChannel}
+                  onChange={(e) => setSlackChannel(e.target.value)}
+                />
+              )}
+              <p className="text-[10px] text-muted-foreground">Alerts will be posted to this channel.</p>
             </div>
 
-            <Button onClick={handleSaveAlerts} disabled={savingAlerts} size="sm" className="gap-1.5">
-              {savingAlerts ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Save Alert Settings
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleSaveAlerts} disabled={savingAlerts} size="sm" className="gap-1.5">
+                {savingAlerts ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                Save Alert Settings
+              </Button>
+              <Button
+                onClick={handleTestSlack}
+                disabled={testingSlack || !slackChannel}
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+              >
+                {testingSlack ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SendHorizonal className="w-3.5 h-3.5" />}
+                Test Alert
+              </Button>
+            </div>
           </div>
         </section>
       </div>
