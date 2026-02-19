@@ -1,4 +1,4 @@
-import { BarChart3, RefreshCw, Settings, Target } from "lucide-react";
+import { RefreshCw, Settings, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -10,11 +10,12 @@ import ClientSwitcher from "@/components/ClientSwitcher";
 import { useClient } from "@/contexts/ClientContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import tfcLogo from "@/assets/tfc-logo.png";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const { activeClient } = useClient();
+  const { activeClient, isAgencyAdmin } = useClient();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -60,49 +61,53 @@ const DashboardHeader = () => {
   return (
     <header className="flex items-center justify-between py-6">
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
-          <BarChart3 className="w-5 h-5 text-primary" />
-        </div>
+        <img src={tfcLogo} alt="Tinned Fish Club" className="h-12 w-auto" />
         <div>
           <h1 className="text-xl font-bold tracking-tight">
             {activeClient ? activeClient.name : "Performance Dashboard"}
           </h1>
-          <p className="text-sm text-muted-foreground">Cross-channel marketing analytics</p>
+          <p className="text-sm text-muted-foreground">Marketing Performance</p>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <ClientSwitcher />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSync}
-                disabled={syncing}
-                className="gap-1.5 text-xs text-muted-foreground"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
-                {lastSynced ? formatRelativeTime(lastSynced) : "Sync"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{syncing ? "Syncing..." : lastSynced ? `Last synced: ${new Date(lastSynced).toLocaleString()}` : "Click to sync"}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        {isAgencyAdmin && <ClientSwitcher />}
+        {isAgencyAdmin && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="gap-1.5 text-xs text-muted-foreground"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+                  {lastSynced ? formatRelativeTime(lastSynced) : "Sync"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{syncing ? "Syncing..." : lastSynced ? `Last synced: ${new Date(lastSynced).toLocaleString()}` : "Click to sync"}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         <DateRangePicker />
-        <Link to="/budget-planner">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
-            <Target className="w-3.5 h-3.5" />
-            Budget Planner
-          </Button>
-        </Link>
-        <Link to="/settings">
-          <Button variant="ghost" size="icon">
-            <Settings className="w-5 h-5" />
-          </Button>
-        </Link>
+        {isAgencyAdmin && (
+          <Link to="/budget-planner">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+              <Target className="w-3.5 h-3.5" />
+              Budget Planner
+            </Button>
+          </Link>
+        )}
+        {isAgencyAdmin && (
+          <Link to="/settings">
+            <Button variant="ghost" size="icon">
+              <Settings className="w-5 h-5" />
+            </Button>
+          </Link>
+        )}
       </div>
     </header>
   );
