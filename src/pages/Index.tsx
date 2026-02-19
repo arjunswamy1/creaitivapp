@@ -3,6 +3,7 @@ import KPICard from "@/components/KPICard";
 import SpendRevenueChart from "@/components/SpendRevenueChart";
 import ChannelBreakdown from "@/components/ChannelBreakdown";
 import CampaignTable from "@/components/CampaignTable";
+import ForecastCard from "@/components/ForecastCard";
 import { useKPIs } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
@@ -52,7 +53,12 @@ const DashboardContent = () => {
         </div>
 
         {/* Campaign Table */}
-        <CampaignTable />
+        <div className="mb-6">
+          <CampaignTable />
+        </div>
+
+        {/* Forecast */}
+        <ForecastCard />
       </div>
     </div>
   );

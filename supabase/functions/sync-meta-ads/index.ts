@@ -16,9 +16,7 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Support both authenticated calls and cron (service role) calls
   let userId: string | null = null;
-
   const authHeader = req.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const supabaseUser = createClient(
@@ -31,25 +29,26 @@ Deno.serve(async (req) => {
     userId = claimsData?.claims?.sub || null;
   }
 
-  // If called from cron, body may contain user_id or we sync all users
   let targetUserIds: string[] = [];
   if (userId) {
     targetUserIds = [userId];
   } else {
-    // Cron mode: sync all users with meta connections
     const { data: connections } = await supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, metadata")
+      .select("user_id, access_token, metadata, selected_ad_account")
       .eq("platform", "meta");
     if (!connections || connections.length === 0) {
       return new Response(JSON.stringify({ message: "No meta connections found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    // Process all connections
     const results = [];
     for (const conn of connections) {
-      const result = await syncMetaForUser(supabaseAdmin, conn.user_id, conn.access_token, conn.metadata);
+      const selectedAccount = conn.selected_ad_account as any;
+      const metadata = selectedAccount?.id
+        ? { ...conn.metadata, ad_accounts: [selectedAccount] }
+        : conn.metadata;
+      const result = await syncMetaForUser(supabaseAdmin, conn.user_id, conn.access_token, metadata);
       results.push(result);
     }
     return new Response(JSON.stringify({ results }), {
@@ -57,7 +56,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Single user sync
   const { data: connection } = await supabaseAdmin
     .from("platform_connections")
     .select("access_token, metadata, selected_ad_account")
@@ -72,7 +70,6 @@ Deno.serve(async (req) => {
     });
   }
 
-  // If user has a selected account, only sync that one
   const selectedAccount = connection.selected_ad_account as any;
   const metadata = selectedAccount?.id
     ? { ...connection.metadata, ad_accounts: [selectedAccount] }
@@ -84,18 +81,12 @@ Deno.serve(async (req) => {
   });
 });
 
-async function syncMetaForUser(
-  supabase: any,
-  userId: string,
-  accessToken: string,
-  metadata: any
-) {
+async function syncMetaForUser(supabase: any, userId: string, accessToken: string, metadata: any) {
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "meta", status: "running" })
     .select("id")
     .single();
-
   const syncId = syncLog?.id;
 
   try {
@@ -111,75 +102,81 @@ async function syncMetaForUser(
     const since = formatDate(startDate);
     const until = formatDate(endDate);
 
-    let totalRecords = 0;
-
-    // Clear existing data for this user/platform so only selected account data remains
+    // Clear existing data so only selected account data remains
     await Promise.all([
       supabase.from("ad_daily_metrics").delete().eq("user_id", userId).eq("platform", "meta"),
       supabase.from("ad_campaigns").delete().eq("user_id", userId).eq("platform", "meta"),
       supabase.from("ad_sets").delete().eq("user_id", userId).eq("platform", "meta"),
+      supabase.from("ads").delete().eq("user_id", userId).eq("platform", "meta"),
     ]);
 
-    // Process all accounts in parallel
+    let totalRecords = 0;
+
     const accountPromises = adAccounts.map(async (account: any) => {
       const accountId = account.id || account.account_id;
       if (!accountId) return 0;
-
       let records = 0;
 
-      // Fetch all 3 levels in parallel per account
-      const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
-        fetchMetaInsights(accountId, accessToken, since, until, "account"),
-        fetchMetaCampaignInsights(accountId, accessToken, since, until),
-        fetchMetaAdsetInsights(accountId, accessToken, since, until),
+      const [dailyInsights, campaignInsights, adsetInsights, adInsights] = await Promise.all([
+        fetchInsights(accountId, accessToken, since, until, "account"),
+        fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,"),
+        fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,"),
+        fetchInsights(accountId, accessToken, since, until, "ad", "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,"),
       ]);
 
       if (dailyInsights) {
         for (const day of dailyInsights) {
-          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(day);
-          await supabase
-            .from("ad_daily_metrics")
-            .upsert({
-              user_id: userId, platform: "meta", date: day.date_start,
-              spend, revenue, impressions, clicks, conversions,
-              cpc: clicks > 0 ? spend / clicks : null,
-              ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
-              cpm: impressions > 0 ? (spend / impressions) * 1000 : null,
-              roas: spend > 0 ? revenue / spend : null,
-            }, { onConflict: "user_id,platform,date" });
+          const m = extractMetrics(day);
+          await supabase.from("ad_daily_metrics").upsert({
+            user_id: userId, platform: "meta", date: day.date_start,
+            spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            cpc: m.clicks > 0 ? m.spend / m.clicks : null,
+            ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : null,
+            cpm: m.impressions > 0 ? (m.spend / m.impressions) * 1000 : null,
+            roas: m.spend > 0 ? m.revenue / m.spend : null,
+          }, { onConflict: "user_id,platform,date" });
           records++;
         }
       }
 
       if (campaignInsights) {
         for (const c of campaignInsights) {
-          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(c);
-          await supabase
-            .from("ad_campaigns")
-            .upsert({
-              user_id: userId, platform: "meta",
-              platform_campaign_id: c.campaign_id, campaign_name: c.campaign_name,
-              status: "active", date: c.date_start,
-              spend, revenue, impressions, clicks, conversions,
-              roas: spend > 0 ? revenue / spend : null,
-            }, { onConflict: "user_id,platform,platform_campaign_id,date" });
+          const m = extractMetrics(c);
+          await supabase.from("ad_campaigns").upsert({
+            user_id: userId, platform: "meta", platform_campaign_id: c.campaign_id,
+            campaign_name: c.campaign_name, status: "active", date: c.date_start,
+            spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            roas: m.spend > 0 ? m.revenue / m.spend : null,
+          }, { onConflict: "user_id,platform,platform_campaign_id,date" });
           records++;
         }
       }
 
       if (adsetInsights) {
         for (const a of adsetInsights) {
-          const { spend, impressions, clicks, conversions, revenue } = extractMetrics(a);
-          await supabase
-            .from("ad_sets")
-            .upsert({
-              user_id: userId, platform: "meta",
-              platform_campaign_id: a.campaign_id, platform_adset_id: a.adset_id,
-              adset_name: a.adset_name, campaign_name: a.campaign_name,
-              status: "active", date: a.date_start,
-              spend, revenue, impressions, clicks, conversions,
-              roas: spend > 0 ? revenue / spend : null,
-            }, { onConflict: "user_id,platform,platform_adset_id,date" });
+          const m = extractMetrics(a);
+          await supabase.from("ad_sets").upsert({
+            user_id: userId, platform: "meta", platform_campaign_id: a.campaign_id,
+            platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
+            status: "active", date: a.date_start,
+            spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            roas: m.spend > 0 ? m.revenue / m.spend : null,
+          }, { onConflict: "user_id,platform,platform_adset_id,date" });
+          records++;
+        }
+      }
+
+      if (adInsights) {
+        for (const ad of adInsights) {
+          const m = extractMetrics(ad);
+          await supabase.from("ads").upsert({
+            user_id: userId, platform: "meta", platform_ad_id: ad.ad_id,
+            platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
+            ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
+            status: "active", date: ad.date_start,
+            spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            roas: m.spend > 0 ? m.revenue / m.spend : null,
+          }, { onConflict: "user_id,platform,platform_ad_id,date" });
           records++;
         }
       }
@@ -199,33 +196,14 @@ async function syncMetaForUser(
   }
 }
 
-async function fetchMetaInsights(accountId: string, accessToken: string, since: string, until: string, level: string) {
-  const fields = "spend,impressions,clicks,actions,action_values";
-  const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}`;
-  console.log(`Fetching insights for ${accountId}, level=${level}, since=${since}, until=${until}`);
+async function fetchInsights(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "") {
+  const fields = `${extraFields}spend,impressions,clicks,actions,action_values`;
+  const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}&limit=500`;
+  console.log(`Fetching ${level} for ${accountId}`);
   const res = await fetch(url);
   const data = await res.json();
-  console.log(`Response for ${accountId}: ${JSON.stringify(data).substring(0, 500)}`);
-  return data.data || null;
-}
-
-async function fetchMetaCampaignInsights(accountId: string, accessToken: string, since: string, until: string) {
-  const fields = "campaign_id,campaign_name,spend,impressions,clicks,actions,action_values";
-  const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=campaign&access_token=${accessToken}&limit=500`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.data?.length) console.log(`Campaigns for ${accountId}: ${data.data.length} rows`);
-  if (data.error) console.error(`Campaign error ${accountId}: ${data.error.message}`);
-  return data.data || null;
-}
-
-async function fetchMetaAdsetInsights(accountId: string, accessToken: string, since: string, until: string) {
-  const fields = "campaign_id,campaign_name,adset_id,adset_name,spend,impressions,clicks,actions,action_values";
-  const url = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=adset&access_token=${accessToken}&limit=500`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.data?.length) console.log(`Adsets for ${accountId}: ${data.data.length} rows`);
-  if (data.error) console.error(`Adset error ${accountId}: ${data.error.message}`);
+  if (data.error) console.error(`${level} error ${accountId}: ${data.error.message}`);
+  if (data.data?.length) console.log(`${level} for ${accountId}: ${data.data.length} rows`);
   return data.data || null;
 }
 
@@ -235,47 +213,31 @@ function formatDate(d: Date): string {
 
 async function updateSyncLog(supabase: any, syncId: string, status: string, records: number, error?: string) {
   if (!syncId) return;
-  await supabase
-    .from("ad_sync_log")
-    .update({
-      status,
-      records_synced: records,
-      error_message: error || null,
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", syncId);
+  await supabase.from("ad_sync_log").update({
+    status, records_synced: records, error_message: error || null, completed_at: new Date().toISOString(),
+  }).eq("id", syncId);
 }
 
 const PURCHASE_ACTIONS = [
   "purchase", "omni_purchase", "web_in_store_purchase",
-  "offsite_conversion.fb_pixel_purchase",
-  "offsite_conversion.custom.purchase",
+  "offsite_conversion.fb_pixel_purchase", "offsite_conversion.custom.purchase",
 ];
 
 function extractMetrics(row: any) {
   const spend = parseFloat(row.spend || "0");
   const impressions = parseInt(row.impressions || "0");
   const clicks = parseInt(row.clicks || "0");
-
-  let conversions = 0;
-  let revenue = 0;
+  let conversions = 0, revenue = 0;
 
   if (row.actions) {
     for (const a of row.actions) {
-      if (PURCHASE_ACTIONS.includes(a.action_type)) {
-        conversions += parseInt(a.value || "0");
-        break; // avoid double counting
-      }
+      if (PURCHASE_ACTIONS.includes(a.action_type)) { conversions += parseInt(a.value || "0"); break; }
     }
   }
   if (row.action_values) {
     for (const a of row.action_values) {
-      if (PURCHASE_ACTIONS.includes(a.action_type)) {
-        revenue += parseFloat(a.value || "0");
-        break;
-      }
+      if (PURCHASE_ACTIONS.includes(a.action_type)) { revenue += parseFloat(a.value || "0"); break; }
     }
   }
-
   return { spend, impressions, clicks, conversions, revenue };
 }
