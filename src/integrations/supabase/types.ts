@@ -266,7 +266,10 @@ export type Database = {
           client_id: string | null
           conversions: number
           created_at: string
+          creative_url: string | null
           date: string
+          format: string | null
+          frequency: number | null
           id: string
           impressions: number
           platform: string
@@ -277,8 +280,13 @@ export type Database = {
           roas: number | null
           spend: number
           status: string | null
+          thumbnail_url: string | null
           updated_at: string
           user_id: string
+          video_views_25: number | null
+          video_views_3s: number | null
+          video_views_50: number | null
+          video_views_95: number | null
         }
         Insert: {
           ad_name: string
@@ -288,7 +296,10 @@ export type Database = {
           client_id?: string | null
           conversions?: number
           created_at?: string
+          creative_url?: string | null
           date: string
+          format?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number
           platform: string
@@ -299,8 +310,13 @@ export type Database = {
           roas?: number | null
           spend?: number
           status?: string | null
+          thumbnail_url?: string | null
           updated_at?: string
           user_id: string
+          video_views_25?: number | null
+          video_views_3s?: number | null
+          video_views_50?: number | null
+          video_views_95?: number | null
         }
         Update: {
           ad_name?: string
@@ -310,7 +326,10 @@ export type Database = {
           client_id?: string | null
           conversions?: number
           created_at?: string
+          creative_url?: string | null
           date?: string
+          format?: string | null
+          frequency?: number | null
           id?: string
           impressions?: number
           platform?: string
@@ -321,8 +340,13 @@ export type Database = {
           roas?: number | null
           spend?: number
           status?: string | null
+          thumbnail_url?: string | null
           updated_at?: string
           user_id?: string
+          video_views_25?: number | null
+          video_views_3s?: number | null
+          video_views_50?: number | null
+          video_views_95?: number | null
         }
         Relationships: [
           {

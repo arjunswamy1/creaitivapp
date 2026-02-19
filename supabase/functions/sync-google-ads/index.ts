@@ -310,6 +310,66 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
           } catch (err) {
             console.error(`Ad group metrics error for ${cid} ${since}-${until}:`, err);
           }
+
+          // Ad-level metrics
+          try {
+            const adRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                campaign.id,
+                campaign.name,
+                ad_group.id,
+                ad_group.name,
+                ad_group_ad.ad.id,
+                ad_group_ad.ad.name,
+                ad_group_ad.ad.type,
+                ad_group_ad.status,
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+              FROM ad_group_ad
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
+
+            if (adRows.length > 0) {
+              const batch = adRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                const adType = row.adGroupAd?.ad?.type || "";
+                let format = "unknown";
+                if (adType.includes("RESPONSIVE_SEARCH")) format = "responsive_search";
+                else if (adType.includes("VIDEO")) format = "video";
+                else if (adType.includes("RESPONSIVE_DISPLAY") || adType.includes("IMAGE")) format = "static";
+                else if (adType.includes("SHOPPING") || adType.includes("SMART_SHOPPING")) format = "shopping";
+                else if (adType.includes("PERFORMANCE_MAX")) format = "pmax";
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  platform_ad_id: String(row.adGroupAd?.ad?.id || ""),
+                  platform_adset_id: String(row.adGroup?.id),
+                  platform_campaign_id: String(row.campaign?.id),
+                  ad_name: row.adGroupAd?.ad?.name || `Ad ${row.adGroupAd?.ad?.id}`,
+                  adset_name: row.adGroup?.name || "Unknown",
+                  campaign_name: row.campaign?.name || "Unknown",
+                  status: (row.adGroupAd?.status || "UNKNOWN").toLowerCase(),
+                  date: row.segments?.date,
+                  spend, revenue,
+                  impressions: parseInt(row.metrics?.impressions || "0"),
+                  clicks: parseInt(row.metrics?.clicks || "0"),
+                  conversions: Math.round(row.metrics?.conversions || 0),
+                  roas: spend > 0 ? revenue / spend : null,
+                  format,
+                };
+              });
+              await supabase.from("ads").upsert(batch, { onConflict: "user_id,platform,platform_ad_id,date" });
+              totalRecords += batch.length;
+            }
+          } catch (err) {
+            console.error(`Ad metrics error for ${cid} ${since}-${until}:`, err);
+          }
         }
       }
     }

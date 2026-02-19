@@ -113,8 +113,12 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,"),
       ]);
 
-      // Fetch ad-level data in monthly chunks to avoid Meta's data size limit
-      const adInsights = await fetchInsightsChunked(accountId, accessToken, since, until, "ad", "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,");
+      // Fetch ad-level data with creative fields in monthly chunks
+      const adInsights = await fetchInsightsChunked(
+        accountId, accessToken, since, until, "ad",
+        "campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,",
+        "video_p25_watched_actions,video_p50_watched_actions,video_p95_watched_actions,video_30_sec_watched_actions,frequency,"
+      );
 
       if (dailyInsights) {
         const batch = dailyInsights.map((day: any) => {
@@ -162,8 +166,13 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
       }
 
       if (adInsights) {
+        // Fetch ad creatives for format detection
+        const creativeMap = await fetchAdCreatives(accountId, accessToken);
+
         const batch = adInsights.map((ad: any) => {
           const m = extractMetrics(ad);
+          const creative = creativeMap.get(ad.ad_id);
+          const format = detectFormat(ad.ad_name, creative);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
@@ -171,6 +180,13 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             status: "active", date: ad.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
+            format,
+            frequency: ad.frequency ? parseFloat(ad.frequency) : null,
+            video_views_3s: extractVideoMetric(ad.video_30_sec_watched_actions),
+            video_views_25: extractVideoMetric(ad.video_p25_watched_actions),
+            video_views_50: extractVideoMetric(ad.video_p50_watched_actions),
+            video_views_95: extractVideoMetric(ad.video_p95_watched_actions),
+            thumbnail_url: creative?.thumbnail_url || null,
           };
         });
         await batchUpsert(supabase, "ads", batch, "user_id,platform,platform_ad_id,date");
@@ -192,8 +208,8 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
   }
 }
 
-async function fetchInsights(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "") {
-  const fields = `${extraFields}spend,impressions,clicks,actions,action_values`;
+async function fetchInsights(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "", extraMetricFields = "") {
+  const fields = `${extraFields}spend,impressions,clicks,actions,action_values${extraMetricFields ? "," + extraMetricFields.replace(/,$/, "") : ""}`;
   let allData: any[] = [];
   let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/insights?fields=${fields}&time_range={"since":"${since}","until":"${until}"}&time_increment=1&level=${level}&access_token=${accessToken}&limit=500`;
   console.log(`Fetching ${level} for ${accountId}`);
@@ -213,7 +229,7 @@ async function fetchInsights(accountId: string, accessToken: string, since: stri
   return allData.length > 0 ? allData : null;
 }
 
-async function fetchInsightsChunked(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "") {
+async function fetchInsightsChunked(accountId: string, accessToken: string, since: string, until: string, level: string, extraFields = "", extraMetricFields = "") {
   // Split into 30-day chunks to avoid Meta's "reduce the amount of data" error
   const chunks: { since: string; until: string }[] = [];
   const start = new Date(since);
@@ -231,12 +247,62 @@ async function fetchInsightsChunked(accountId: string, accessToken: string, sinc
 
   let allData: any[] = [];
   for (const chunk of chunks) {
-    const data = await fetchInsights(accountId, accessToken, chunk.since, chunk.until, level, extraFields);
+    const data = await fetchInsights(accountId, accessToken, chunk.since, chunk.until, level, extraFields, extraMetricFields);
     if (data) allData = allData.concat(data);
   }
 
   console.log(`${level} chunked total for ${accountId}: ${allData.length} rows`);
   return allData.length > 0 ? allData : null;
+}
+
+async function fetchAdCreatives(accountId: string, accessToken: string): Promise<Map<string, any>> {
+  const map = new Map<string, any>();
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,creative{object_type,thumbnail_url,effective_object_story_id}&limit=500&access_token=${accessToken}`;
+  
+  try {
+    while (url) {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        console.error("Ad creatives error:", data.error.message);
+        break;
+      }
+      if (data.data) {
+        for (const ad of data.data) {
+          map.set(ad.id, {
+            object_type: ad.creative?.object_type || null,
+            thumbnail_url: ad.creative?.thumbnail_url || null,
+          });
+        }
+      }
+      url = data.paging?.next || null;
+    }
+  } catch (err) {
+    console.error("Failed to fetch ad creatives:", err);
+  }
+  console.log(`Fetched creatives for ${map.size} ads`);
+  return map;
+}
+
+function detectFormat(adName: string, creative: any): string {
+  const objectType = creative?.object_type?.toLowerCase() || "";
+  if (objectType.includes("video")) return "video";
+  if (objectType === "share" || objectType === "link") return "static";
+  if (objectType === "carousel") return "carousel";
+  // Fallback: name-based detection
+  const nameLower = adName.toLowerCase();
+  if (nameLower.includes("video") || nameLower.includes("ugc") || nameLower.includes("vsl")) return "video";
+  if (nameLower.includes("carousel") || nameLower.includes("caro")) return "carousel";
+  if (nameLower.includes("static") || nameLower.includes("image")) return "static";
+  return "unknown";
+}
+
+function extractVideoMetric(actions: any[] | undefined): number | null {
+  if (!actions || !Array.isArray(actions)) return null;
+  for (const a of actions) {
+    if (a.action_type === "video_view") return parseInt(a.value || "0");
+  }
+  return null;
 }
 async function batchUpsert(supabase: any, table: string, rows: any[], onConflict: string, batchSize = 200) {
   for (let i = 0; i < rows.length; i += batchSize) {
