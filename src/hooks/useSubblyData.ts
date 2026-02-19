@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
+import { useDateRange } from "@/contexts/DateRangeContext";
+import { format } from "date-fns";
 
 export interface SubblyKPIs {
   activeSubscriptions: number;
@@ -13,11 +15,14 @@ export interface SubblyKPIs {
 
 export function useSubblyKPIs() {
   const { activeClient, dashboardConfig } = useClient();
+  const { dateRange } = useDateRange();
   const clientId = activeClient?.id;
   const enabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+  const fromStr = format(dateRange.from, "yyyy-MM-dd");
+  const toStr = format(dateRange.to, "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["subbly-kpis", clientId],
+    queryKey: ["subbly-kpis", clientId, fromStr, toStr],
     enabled: !!clientId && enabled,
     queryFn: async (): Promise<SubblyKPIs> => {
       if (!clientId) throw new Error("No client");
@@ -35,12 +40,14 @@ export function useSubblyKPIs() {
       );
       const cancelledSubs = (subs || []).filter((s) => s.status === "cancelled");
 
-      // Fetch paid invoices for revenue
+      // Fetch paid invoices filtered by date range
       const { data: invoices, error: invErr } = await supabase
         .from("subbly_invoices")
-        .select("amount, status")
+        .select("amount, status, invoice_date")
         .eq("client_id", clientId)
-        .eq("status", "paid");
+        .eq("status", "paid")
+        .gte("invoice_date", fromStr)
+        .lte("invoice_date", toStr + "T23:59:59.999Z");
 
       if (invErr) throw invErr;
 
