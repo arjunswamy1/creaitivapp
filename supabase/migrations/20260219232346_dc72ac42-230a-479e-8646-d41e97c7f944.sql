@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.idx_platform_connections_user_platform;

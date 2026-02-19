@@ -87,9 +87,10 @@ Deno.serve(async (req) => {
 
     // Redirect back to settings
     const appUrl = Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "https://id-preview--774dbaa2-6e13-44bc-8448-7d4764315a98.lovable.app";
+    const clientParam = parsedState.client_id ? `&client_id=${parsedState.client_id}` : "";
     return new Response(null, {
       status: 302,
-      headers: { Location: `${appUrl}/settings?connected=shopify` },
+      headers: { Location: `${appUrl}/settings?connected=shopify${clientParam}` },
     });
   } catch (err) {
     console.error("Shopify callback error:", err);

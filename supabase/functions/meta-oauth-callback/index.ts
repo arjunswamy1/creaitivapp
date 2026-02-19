@@ -109,7 +109,8 @@ Deno.serve(async (req) => {
       return redirect(`/settings?error=db_error`);
     }
 
-    return redirect("/settings?connected=meta");
+    const clientParam = state.client_id ? `&client_id=${state.client_id}` : "";
+    return redirect(`/settings?connected=meta${clientParam}`);
   } catch (err) {
     console.error("Callback error:", err);
     const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://id-preview--774dbaa2-6e13-44bc-8448-7d4764315a98.lovable.app";

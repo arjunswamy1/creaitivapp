@@ -125,7 +125,8 @@ Deno.serve(async (req) => {
       return redirect("/settings?error=db_error");
     }
 
-    return redirect("/settings?connected=google");
+    const clientParam = state.client_id ? `&client_id=${state.client_id}` : "";
+    return redirect(`/settings?connected=google${clientParam}`);
   } catch (err) {
     console.error("Callback error:", err);
     const frontendUrl =

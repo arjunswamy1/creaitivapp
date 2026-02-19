@@ -101,7 +101,7 @@ const PlatformCard = ({
 
 const Settings = () => {
   const { user, signOut } = useAuth();
-  const { activeClient, dashboardConfig } = useClient();
+  const { activeClient, dashboardConfig, setActiveClientId } = useClient();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
@@ -191,14 +191,23 @@ const Settings = () => {
     }
   };
 
+  
+
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("error");
+    const returnClientId = searchParams.get("client_id");
+
+    // Restore the client context from the OAuth redirect
+    if (returnClientId) {
+      setActiveClientId(returnClientId);
+    }
 
     if (connected) {
       toast({ title: "Connected!", description: `${connected.charAt(0).toUpperCase() + connected.slice(1)} account connected successfully.` });
+      const cid = returnClientId || activeClient?.id;
       let connQuery = supabase.from("platform_connections").select("platform, account_name, connected_at, client_id");
-      if (activeClient?.id) connQuery = connQuery.eq("client_id", activeClient.id);
+      if (cid) connQuery = connQuery.eq("client_id", cid);
       connQuery.then(({ data }) => { if (data) setConnections(data); });
       setSearchParams({}, { replace: true });
     }
