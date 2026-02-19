@@ -89,19 +89,27 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const token = authHeader.replace("Bearer ", "");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const isCron = token === serviceRoleKey;
 
-    console.log("sync-subbly: verifying user");
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) {
-      console.log("sync-subbly: auth failed", userErr?.message);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    if (!isCron) {
+      // Normal user auth flow
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      console.log("sync-subbly: verifying user");
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !user) {
+        console.log("sync-subbly: auth failed", userErr?.message);
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+      }
+      console.log("sync-subbly: user verified", user.id);
+    } else {
+      console.log("sync-subbly: cron/service-role invocation");
     }
-    console.log("sync-subbly: user verified", user.id);
 
     const body = await req.json().catch(() => ({}));
     console.log("sync-subbly: body", JSON.stringify(body));
