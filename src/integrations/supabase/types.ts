@@ -618,6 +618,7 @@ export type Database = {
           product_id: number
           quantity: number
           status: string
+          subbly_created_at: string | null
           subbly_id: number
           successful_charges_count: number | null
           synced_at: string
@@ -635,6 +636,7 @@ export type Database = {
           product_id: number
           quantity?: number
           status: string
+          subbly_created_at?: string | null
           subbly_id: number
           successful_charges_count?: number | null
           synced_at?: string
@@ -652,6 +654,7 @@ export type Database = {
           product_id?: number
           quantity?: number
           status?: string
+          subbly_created_at?: string | null
           subbly_id?: number
           successful_charges_count?: number | null
           synced_at?: string
