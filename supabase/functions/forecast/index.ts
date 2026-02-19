@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
   // Determine current month boundaries
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of month
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const totalDaysInMonth = monthEnd.getDate();
   const today = now.getDate();
   const remainingDays = totalDaysInMonth - today;
@@ -44,93 +44,116 @@ Deno.serve(async (req) => {
   const monthStartStr = formatDate(monthStart);
   const todayStr = formatDate(now);
 
-  // Fetch actuals for current month so far
-  const { data: monthActuals, error: monthErr } = await supabase
+  // Fetch MTD ad spend (all platforms)
+  const { data: monthAdMetrics, error: adErr } = await supabase
     .from("ad_daily_metrics")
-    .select("date, spend, revenue, conversions")
+    .select("date, spend")
     .gte("date", monthStartStr)
     .lte("date", todayStr)
     .order("date", { ascending: true });
 
-  if (monthErr) {
-    return new Response(JSON.stringify({ error: monthErr.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  if (adErr) {
+    return errResponse(adErr.message);
   }
 
-  // Fetch all historical data for regression
-  const { data: allMetrics, error: allErr } = await supabase
+  // Fetch MTD Subbly new subscriptions
+  const fromUTC = monthStartStr + "T05:00:00.000Z";
+  const tomorrowStr = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  const toUTC = tomorrowStr + "T04:59:59.999Z";
+
+  const { data: monthSubs, error: subErr } = await supabase
+    .from("subbly_subscriptions")
+    .select("id, subbly_created_at")
+    .gte("subbly_created_at", fromUTC)
+    .lte("subbly_created_at", toUTC);
+
+  if (subErr) {
+    return errResponse(subErr.message);
+  }
+
+  // Fetch historical daily data for regression (spend + subs)
+  const { data: allAdMetrics, error: allAdErr } = await supabase
     .from("ad_daily_metrics")
-    .select("date, spend, revenue, conversions")
+    .select("date, spend")
     .order("date", { ascending: true });
 
-  if (allErr) {
-    return new Response(JSON.stringify({ error: allErr.message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  if (allAdErr) {
+    return errResponse(allAdErr.message);
   }
 
-  if (!allMetrics || allMetrics.length < 3) {
-    return new Response(JSON.stringify({ error: "Not enough data for forecasting (need 3+ days)" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const { data: allSubs, error: allSubErr } = await supabase
+    .from("subbly_subscriptions")
+    .select("subbly_created_at")
+    .not("subbly_created_at", "is", null)
+    .order("subbly_created_at", { ascending: true });
+
+  if (allSubErr) {
+    return errResponse(allSubErr.message);
   }
 
-  // Actuals MTD
-  const actualPurchases = (monthActuals || []).reduce((s, r) => s + Number(r.conversions), 0);
-  const actualSpend = (monthActuals || []).reduce((s, r) => s + Number(r.spend), 0);
-  const actualRevenue = (monthActuals || []).reduce((s, r) => s + Number(r.revenue), 0);
-  const daysWithData = (monthActuals || []).length;
+  // Build daily spend map
+  const dailySpend = new Map<string, number>();
+  for (const row of allAdMetrics || []) {
+    const d = row.date;
+    dailySpend.set(d, (dailySpend.get(d) || 0) + Number(row.spend));
+  }
 
-  // Linear regression on all historical for daily projections
-  const dailyData = allMetrics.map((m, i) => ({
+  // Build daily subs map
+  const dailySubs = new Map<string, number>();
+  for (const sub of allSubs || []) {
+    if (!sub.subbly_created_at) continue;
+    const d = sub.subbly_created_at.split("T")[0];
+    dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
+  }
+
+  // Merge into aligned daily series
+  const allDates = [...new Set([...dailySpend.keys(), ...dailySubs.keys()])].sort();
+  if (allDates.length < 3) {
+    return errResponse("Not enough data for forecasting (need 3+ days)", 400);
+  }
+
+  const dailyData = allDates.map((d, i) => ({
     index: i,
-    spend: Number(m.spend),
-    revenue: Number(m.revenue),
-    conversions: Number(m.conversions),
+    spend: dailySpend.get(d) || 0,
+    subs: dailySubs.get(d) || 0,
   }));
 
-  const convRegression = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.conversions));
-  const spendRegression = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.spend));
-  const revRegression = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.revenue));
+  // MTD actuals
+  const actualSpend = (monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0);
+  const actualSubs = (monthSubs || []).length;
+  const daysWithData = new Set((monthAdMetrics || []).map(r => r.date)).size;
 
+  // Linear regression for projections
+  const spendReg = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.spend));
+  const subsReg = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.subs));
   const n = dailyData.length;
 
-  // Project remaining days of the month
-  const dailyForecast: any[] = [];
-  let projectedPurchases = 0;
   let projectedSpend = 0;
-  let projectedRevenue = 0;
+  let projectedSubs = 0;
+  const dailyForecast: any[] = [];
 
   for (let i = 1; i <= remainingDays; i++) {
     const idx = n + i - 1;
     const forecastDate = new Date(now);
     forecastDate.setDate(forecastDate.getDate() + i);
-    const dayPurchases = Math.max(0, Math.round(convRegression.slope * idx + convRegression.intercept));
-    const daySpend = Math.max(0, Math.round(spendRegression.slope * idx + spendRegression.intercept));
-    const dayRevenue = Math.max(0, Math.round(revRegression.slope * idx + revRegression.intercept));
+    const daySpend = Math.max(0, Math.round(spendReg.slope * idx + spendReg.intercept));
+    const daySubs = Math.max(0, Math.round(subsReg.slope * idx + subsReg.intercept));
 
-    projectedPurchases += dayPurchases;
     projectedSpend += daySpend;
-    projectedRevenue += dayRevenue;
+    projectedSubs += daySubs;
 
     dailyForecast.push({
       date: formatDate(forecastDate),
-      projected_conversions: dayPurchases,
       projected_spend: daySpend,
-      projected_revenue: dayRevenue,
+      projected_subs: daySubs,
     });
   }
 
-  // Monthly totals = actual + projected
-  const monthTotalPurchases = actualPurchases + projectedPurchases;
   const monthTotalSpend = actualSpend + projectedSpend;
-  const monthTotalRevenue = actualRevenue + projectedRevenue;
-  const monthCAC = monthTotalPurchases > 0 ? Math.round((monthTotalSpend / monthTotalPurchases) * 100) / 100 : 0;
-  const monthROAS = monthTotalSpend > 0 ? Math.round((monthTotalRevenue / monthTotalSpend) * 100) / 100 : 0;
+  const monthTotalSubs = actualSubs + projectedSubs;
+  const monthCAC = monthTotalSubs > 0 ? Math.round((monthTotalSpend / monthTotalSubs) * 100) / 100 : 0;
 
-  // Daily average for context
-  const avgDailyPurchases = daysWithData > 0 ? Math.round((actualPurchases / daysWithData) * 10) / 10 : 0;
+  const avgDailySubs = daysWithData > 0 ? Math.round((actualSubs / daysWithData) * 10) / 10 : 0;
   const avgDailySpend = daysWithData > 0 ? Math.round(actualSpend / daysWithData) : 0;
 
   const stats = {
@@ -138,42 +161,34 @@ Deno.serve(async (req) => {
     days_elapsed: today,
     days_remaining: remainingDays,
     total_days: totalDaysInMonth,
-    // Actuals MTD
-    actual_purchases: actualPurchases,
+    actual_subs: actualSubs,
     actual_spend: Math.round(actualSpend),
-    actual_revenue: Math.round(actualRevenue),
-    actual_cac: actualPurchases > 0 ? Math.round((actualSpend / actualPurchases) * 100) / 100 : 0,
-    // Projected remaining
-    projected_remaining_purchases: projectedPurchases,
+    actual_cac: actualSubs > 0 ? Math.round((actualSpend / actualSubs) * 100) / 100 : 0,
+    projected_remaining_subs: projectedSubs,
     projected_remaining_spend: Math.round(projectedSpend),
-    projected_remaining_revenue: Math.round(projectedRevenue),
-    // Month totals (actual + projected)
-    month_total_purchases: monthTotalPurchases,
+    month_total_subs: monthTotalSubs,
     month_total_spend: Math.round(monthTotalSpend),
-    month_total_revenue: Math.round(monthTotalRevenue),
     month_cac: monthCAC,
-    month_roas: monthROAS,
-    // Context
-    avg_daily_purchases: avgDailyPurchases,
+    avg_daily_subs: avgDailySubs,
     avg_daily_spend: avgDailySpend,
     daily_forecast: dailyForecast,
   };
 
-  // AI insight layer
+  // AI insight
   let aiInsight = "";
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (LOVABLE_API_KEY) {
     try {
-      const prompt = `You are a performance marketing analyst. Provide a concise 3-4 sentence monthly forecast summary.
+      const prompt = `You are a performance marketing analyst for a DTC subscription brand. Provide a concise 3-4 sentence monthly forecast summary.
 
 Month: ${monthName}
 Days elapsed: ${today} of ${totalDaysInMonth}
-Actuals MTD: ${actualPurchases} purchases, $${Math.round(actualSpend)} spend, $${Math.round(actualRevenue)} revenue, CAC $${stats.actual_cac}
-Avg daily: ${avgDailyPurchases} purchases/day, $${avgDailySpend} spend/day
+Actuals MTD: ${actualSubs} new subscriptions, $${Math.round(actualSpend)} total ad spend, CAC $${stats.actual_cac}
+Avg daily: ${avgDailySubs} subs/day, $${avgDailySpend} spend/day
 
-Forecast for full month: ${monthTotalPurchases} total purchases, $${Math.round(monthTotalSpend)} total spend, CAC $${monthCAC}, ROAS ${monthROAS}x
+Forecast for full month: ${monthTotalSubs} total new subscriptions, $${Math.round(monthTotalSpend)} total spend, CAC $${monthCAC}
 
-Focus on: Will the brand hit purchase targets? Is CAC trending well? Actionable advice.`;
+Focus on: subscription growth trajectory, CAC efficiency, and actionable advice to improve acquisition.`;
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -199,6 +214,16 @@ Focus on: Will the brand hit purchase targets? Is CAC trending well? Actionable 
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
+
+function errResponse(msg: string, status = 500) {
+  return new Response(JSON.stringify({ error: msg }), {
+    status,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Content-Type": "application/json",
+    },
+  });
+}
 
 function formatDate(d: Date): string {
   return d.toISOString().split("T")[0];

@@ -7,8 +7,8 @@ interface FunnelStep {
   formatted: string;
 }
 
-const FunnelChart = () => {
-  const { data: kpis, isLoading } = useKPIs();
+const FunnelChart = ({ platform }: { platform?: string }) => {
+  const { data: kpis, isLoading } = useKPIs(platform);
 
   if (isLoading) {
     return <Skeleton className="h-[260px] rounded-xl" />;

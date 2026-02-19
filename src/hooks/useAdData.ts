@@ -96,13 +96,13 @@ function useDateStrings() {
   return { fromStr, toStr, prevFrom, prevTo, days };
 }
 
-export function useKPIs() {
+export function useKPIs(platform?: string) {
   const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
   const { activeClient } = useClient();
   const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["kpis", fromStr, toStr, clientId],
+    queryKey: ["kpis", fromStr, toStr, clientId, platform],
     queryFn: async (): Promise<KPIWithChange> => {
       let currentQuery = supabase.from("ad_daily_metrics")
         .select("spend, revenue, impressions, clicks, conversions")
@@ -114,6 +114,10 @@ export function useKPIs() {
       if (clientId) {
         currentQuery = currentQuery.eq("client_id", clientId);
         previousQuery = previousQuery.eq("client_id", clientId);
+      }
+      if (platform) {
+        currentQuery = currentQuery.eq("platform", platform);
+        previousQuery = previousQuery.eq("platform", platform);
       }
 
       const [{ data: current, error: e1 }, { data: previous }] = await Promise.all([
@@ -230,13 +234,13 @@ export function useChannelBreakdown() {
   });
 }
 
-export function useTopCampaigns() {
+export function useTopCampaigns(platform?: string) {
   const { fromStr, toStr } = useDateStrings();
   const { activeClient } = useClient();
   const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["top-campaigns", fromStr, toStr, clientId],
+    queryKey: ["top-campaigns", fromStr, toStr, clientId, platform],
     queryFn: async (): Promise<CampaignRow[]> => {
       let query = supabase
         .from("ad_campaigns")
@@ -244,6 +248,7 @@ export function useTopCampaigns() {
         .gte("date", fromStr).lte("date", toStr);
 
       if (clientId) query = query.eq("client_id", clientId);
+      if (platform) query = query.eq("platform", platform);
 
       const { data, error } = await query;
 

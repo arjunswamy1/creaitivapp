@@ -1,6 +1,6 @@
 import { useForecast } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, DollarSign, ShoppingCart, Target, Sparkles, CalendarDays } from "lucide-react";
+import { DollarSign, Target, Sparkles, CalendarDays, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const ForecastCard = () => {
@@ -53,16 +53,16 @@ const ForecastCard = () => {
       {/* Actuals vs Projected */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <MetricCard
-          icon={<ShoppingCart className="w-3.5 h-3.5" />}
-          label="MTD Purchases"
-          value={forecast.actual_purchases}
-          sublabel={`${forecast.avg_daily_purchases}/day avg`}
+          icon={<Users className="w-3.5 h-3.5" />}
+          label="MTD New Subs"
+          value={forecast.actual_subs}
+          sublabel={`${forecast.avg_daily_subs}/day avg`}
         />
         <MetricCard
-          icon={<ShoppingCart className="w-3.5 h-3.5" />}
-          label="Projected Month Total"
-          value={forecast.month_total_purchases}
-          sublabel={`+${forecast.projected_remaining_purchases} remaining`}
+          icon={<Users className="w-3.5 h-3.5" />}
+          label="Projected Month Subs"
+          value={forecast.month_total_subs}
+          sublabel={`+${forecast.projected_remaining_subs} remaining`}
           highlight
         />
         <MetricCard
@@ -75,24 +75,24 @@ const ForecastCard = () => {
           icon={<DollarSign className="w-3.5 h-3.5" />}
           label="Projected Month CAC"
           value={`$${forecast.month_cac}`}
-          sublabel={`${forecast.month_roas}x ROAS`}
+          sublabel={`$${forecast.month_total_spend?.toLocaleString()} spend`}
           highlight
         />
       </div>
 
-      {/* Spend & Revenue summary */}
+      {/* Spend summary */}
       <div className="grid grid-cols-3 gap-4 mb-5">
         <div className="bg-secondary/40 rounded-lg p-3">
           <p className="text-xs text-muted-foreground mb-1">MTD Spend</p>
           <p className="text-base font-bold font-mono">${forecast.actual_spend?.toLocaleString()}</p>
         </div>
         <div className="bg-secondary/40 rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-1">MTD Revenue</p>
-          <p className="text-base font-bold font-mono">${forecast.actual_revenue?.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mb-1">Avg Daily Spend</p>
+          <p className="text-base font-bold font-mono">${forecast.avg_daily_spend?.toLocaleString()}</p>
         </div>
         <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
-          <p className="text-xs text-muted-foreground mb-1">Projected Month Revenue</p>
-          <p className="text-base font-bold font-mono text-primary">${forecast.month_total_revenue?.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mb-1">Projected Month Spend</p>
+          <p className="text-base font-bold font-mono text-primary">${forecast.month_total_spend?.toLocaleString()}</p>
         </div>
       </div>
 
