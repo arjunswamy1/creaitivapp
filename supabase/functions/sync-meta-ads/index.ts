@@ -29,59 +29,49 @@ Deno.serve(async (req) => {
     userId = claimsData?.claims?.sub || null;
   }
 
-  let targetUserIds: string[] = [];
+  let targetConnections: { user_id: string; access_token: string; metadata: any; selected_ad_account: any; client_id: string | null }[] = [];
+
   if (userId) {
-    targetUserIds = [userId];
+    const { data: conn } = await supabaseAdmin
+      .from("platform_connections")
+      .select("user_id, access_token, metadata, selected_ad_account, client_id")
+      .eq("user_id", userId)
+      .eq("platform", "meta")
+      .maybeSingle();
+    if (!conn) {
+      return new Response(JSON.stringify({ error: "No Meta connection found" }), {
+        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    targetConnections = [conn];
   } else {
     const { data: connections } = await supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, metadata, selected_ad_account")
+      .select("user_id, access_token, metadata, selected_ad_account, client_id")
       .eq("platform", "meta");
     if (!connections || connections.length === 0) {
       return new Response(JSON.stringify({ message: "No meta connections found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const results = [];
-    for (const conn of connections) {
-      const selectedAccount = conn.selected_ad_account as any;
-      const metadata = selectedAccount?.id
-        ? { ...conn.metadata, ad_accounts: [selectedAccount] }
-        : conn.metadata;
-      const result = await syncMetaForUser(supabaseAdmin, conn.user_id, conn.access_token, metadata);
-      results.push(result);
-    }
-    return new Response(JSON.stringify({ results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    targetConnections = connections;
   }
 
-  const { data: connection } = await supabaseAdmin
-    .from("platform_connections")
-    .select("access_token, metadata, selected_ad_account")
-    .eq("user_id", userId)
-    .eq("platform", "meta")
-    .single();
-
-  if (!connection) {
-    return new Response(JSON.stringify({ error: "No Meta connection found" }), {
-      status: 404,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  const results = [];
+  for (const conn of targetConnections) {
+    const selectedAccount = conn.selected_ad_account as any;
+    const metadata = selectedAccount?.id
+      ? { ...conn.metadata, ad_accounts: [selectedAccount] }
+      : conn.metadata;
+    const result = await syncMetaForUser(supabaseAdmin, conn.user_id, conn.access_token, metadata, conn.client_id);
+    results.push(result);
   }
-
-  const selectedAccount = connection.selected_ad_account as any;
-  const metadata = selectedAccount?.id
-    ? { ...connection.metadata, ad_accounts: [selectedAccount] }
-    : connection.metadata;
-
-  const result = await syncMetaForUser(supabaseAdmin, userId!, connection.access_token, metadata);
-  return new Response(JSON.stringify(result), {
+  return new Response(JSON.stringify({ results }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
 
-async function syncMetaForUser(supabase: any, userId: string, accessToken: string, metadata: any) {
+async function syncMetaForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null) {
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "meta", status: "running" })
@@ -130,7 +120,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         const batch = dailyInsights.map((day: any) => {
           const m = extractMetrics(day);
           return {
-            user_id: userId, platform: "meta", date: day.date_start,
+            user_id: userId, client_id: clientId, platform: "meta", date: day.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             cpc: m.clicks > 0 ? m.spend / m.clicks : null,
             ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : null,
@@ -146,7 +136,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         const batch = campaignInsights.map((c: any) => {
           const m = extractMetrics(c);
           return {
-            user_id: userId, platform: "meta", platform_campaign_id: c.campaign_id,
+            user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: c.campaign_id,
             campaign_name: c.campaign_name, status: "active", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
@@ -160,7 +150,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         const batch = adsetInsights.map((a: any) => {
           const m = extractMetrics(a);
           return {
-            user_id: userId, platform: "meta", platform_campaign_id: a.campaign_id,
+            user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: a.campaign_id,
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
             status: "active", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
@@ -175,7 +165,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         const batch = adInsights.map((ad: any) => {
           const m = extractMetrics(ad);
           return {
-            user_id: userId, platform: "meta", platform_ad_id: ad.ad_id,
+            user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
             status: "active", date: ad.date_start,
