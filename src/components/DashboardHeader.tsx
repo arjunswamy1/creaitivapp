@@ -8,14 +8,15 @@ import DateRangePicker from "@/components/DateRangePicker";
 import AccountSelector from "@/components/AccountSelector";
 import ClientSwitcher from "@/components/ClientSwitcher";
 import { useClient } from "@/contexts/ClientContext";
+import { useBranding } from "@/contexts/BrandingContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import tfcLogo from "@/assets/tfc-logo.png";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const { activeClient, isAgencyAdmin } = useClient();
+  const { logoUrl, clientName } = useBranding();
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -61,10 +62,12 @@ const DashboardHeader = () => {
   return (
     <header className="flex items-center justify-between py-6">
       <div className="flex items-center gap-4">
-        <img src={tfcLogo} alt="Tinned Fish Club" className="h-12 w-auto" />
+        {logoUrl && (
+          <img src={logoUrl} alt={clientName} className="h-12 w-auto rounded-lg" />
+        )}
         <div>
-          <h1 className="text-xl font-bold tracking-tight">
-            {activeClient ? activeClient.name : "Performance Dashboard"}
+          <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
+            {clientName}
           </h1>
           <p className="text-sm text-muted-foreground">Marketing Performance</p>
         </div>
