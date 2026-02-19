@@ -1,4 +1,4 @@
-import { BarChart3, RefreshCw, Settings } from "lucide-react";
+import { BarChart3, RefreshCw, Settings, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -92,6 +92,12 @@ const DashboardHeader = () => {
           </Tooltip>
         </TooltipProvider>
         <DateRangePicker />
+        <Link to="/budget-planner">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+            <Target className="w-3.5 h-3.5" />
+            Budget Planner
+          </Button>
+        </Link>
         <Link to="/settings">
           <Button variant="ghost" size="icon">
             <Settings className="w-5 h-5" />
