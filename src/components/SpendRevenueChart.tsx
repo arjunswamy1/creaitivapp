@@ -33,7 +33,7 @@ const SpendRevenueChart = () => {
         </div>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <ComposedChart data={dailyData || []} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+        <ComposedChart data={dailyData || []} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
           <defs>
             <linearGradient id="metaGradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="hsl(214, 89%, 52%)" stopOpacity={0.3} />
@@ -46,7 +46,7 @@ const SpendRevenueChart = () => {
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 18%)" />
           <XAxis dataKey="date" stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} />
-          <YAxis yAxisId="spend" stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+          <YAxis yAxisId="spend" stroke="hsl(215, 12%, 52%)" fontSize={12} tickLine={false} tickFormatter={(v) => v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`} />
           <YAxis yAxisId="subs" orientation="right" stroke="hsl(150, 62%, 48%)" fontSize={12} tickLine={false} allowDecimals={false} />
           <Tooltip
             contentStyle={{
