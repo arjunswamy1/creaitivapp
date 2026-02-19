@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
+import { useClient } from "@/contexts/ClientContext";
 import { format, differenceInDays, subDays } from "date-fns";
 
 export interface KPIData {
@@ -96,17 +97,27 @@ function useDateStrings() {
 
 export function useKPIs() {
   const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["kpis", fromStr, toStr],
+    queryKey: ["kpis", fromStr, toStr, clientId],
     queryFn: async (): Promise<KPIWithChange> => {
-      const [{ data: current, error: e1 }, { data: previous, error: e2 }] = await Promise.all([
-        supabase.from("ad_daily_metrics")
-          .select("spend, revenue, impressions, clicks, conversions")
-          .gte("date", fromStr).lte("date", toStr),
-        supabase.from("ad_daily_metrics")
-          .select("spend, revenue, impressions, clicks, conversions")
-          .gte("date", prevFrom).lte("date", prevTo),
+      let currentQuery = supabase.from("ad_daily_metrics")
+        .select("spend, revenue, impressions, clicks, conversions")
+        .gte("date", fromStr).lte("date", toStr);
+      let previousQuery = supabase.from("ad_daily_metrics")
+        .select("spend, revenue, impressions, clicks, conversions")
+        .gte("date", prevFrom).lte("date", prevTo);
+
+      if (clientId) {
+        currentQuery = currentQuery.eq("client_id", clientId);
+        previousQuery = previousQuery.eq("client_id", clientId);
+      }
+
+      const [{ data: current, error: e1 }, { data: previous }] = await Promise.all([
+        currentQuery,
+        previousQuery,
       ]);
 
       if (e1) throw e1;
@@ -132,15 +143,21 @@ export function useKPIs() {
 
 export function useDailyMetrics() {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["daily-metrics", fromStr, toStr],
+    queryKey: ["daily-metrics", fromStr, toStr, clientId],
     queryFn: async (): Promise<DailyMetric[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ad_daily_metrics")
         .select("date, platform, spend, revenue")
         .gte("date", fromStr).lte("date", toStr)
         .order("date", { ascending: true });
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
@@ -167,14 +184,20 @@ export function useDailyMetrics() {
 
 export function useChannelBreakdown() {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["channel-breakdown", fromStr, toStr],
+    queryKey: ["channel-breakdown", fromStr, toStr, clientId],
     queryFn: async (): Promise<ChannelSummary[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ad_daily_metrics")
         .select("platform, spend, revenue, clicks, impressions, conversions")
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
@@ -208,14 +231,20 @@ export function useChannelBreakdown() {
 
 export function useTopCampaigns() {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["top-campaigns", fromStr, toStr],
+    queryKey: ["top-campaigns", fromStr, toStr, clientId],
     queryFn: async (): Promise<CampaignRow[]> => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("ad_campaigns")
         .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions")
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
