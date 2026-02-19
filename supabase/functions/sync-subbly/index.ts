@@ -12,45 +12,69 @@ async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function subblyFetch(path: string, apiKey: string, params: Record<string, string> = {}, retries = 3) {
+async function subblyFetch(path: string, apiKey: string, params: Record<string, string> = {}, retries = 2) {
   const url = new URL(`${SUBBLY_BASE}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(url.toString(), {
-      headers: { "X-API-KEY": apiKey, Accept: "application/json" },
-    });
+    console.log(`subblyFetch: ${path} attempt ${attempt + 1}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), {
+        headers: { "X-API-KEY": apiKey, Accept: "application/json" },
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (err.name === "AbortError") {
+        console.log(`subblyFetch: ${path} timed out on attempt ${attempt + 1}`);
+        if (attempt < retries) { await sleep(2000); continue; }
+        throw new Error(`Subbly API timeout after ${retries + 1} attempts`);
+      }
+      throw err;
+    }
+    clearTimeout(timeout);
 
     if (res.status === 429) {
-      const waitMs = Math.min(2000 * Math.pow(2, attempt), 30000);
+      const waitMs = Math.min(2000 * Math.pow(2, attempt), 10000);
       console.log(`Rate limited, waiting ${waitMs}ms before retry ${attempt + 1}/${retries}`);
-      await res.text(); // consume body
-      if (attempt < retries) {
-        await sleep(waitMs);
-        continue;
-      }
-      throw new Error(`Subbly API rate limit exceeded after ${retries} retries`);
+      await res.text();
+      if (attempt < retries) { await sleep(waitMs); continue; }
+      throw new Error(`Subbly API rate limit exceeded after ${retries + 1} attempts`);
     }
 
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Subbly API ${res.status}: ${text}`);
     }
+    console.log(`subblyFetch: ${path} success`);
     return res.json();
   }
 }
 
-async function fetchAllPages(path: string, apiKey: string, extraParams: Record<string, string> = {}) {
+async function fetchAllPages(path: string, apiKey: string, extraParams: Record<string, string> = {}, maxPages = 5) {
   const allData: any[] = [];
   let page = 1;
-  while (true) {
+  while (page <= maxPages) {
+    console.log(`fetchAllPages: ${path} page ${page}`);
     const result = await subblyFetch(path, apiKey, { ...extraParams, page: String(page), per_page: "100" });
-    if (result?.data) allData.push(...result.data);
-    if (!result?.pagination || page >= (result.pagination.last_page ?? page)) break;
+    const pageData = result?.data;
+    if (!pageData || !Array.isArray(pageData) || pageData.length === 0) {
+      console.log(`fetchAllPages: ${path} no more data at page ${page}`);
+      break;
+    }
+    allData.push(...pageData);
+    // Break if we got fewer items than requested (last page)
+    if (pageData.length < 100) break;
+    // Also check pagination metadata
+    if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
     page++;
-    // Small delay between pages to avoid rate limiting
     await sleep(500);
   }
+  console.log(`fetchAllPages: ${path} total records: ${allData.length}`);
   return allData;
 }
 
@@ -58,8 +82,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    console.log("sync-subbly: start");
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      console.log("sync-subbly: no auth header");
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
@@ -69,12 +95,16 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
+    console.log("sync-subbly: verifying user");
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr || !user) {
+      console.log("sync-subbly: auth failed", userErr?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
+    console.log("sync-subbly: user verified", user.id);
 
     const body = await req.json().catch(() => ({}));
+    console.log("sync-subbly: body", JSON.stringify(body));
     const clientId = body.client_id;
     if (!clientId) {
       return new Response(JSON.stringify({ error: "client_id is required" }), { status: 400, headers: corsHeaders });
@@ -91,7 +121,9 @@ Deno.serve(async (req) => {
     );
 
     // Sync subscriptions
+    console.log("sync-subbly: fetching subscriptions");
     const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY);
+    console.log("sync-subbly: got", subs.length, "subscriptions");
     let subsUpserted = 0;
 
     if (subs.length > 0) {
