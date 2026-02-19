@@ -225,6 +225,7 @@ export type Database = {
           metadata: Json | null
           platform: string
           refresh_token: string | null
+          selected_ad_account: Json | null
           token_expires_at: string | null
           updated_at: string
           user_id: string
@@ -238,6 +239,7 @@ export type Database = {
           metadata?: Json | null
           platform: string
           refresh_token?: string | null
+          selected_ad_account?: Json | null
           token_expires_at?: string | null
           updated_at?: string
           user_id: string
@@ -251,6 +253,7 @@ export type Database = {
           metadata?: Json | null
           platform?: string
           refresh_token?: string | null
+          selected_ad_account?: Json | null
           token_expires_at?: string | null
           updated_at?: string
           user_id?: string
