@@ -127,3 +127,79 @@ export function useCrossChannelKPIs() {
     },
   });
 }
+
+export function useSpendSubsDaily() {
+  const { fromStr, toStr, dateRange } = useDateStrings();
+  const { activeClient, dashboardConfig } = useClient();
+  const clientId = activeClient?.id;
+  const subblyEnabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+
+  return useQuery({
+    queryKey: ["spend-subs-daily", fromStr, toStr, clientId],
+    enabled: !!clientId,
+    queryFn: async () => {
+      if (!clientId) return [];
+
+      // Fetch ad spend by day
+      const { data: adData, error: adErr } = await supabase
+        .from("ad_daily_metrics")
+        .select("date, platform, spend")
+        .eq("client_id", clientId)
+        .gte("date", fromStr)
+        .lte("date", toStr)
+        .order("date", { ascending: true });
+
+      if (adErr) throw adErr;
+
+      // Fetch daily new subscriptions
+      let subsByDay = new Map<string, number>();
+      if (subblyEnabled) {
+        const fromUTC = fromStr + "T00:00:00.000Z";
+        const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
+        const toUTC = toNextDay + "T23:59:59.999Z";
+
+        const { data: subsData, error: subsErr } = await supabase
+          .from("subbly_subscriptions")
+          .select("subbly_created_at")
+          .eq("client_id", clientId)
+          .gte("subbly_created_at", fromUTC)
+          .lte("subbly_created_at", toUTC);
+
+        if (subsErr) throw subsErr;
+
+        for (const row of subsData || []) {
+          if (!row.subbly_created_at) continue;
+          const day = row.subbly_created_at.split("T")[0];
+          subsByDay.set(day, (subsByDay.get(day) || 0) + 1);
+        }
+      }
+
+      // Merge by date
+      const byDate = new Map<string, { metaSpend: number; googleSpend: number; newSubs: number }>();
+
+      // Initialize all dates in range
+      let d = new Date(dateRange.from);
+      while (d <= dateRange.to) {
+        const key = format(d, "yyyy-MM-dd");
+        byDate.set(key, { metaSpend: 0, googleSpend: 0, newSubs: subsByDay.get(key) || 0 });
+        d = addDays(d, 1);
+      }
+
+      for (const row of adData || []) {
+        const existing = byDate.get(row.date) || { metaSpend: 0, googleSpend: 0, newSubs: subsByDay.get(row.date) || 0 };
+        if (row.platform === "meta") existing.metaSpend += Number(row.spend);
+        else if (row.platform === "google") existing.googleSpend += Number(row.spend);
+        byDate.set(row.date, existing);
+      }
+
+      return Array.from(byDate.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, vals]) => ({
+          date: new Date(date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          metaSpend: Math.round(vals.metaSpend),
+          googleSpend: Math.round(vals.googleSpend),
+          newSubs: vals.newSubs,
+        }));
+    },
+  });
+}
