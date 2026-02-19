@@ -1,9 +1,10 @@
-import { BarChart3, Calendar, Settings, RefreshCw } from "lucide-react";
+import { BarChart3, RefreshCw, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import DateRangePicker from "@/components/DateRangePicker";
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
@@ -60,10 +61,7 @@ const DashboardHeader = () => {
             </Tooltip>
           </TooltipProvider>
         )}
-        <Button variant="outline" className="gap-2 text-sm">
-          <Calendar className="w-4 h-4" />
-          Feb 1 – Feb 14, 2025
-        </Button>
+        <DateRangePicker />
         <Link to="/settings">
           <Button variant="ghost" size="icon">
             <Settings className="w-5 h-5" />

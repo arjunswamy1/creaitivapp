@@ -5,8 +5,9 @@ import ChannelBreakdown from "@/components/ChannelBreakdown";
 import CampaignTable from "@/components/CampaignTable";
 import { useKPIs } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DateRangeProvider } from "@/contexts/DateRangeContext";
 
-const Index = () => {
+const DashboardContent = () => {
   const { data: kpis, isLoading } = useKPIs();
 
   return (
@@ -20,10 +21,10 @@ const Index = () => {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
           ) : (
             <>
-              <KPICard title="Total Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} />
-              <KPICard title="Total Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} />
-              <KPICard title="Blended ROAS" value={`${kpis?.blendedROAS ?? 0}x`} />
-              <KPICard title="Conversions" value={(kpis?.totalConversions ?? 0).toLocaleString()} />
+              <KPICard title="Total Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} change={kpis?.changes.spend} invertColor />
+              <KPICard title="Total Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} change={kpis?.changes.revenue} />
+              <KPICard title="Blended ROAS" value={`${kpis?.blendedROAS ?? 0}x`} change={kpis?.changes.roas} />
+              <KPICard title="Conversions" value={(kpis?.totalConversions ?? 0).toLocaleString()} change={kpis?.changes.conversions} />
             </>
           )}
         </div>
@@ -34,10 +35,10 @@ const Index = () => {
             Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
           ) : (
             <>
-              <KPICard title="Avg CPC" value={`$${kpis?.cpc ?? 0}`} />
-              <KPICard title="CTR" value={`${kpis?.ctr ?? 0}%`} />
-              <KPICard title="CPM" value={`$${kpis?.cpm ?? 0}`} />
-              <KPICard title="Impressions" value={`${((kpis?.impressions ?? 0) / 1000000).toFixed(1)}M`} />
+              <KPICard title="Avg CPC" value={`$${kpis?.cpc ?? 0}`} change={kpis?.changes.cpc} invertColor />
+              <KPICard title="CTR" value={`${kpis?.ctr ?? 0}%`} change={kpis?.changes.ctr} />
+              <KPICard title="CPM" value={`$${kpis?.cpm ?? 0}`} change={kpis?.changes.cpm} invertColor />
+              <KPICard title="Impressions" value={`${((kpis?.impressions ?? 0) / 1000000).toFixed(1)}M`} change={kpis?.changes.impressions} />
             </>
           )}
         </div>
@@ -56,5 +57,11 @@ const Index = () => {
     </div>
   );
 };
+
+const Index = () => (
+  <DateRangeProvider>
+    <DashboardContent />
+  </DateRangeProvider>
+);
 
 export default Index;
