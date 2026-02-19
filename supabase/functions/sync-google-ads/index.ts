@@ -130,7 +130,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
     if (customers.length === 0) {
       try {
         const customersRes = await fetch(
-          "https://googleads.googleapis.com/v18/customers:listAccessibleCustomers",
+          "https://googleads.googleapis.com/v23/customers:listAccessibleCustomers",
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -351,7 +351,7 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
 
 async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string): Promise<any[]> {
   const res = await fetch(
-    `https://googleads.googleapis.com/v18/customers/${customerId}/googleAds:searchStream`,
+    `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
     {
       method: "POST",
       headers: {
