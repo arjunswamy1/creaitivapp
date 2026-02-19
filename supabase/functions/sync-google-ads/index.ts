@@ -373,6 +373,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
 
           // Keyword-level metrics (Google Search only)
           try {
+            console.log(`Fetching keywords for customer ${cid}, ${since} to ${until}`);
             const kwRows = await queryGoogleAds(cid, accessToken, developerToken, `
               SELECT
                 campaign.id,
@@ -392,6 +393,8 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               FROM keyword_view
               WHERE segments.date BETWEEN '${since}' AND '${until}'
             `);
+
+            console.log(`Keyword rows returned for ${cid}: ${kwRows.length}`);
 
             if (kwRows.length > 0) {
               const batch = kwRows.map((row: any) => {
@@ -417,11 +420,16 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   roas: spend > 0 ? revenue / spend : null,
                 };
               });
-              await supabase.from("keywords").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,keyword_text,match_type,date" });
-              totalRecords += batch.length;
+              const { error: upsertErr } = await supabase.from("keywords").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,keyword_text,match_type,date" });
+              if (upsertErr) {
+                console.error(`Keyword upsert error for ${cid}:`, upsertErr);
+              } else {
+                totalRecords += batch.length;
+                console.log(`Upserted ${batch.length} keywords for ${cid}`);
+              }
             }
           } catch (err) {
-            console.error(`Keyword metrics error for ${cid} ${since}-${until}:`, err);
+            console.error(`Keyword metrics error for ${cid} ${since}-${until}:`, err?.message || err);
           }
         }
       }
