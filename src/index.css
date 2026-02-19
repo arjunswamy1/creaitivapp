@@ -2,39 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @layer base {
   :root {
-    --background: 34 50% 96%;
-    --foreground: 200 25% 15%;
+    --background: 230 40% 16%;
+    --foreground: 0 0% 98%;
 
-    --card: 36 40% 93%;
-    --card-foreground: 200 25% 15%;
+    --card: 230 35% 20%;
+    --card-foreground: 0 0% 98%;
 
-    --popover: 36 40% 93%;
-    --popover-foreground: 200 25% 15%;
+    --popover: 230 35% 20%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 174 43% 30%;
+    --primary: 15 78% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 34 30% 88%;
-    --secondary-foreground: 200 25% 20%;
+    --secondary: 230 30% 24%;
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 34 20% 90%;
-    --muted-foreground: 200 10% 45%;
+    --muted: 230 25% 22%;
+    --muted-foreground: 230 10% 60%;
 
-    --accent: 16 78% 60%;
+    --accent: 15 78% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 56%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 34 20% 84%;
-    --input: 34 20% 84%;
-    --ring: 174 43% 30%;
+    --border: 230 20% 28%;
+    --input: 230 20% 28%;
+    --ring: 15 78% 55%;
 
     --radius: 0.75rem;
+
+    --font-heading: 'Inter', sans-serif;
+    --font-body: 'Inter', sans-serif;
 
     /* Platform colors */
     --meta: 214 89% 52%;
@@ -48,21 +51,21 @@
     --gradient-meta: linear-gradient(135deg, hsl(214, 89%, 52%), hsl(240, 80%, 62%));
     --gradient-google: linear-gradient(135deg, hsl(36, 100%, 55%), hsl(12, 90%, 55%));
     --gradient-shopify: linear-gradient(135deg, hsl(150, 62%, 48%), hsl(170, 60%, 42%));
-    --gradient-revenue: linear-gradient(135deg, hsl(174, 43%, 30%), hsl(16, 78%, 60%));
+    --gradient-revenue: linear-gradient(135deg, hsl(15, 78%, 55%), hsl(30, 90%, 60%));
 
     /* Glow effects */
     --glow-meta: 0 0 20px hsl(214 89% 52% / 0.2);
     --glow-google: 0 0 20px hsl(36 100% 55% / 0.2);
     --glow-shopify: 0 0 20px hsl(150 62% 48% / 0.2);
 
-    --sidebar-background: 34 50% 96%;
-    --sidebar-foreground: 200 25% 20%;
-    --sidebar-primary: 174 43% 30%;
+    --sidebar-background: 230 40% 16%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 15 78% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 34 30% 88%;
-    --sidebar-accent-foreground: 200 25% 20%;
-    --sidebar-border: 34 20% 84%;
-    --sidebar-ring: 174 43% 30%;
+    --sidebar-accent: 230 30% 24%;
+    --sidebar-accent-foreground: 0 0% 90%;
+    --sidebar-border: 230 20% 28%;
+    --sidebar-ring: 15 78% 55%;
   }
 }
 
@@ -72,12 +75,12 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'DM Sans', sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
   }
 
   h1, h2, h3 {
-    font-family: 'DM Serif Display', serif;
+    font-family: var(--font-heading);
   }
 
   .font-mono {

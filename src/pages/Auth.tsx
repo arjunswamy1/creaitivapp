@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import tfcLogo from "@/assets/tfc-logo.png";
+import creaitvLogo from "@/assets/creaitiv-logo.png";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,8 +21,8 @@ const Auth = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[hsl(230,40%,16%)] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[hsl(15,78%,55%)] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -64,20 +64,29 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4"
+      style={{ background: "linear-gradient(135deg, hsl(230,40%,14%), hsl(230,35%,10%))" }}
+    >
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-10">
-          <img src={tfcLogo} alt="Tinned Fish Club" className="h-20 w-auto" />
-          <p className="text-sm text-muted-foreground font-medium">Performance Dashboard</p>
+          <img src={creaitvLogo} alt="Creaitiv App" className="h-16 w-auto rounded-xl" />
+          <p className="text-sm font-medium" style={{ color: "hsl(230,10%,60%)", fontFamily: "Inter, sans-serif" }}>
+            Performance Dashboard
+          </p>
         </div>
 
         {/* Card */}
-        <div className="glass-card p-8">
-          <h2 className="text-lg font-semibold mb-1">
+        <div className="p-8 rounded-xl border"
+          style={{
+            background: "hsl(230,35%,20%)",
+            borderColor: "hsl(230,20%,28%)",
+          }}
+        >
+          <h2 className="text-lg font-semibold mb-1" style={{ color: "hsl(0,0%,98%)", fontFamily: "Inter, sans-serif" }}>
             {isLogin ? "Welcome back" : "Create account"}
           </h2>
-          <p className="text-sm text-muted-foreground mb-6">
+          <p className="text-sm mb-6" style={{ color: "hsl(230,10%,60%)" }}>
             {isLogin
               ? "Sign in to view your performance data"
               : "Get access to your marketing dashboard"}
@@ -85,7 +94,7 @@ const Auth = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" style={{ color: "hsl(0,0%,85%)" }}>Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -93,10 +102,11 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="border-[hsl(230,20%,28%)] bg-[hsl(230,30%,16%)] text-white placeholder:text-[hsl(230,10%,45%)]"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" style={{ color: "hsl(0,0%,85%)" }}>Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -105,9 +115,15 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                className="border-[hsl(230,20%,28%)] bg-[hsl(230,30%,16%)] text-white placeholder:text-[hsl(230,10%,45%)]"
               />
             </div>
-            <Button type="submit" className="w-full gap-2" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full gap-2 text-white font-semibold"
+              style={{ background: "hsl(15,78%,55%)" }}
+              disabled={loading}
+            >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
@@ -119,16 +135,21 @@ const Auth = () => {
             </Button>
           </form>
 
-          <p className="text-sm text-muted-foreground text-center mt-6">
+          <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline font-medium"
+              className="hover:underline font-medium"
+              style={{ color: "hsl(15,78%,55%)" }}
             >
               {isLogin ? "Sign up" : "Sign in"}
             </button>
           </p>
         </div>
+
+        <p className="text-xs text-center mt-6" style={{ color: "hsl(230,10%,40%)" }}>
+          Powered by Creaitiv App
+        </p>
       </div>
     </div>
   );
