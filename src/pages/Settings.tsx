@@ -120,6 +120,10 @@ const Settings = () => {
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [testingSlack, setTestingSlack] = useState(false);
   const [shopifyDialogOpen, setShopifyDialogOpen] = useState(false);
+  // Default Shopify domains per client slug
+  const defaultShopifyDomains: Record<string, string> = {
+    phantasmagorical: "4d06a2-4.myshopify.com",
+  };
   const [shopDomain, setShopDomain] = useState("");
   useEffect(() => {
     const fetchData = async () => {
@@ -398,7 +402,7 @@ const Settings = () => {
                 <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
               )}
               {dashboardConfig?.enabled_platforms?.includes("shopify") && (
-                <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => setShopifyDialogOpen(true)} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
+                <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => { setShopDomain(defaultShopifyDomains[activeClient?.slug || ""] || ""); setShopifyDialogOpen(true); }} onDisconnect={() => handleDisconnect("shopify")} connecting={connecting === "shopify"} disconnecting={disconnecting === "shopify"} />
               )}
 
               {/* Subbly - sync via API key (only for subbly revenue source) */}
