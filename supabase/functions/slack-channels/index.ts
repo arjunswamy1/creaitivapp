@@ -56,8 +56,15 @@ Deno.serve(async (req) => {
   let body: any = {};
   
   if (req.method === "POST") {
-    body = await req.json();
-    action = body.action || "test";
+    try {
+      const text = await req.text();
+      if (text) {
+        body = JSON.parse(text);
+        action = body.action || "list";
+      }
+    } catch {
+      // empty body = list action
+    }
   }
 
   if (action === "list") {
