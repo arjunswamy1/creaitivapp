@@ -264,17 +264,16 @@ export function useCampaignAdSets(campaignName: string | null, platform: string 
 
       const { data, error } = await supabase
         .from("ad_sets")
-        .select("adset_name, spend, revenue, impressions, clicks, conversions, roas, status, date")
+        .select("adset_name, platform_adset_id, spend, revenue, impressions, clicks, conversions, roas, status, date")
         .eq("campaign_name", campaignName)
         .gte("date", fromStr).lte("date", toStr);
 
       if (error) throw error;
       if (!data) return [];
 
-      // Aggregate by ad set name
-      const byAdSet = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number; status: string }>();
+      const byAdSet = new Map<string, { id: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number; status: string }>();
       for (const row of data) {
-        const existing = byAdSet.get(row.adset_name) || { spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, status: row.status || "unknown" };
+        const existing = byAdSet.get(row.adset_name) || { id: row.platform_adset_id, spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, status: row.status || "unknown" };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);
         existing.impressions += Number(row.impressions);
@@ -287,6 +286,7 @@ export function useCampaignAdSets(campaignName: string | null, platform: string 
       return Array.from(byAdSet.entries())
         .map(([name, vals]) => ({
           name,
+          adsetId: vals.id,
           spend: Math.round(vals.spend),
           revenue: Math.round(vals.revenue),
           roas: vals.spend > 0 ? Math.round((vals.revenue / vals.spend) * 100) / 100 : 0,
@@ -297,5 +297,70 @@ export function useCampaignAdSets(campaignName: string | null, platform: string 
         }))
         .sort((a, b) => b.spend - a.spend);
     },
+  });
+}
+
+export function useAdSetAds(adsetId: string | null) {
+  const { fromStr, toStr } = useDateStrings();
+
+  return useQuery({
+    queryKey: ["adset-ads", adsetId, fromStr, toStr],
+    enabled: !!adsetId,
+    queryFn: async () => {
+      if (!adsetId) return [];
+
+      const { data, error } = await supabase
+        .from("ads")
+        .select("ad_name, spend, revenue, impressions, clicks, conversions, roas, status, date")
+        .eq("platform_adset_id", adsetId)
+        .gte("date", fromStr).lte("date", toStr);
+
+      if (error) throw error;
+      if (!data) return [];
+
+      const byAd = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number; status: string }>();
+      for (const row of data) {
+        const existing = byAd.get(row.ad_name) || { spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, status: row.status || "unknown" };
+        existing.spend += Number(row.spend);
+        existing.revenue += Number(row.revenue);
+        existing.impressions += Number(row.impressions);
+        existing.clicks += Number(row.clicks);
+        existing.conversions += Number(row.conversions);
+        if (row.status === "active") existing.status = "active";
+        byAd.set(row.ad_name, existing);
+      }
+
+      return Array.from(byAd.entries())
+        .map(([name, vals]) => ({
+          name,
+          spend: Math.round(vals.spend),
+          revenue: Math.round(vals.revenue),
+          roas: vals.spend > 0 ? Math.round((vals.revenue / vals.spend) * 100) / 100 : 0,
+          impressions: vals.impressions,
+          clicks: vals.clicks,
+          conversions: vals.conversions,
+          status: vals.status,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+    },
+  });
+}
+
+export function useForecast(forecastDays = 30) {
+  return useQuery({
+    queryKey: ["forecast", forecastDays],
+    queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      const { data, error } = await supabase.functions.invoke("forecast", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: { forecast_days: forecastDays },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 1000 * 60 * 10, // 10 min
   });
 }

@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { useTopCampaigns, useCampaignAdSets } from "@/hooks/useAdData";
+import { useTopCampaigns, useCampaignAdSets, useAdSetAds } from "@/hooks/useAdData";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 const CampaignTable = () => {
   const { data: campaigns, isLoading } = useTopCampaigns();
@@ -94,6 +93,7 @@ const CampaignTable = () => {
 
 function AdSetDetail({ campaignName, platform }: { campaignName: string; platform: string }) {
   const { data: adSets, isLoading } = useCampaignAdSets(campaignName, platform);
+  const [expandedAdSet, setExpandedAdSet] = useState<{ name: string; id: string } | null>(null);
 
   if (isLoading) {
     return <div className="p-4"><Skeleton className="h-20 rounded-lg" /></div>;
@@ -124,16 +124,86 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
         </thead>
         <tbody>
           {adSets.map((as) => (
-            <tr key={as.name} className="border-b border-border/20 hover:bg-secondary/30 transition-colors">
+            <>
+              <tr
+                key={as.name}
+                className="border-b border-border/20 hover:bg-secondary/30 transition-colors cursor-pointer"
+                onClick={() => setExpandedAdSet(expandedAdSet?.name === as.name ? null : { name: as.name, id: as.adsetId })}
+              >
+                <td className="w-8 pl-4">
+                  {expandedAdSet?.name === as.name ? (
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                  )}
+                </td>
+                <td className="py-2 pl-10 font-medium text-xs max-w-[260px] truncate">{as.name}</td>
+                <td></td>
+                <td className="py-2 text-right font-mono text-xs">${as.spend.toLocaleString()}</td>
+                <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>
+                <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>
+                <td className="py-2 text-right font-mono text-xs">{as.conversions.toLocaleString()}</td>
+                <td className="py-2 text-right">
+                  <Badge variant="secondary" className="text-xs">{as.status}</Badge>
+                </td>
+              </tr>
+              {expandedAdSet?.name === as.name && (
+                <tr key={`${as.name}-ads`}>
+                  <td colSpan={8} className="p-0">
+                    <AdsDetail adsetId={expandedAdSet.id} />
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdsDetail({ adsetId }: { adsetId: string }) {
+  const { data: ads, isLoading } = useAdSetAds(adsetId);
+
+  if (isLoading) {
+    return <div className="p-4 pl-16"><Skeleton className="h-16 rounded-lg" /></div>;
+  }
+
+  if (!ads || ads.length === 0) {
+    return (
+      <div className="px-16 py-3 bg-secondary/30 text-xs text-muted-foreground">
+        No ad data available for this ad set.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-secondary/30 border-t border-border/20">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/20">
+            <th className="w-8"></th>
+            <th className="text-left py-1.5 pl-16 text-muted-foreground font-medium">Ad</th>
+            <th></th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Spend</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Revenue</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">ROAS</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Conv.</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ads.map((ad) => (
+            <tr key={ad.name} className="border-b border-border/10 hover:bg-secondary/40 transition-colors">
               <td className="w-8"></td>
-              <td className="py-2 pl-10 font-medium text-xs max-w-[260px] truncate">{as.name}</td>
+              <td className="py-1.5 pl-16 font-medium max-w-[240px] truncate">{ad.name}</td>
               <td></td>
-              <td className="py-2 text-right font-mono text-xs">${as.spend.toLocaleString()}</td>
-              <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>
-              <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>
-              <td className="py-2 text-right font-mono text-xs">{as.conversions.toLocaleString()}</td>
-              <td className="py-2 text-right">
-                <Badge variant="secondary" className="text-xs">{as.status}</Badge>
+              <td className="py-1.5 text-right font-mono">${ad.spend.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">${ad.revenue.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{ad.roas}x</td>
+              <td className="py-1.5 text-right font-mono">{ad.conversions.toLocaleString()}</td>
+              <td className="py-1.5 text-right">
+                <Badge variant="secondary" className="text-[10px]">{ad.status}</Badge>
               </td>
             </tr>
           ))}

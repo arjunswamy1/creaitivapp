@@ -215,6 +215,105 @@ export type Database = {
         }
         Relationships: []
       }
+      ads: {
+        Row: {
+          ad_name: string
+          adset_name: string | null
+          campaign_name: string | null
+          clicks: number
+          conversions: number
+          created_at: string
+          date: string
+          id: string
+          impressions: number
+          platform: string
+          platform_ad_id: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          revenue: number
+          roas: number | null
+          spend: number
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ad_name: string
+          adset_name?: string | null
+          campaign_name?: string | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date: string
+          id?: string
+          impressions?: number
+          platform: string
+          platform_ad_id: string
+          platform_adset_id: string
+          platform_campaign_id: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ad_name?: string
+          adset_name?: string | null
+          campaign_name?: string | null
+          clicks?: number
+          conversions?: number
+          created_at?: string
+          date?: string
+          id?: string
+          impressions?: number
+          platform?: string
+          platform_ad_id?: string
+          platform_adset_id?: string
+          platform_campaign_id?: string
+          revenue?: number
+          roas?: number | null
+          spend?: number
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      alert_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          max_cac: number | null
+          min_roas: number | null
+          slack_channel: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          max_cac?: number | null
+          min_roas?: number | null
+          slack_channel?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          max_cac?: number | null
+          min_roas?: number | null
+          slack_channel?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       platform_connections: {
         Row: {
           access_token: string

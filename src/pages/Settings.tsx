@@ -3,6 +3,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings as SettingsIcon,
@@ -11,6 +14,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   Loader2,
+  Bell,
+  Save,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -42,17 +47,13 @@ const PlatformCard = ({
 }: PlatformCardProps) => (
   <div className="glass-card p-6 flex items-center justify-between">
     <div className="flex items-center gap-4">
-      <div
-        className={`w-10 h-10 rounded-lg ${gradientClass} flex items-center justify-center ${glowClass}`}
-      >
+      <div className={`w-10 h-10 rounded-lg ${gradientClass} flex items-center justify-center ${glowClass}`}>
         <span className="text-sm font-bold text-white">{name.charAt(0)}</span>
       </div>
       <div>
         <h3 className="font-semibold text-sm">{name}</h3>
         <p className="text-xs text-muted-foreground">
-          {connection
-            ? `Connected as ${connection.account_name || "Unknown"}`
-            : description}
+          {connection ? `Connected as ${connection.account_name || "Unknown"}` : description}
         </p>
       </div>
     </div>
@@ -62,21 +63,8 @@ const PlatformCard = ({
         Connected
       </div>
     ) : (
-      <Button
-        size="sm"
-        variant="outline"
-        className="gap-1.5"
-        onClick={onConnect}
-        disabled={connecting}
-      >
-        {connecting ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <>
-            Connect
-            <ExternalLink className="w-3.5 h-3.5" />
-          </>
-        )}
+      <Button size="sm" variant="outline" className="gap-1.5" onClick={onConnect} disabled={connecting}>
+        {connecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (<>Connect<ExternalLink className="w-3.5 h-3.5" /></>)}
       </Button>
     )}
   </div>
@@ -90,46 +78,43 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
 
-  // Fetch existing connections
-  useEffect(() => {
-    const fetchConnections = async () => {
-      const { data, error } = await supabase
-        .from("platform_connections")
-        .select("platform, account_name, connected_at");
+  // Alert settings state
+  const [alertEnabled, setAlertEnabled] = useState(true);
+  const [maxCac, setMaxCac] = useState("");
+  const [minRoas, setMinRoas] = useState("");
+  const [slackChannel, setSlackChannel] = useState("");
+  const [savingAlerts, setSavingAlerts] = useState(false);
 
-      if (!error && data) {
-        setConnections(data);
+  useEffect(() => {
+    const fetchData = async () => {
+      const [connRes, alertRes] = await Promise.all([
+        supabase.from("platform_connections").select("platform, account_name, connected_at"),
+        supabase.from("alert_settings").select("*").maybeSingle(),
+      ]);
+
+      if (connRes.data) setConnections(connRes.data);
+      if (alertRes.data) {
+        setAlertEnabled(alertRes.data.enabled);
+        setMaxCac(alertRes.data.max_cac?.toString() || "");
+        setMinRoas(alertRes.data.min_roas?.toString() || "");
+        setSlackChannel(alertRes.data.slack_channel || "");
       }
       setLoading(false);
     };
-    fetchConnections();
+    fetchData();
   }, []);
 
-  // Handle redirect params
   useEffect(() => {
     const connected = searchParams.get("connected");
     const error = searchParams.get("error");
 
     if (connected) {
-      toast({
-        title: "Connected!",
-        description: `${connected.charAt(0).toUpperCase() + connected.slice(1)} account connected successfully.`,
-      });
-      // Refresh connections
-      supabase
-        .from("platform_connections")
-        .select("platform, account_name, connected_at")
-        .then(({ data }) => {
-          if (data) setConnections(data);
-        });
+      toast({ title: "Connected!", description: `${connected.charAt(0).toUpperCase() + connected.slice(1)} account connected successfully.` });
+      supabase.from("platform_connections").select("platform, account_name, connected_at").then(({ data }) => { if (data) setConnections(data); });
       setSearchParams({}, { replace: true });
     }
     if (error) {
-      toast({
-        title: "Connection failed",
-        description: decodeURIComponent(error),
-        variant: "destructive",
-      });
+      toast({ title: "Connection failed", description: decodeURIComponent(error), variant: "destructive" });
       setSearchParams({}, { replace: true });
     }
   }, [searchParams]);
@@ -139,21 +124,11 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-
-      const res = await supabase.functions.invoke("meta-oauth-initiate", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
+      const res = await supabase.functions.invoke("meta-oauth-initiate", { headers: { Authorization: `Bearer ${session.access_token}` } });
       if (res.error) throw res.error;
-      if (res.data?.url) {
-        window.open(res.data.url, "_self");
-      }
+      if (res.data?.url) window.open(res.data.url, "_self");
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to start Meta connection",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err.message || "Failed to start Meta connection", variant: "destructive" });
       setConnecting(null);
     }
   };
@@ -163,126 +138,144 @@ const Settings = () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
-
-      const res = await supabase.functions.invoke("google-oauth-initiate", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
+      const res = await supabase.functions.invoke("google-oauth-initiate", { headers: { Authorization: `Bearer ${session.access_token}` } });
       if (res.error) throw res.error;
-      if (res.data?.url) {
-        window.open(res.data.url, "_self");
-      }
+      if (res.data?.url) window.open(res.data.url, "_self");
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to start Google connection",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: err.message || "Failed to start Google connection", variant: "destructive" });
       setConnecting(null);
     }
   };
 
-  const handleConnectPlaceholder = (platform: string) => {
-    toast({
-      title: "Coming soon",
-      description: `${platform} OAuth integration will be connected shortly.`,
-    });
+  const handleSaveAlerts = async () => {
+    setSavingAlerts(true);
+    try {
+      const payload = {
+        user_id: user!.id,
+        enabled: alertEnabled,
+        max_cac: maxCac ? parseFloat(maxCac) : null,
+        min_roas: minRoas ? parseFloat(minRoas) : null,
+        slack_channel: slackChannel || null,
+      };
+
+      const { error } = await supabase.from("alert_settings").upsert(payload, { onConflict: "user_id" });
+      if (error) throw error;
+      toast({ title: "Saved", description: "Alert settings updated successfully." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSavingAlerts(false);
+    }
   };
 
-  const getConnection = (platform: string) =>
-    connections.find((c) => c.platform === platform);
+  const getConnection = (platform: string) => connections.find((c) => c.platform === platform);
 
   return (
     <div className="min-h-screen bg-background px-6 pb-12">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <header className="flex items-center justify-between py-6">
           <div className="flex items-center gap-4">
-            <Link to="/">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+            <Link to="/"><Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button></Link>
             <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
               <SettingsIcon className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">Settings</h1>
-              <p className="text-sm text-muted-foreground">
-                Manage your account &amp; connections
-              </p>
+              <p className="text-sm text-muted-foreground">Manage your account &amp; connections</p>
             </div>
           </div>
         </header>
 
         {/* Account */}
         <section className="mb-8">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Account
-          </h2>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Account</h2>
           <div className="glass-card p-6 flex items-center justify-between">
             <div>
               <p className="font-medium text-sm">{user?.email}</p>
-              <p className="text-xs text-muted-foreground">
-                Signed in since{" "}
-                {new Date(user?.created_at ?? "").toLocaleDateString()}
-              </p>
+              <p className="text-xs text-muted-foreground">Signed in since {new Date(user?.created_at ?? "").toLocaleDateString()}</p>
             </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-1.5"
-              onClick={signOut}
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign out
+            <Button variant="destructive" size="sm" className="gap-1.5" onClick={signOut}>
+              <LogOut className="w-3.5 h-3.5" /> Sign out
             </Button>
           </div>
         </section>
 
         {/* Platform connections */}
-        <section>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Platform Connections
-          </h2>
+        <section className="mb-8">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Platform Connections</h2>
           {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <div className="space-y-3">
-              <PlatformCard
-                name="Meta Ads"
-                platformKey="meta"
-                description="Connect your Facebook & Instagram ad accounts"
-                connection={getConnection("meta")}
-                gradientClass="platform-meta"
-                glowClass="glow-meta"
-                onConnect={handleConnectMeta}
-                connecting={connecting === "meta"}
-              />
-              <PlatformCard
-                name="Google Ads"
-                platformKey="google"
-                description="Connect your Google Ads manager account"
-                connection={getConnection("google")}
-                gradientClass="platform-google"
-                glowClass="glow-google"
-                onConnect={handleConnectGoogle}
-                connecting={connecting === "google"}
-              />
-              <PlatformCard
-                name="Shopify"
-                platformKey="shopify"
-                description="Connect your Shopify store for revenue data"
-                connection={getConnection("shopify")}
-                gradientClass="platform-shopify"
-                glowClass="glow-shopify"
-                onConnect={() => handleConnectPlaceholder("Shopify")}
-                connecting={connecting === "shopify"}
-              />
+              <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} connecting={connecting === "meta"} />
+              <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} connecting={connecting === "google"} />
+              <PlatformCard name="Shopify" platformKey="shopify" description="Connect your Shopify store for revenue data" connection={getConnection("shopify")} gradientClass="platform-shopify" glowClass="glow-shopify" onConnect={() => toast({ title: "Coming soon", description: "Shopify integration will be connected shortly." })} connecting={connecting === "shopify"} />
             </div>
           )}
+        </section>
+
+        {/* Alert Settings */}
+        <section className="mb-8">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Bell className="w-4 h-4" /> Performance Alerts
+          </h2>
+          <div className="glass-card p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">Enable Alerts</p>
+                <p className="text-xs text-muted-foreground">Get notified when campaigns breach your targets</p>
+              </div>
+              <Switch checked={alertEnabled} onCheckedChange={setAlertEnabled} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="max-cac" className="text-xs">Max CAC (Cost per Acquisition)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                  <Input
+                    id="max-cac"
+                    type="number"
+                    placeholder="50.00"
+                    value={maxCac}
+                    onChange={(e) => setMaxCac(e.target.value)}
+                    className="pl-7"
+                  />
+                </div>
+                <p className="text-[10px] text-muted-foreground">Alert when any campaign's CAC exceeds this</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="min-roas" className="text-xs">Min ROAS Target</Label>
+                <div className="relative">
+                  <Input
+                    id="min-roas"
+                    type="number"
+                    placeholder="2.0"
+                    value={minRoas}
+                    onChange={(e) => setMinRoas(e.target.value)}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">x</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Alert when any campaign's ROAS drops below this</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="slack-channel" className="text-xs">Slack Channel ID</Label>
+              <Input
+                id="slack-channel"
+                placeholder="C0123456789"
+                value={slackChannel}
+                onChange={(e) => setSlackChannel(e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground">The Slack channel where alerts will be posted. Connect Slack first in your workspace settings.</p>
+            </div>
+
+            <Button onClick={handleSaveAlerts} disabled={savingAlerts} size="sm" className="gap-1.5">
+              {savingAlerts ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Save Alert Settings
+            </Button>
+          </div>
         </section>
       </div>
     </div>
