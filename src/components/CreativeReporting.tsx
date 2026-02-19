@@ -22,11 +22,11 @@ const formatLabels: Record<string, string> = {
   unknown: "Other",
 };
 
-const CreativeReporting = () => {
+const CreativeReporting = ({ platformFilter: initialPlatform }: { platformFilter?: string }) => {
   const { data: creatives, isLoading } = useCreativePerformance();
   const formatData = useFormatComparison(creatives);
   const fatigueAlerts = useFatigueAlerts(creatives);
-  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [platformFilter, setPlatformFilter] = useState<string>(initialPlatform || "all");
 
   if (isLoading) {
     return <Skeleton className="h-[400px] rounded-xl" />;
@@ -43,21 +43,23 @@ const CreativeReporting = () => {
           <Layers className="w-5 h-5 text-primary" />
           <h3 className="text-lg font-semibold">Creative Performance</h3>
         </div>
-        <div className="flex gap-1.5">
-          {["all", "meta", "google"].map(p => (
-            <button
-              key={p}
-              onClick={() => setPlatformFilter(p)}
-              className={`px-3 py-1 text-xs rounded-lg transition-colors font-medium ${
-                platformFilter === p
-                  ? "bg-primary/20 text-primary"
-                  : "bg-secondary/60 text-muted-foreground hover:bg-secondary"
-              }`}
-            >
-              {p === "all" ? "All" : p === "meta" ? "Meta" : "Google"}
-            </button>
-          ))}
-        </div>
+        {!initialPlatform && (
+          <div className="flex gap-1.5">
+            {["all", "meta", "google"].map(p => (
+              <button
+                key={p}
+                onClick={() => setPlatformFilter(p)}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors font-medium ${
+                  platformFilter === p
+                    ? "bg-primary/20 text-primary"
+                    : "bg-secondary/60 text-muted-foreground hover:bg-secondary"
+                }`}
+              >
+                {p === "all" ? "All" : p === "meta" ? "Meta" : "Google"}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="formats" className="w-full">

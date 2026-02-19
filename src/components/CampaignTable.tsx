@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-const CampaignTable = () => {
-  const { data: campaigns, isLoading } = useTopCampaigns();
+const CampaignTable = ({ platform }: { platform?: string }) => {
+  const { data: campaigns, isLoading } = useTopCampaigns(platform);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
 
