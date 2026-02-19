@@ -44,9 +44,6 @@ export function useSubblyKPIs() {
 
       if (subErr) throw subErr;
 
-      const newSubs = (subs || []).filter((s) =>
-        ["active", "trial", "pre_order"].includes(s.status)
-      );
       const cancelledSubs = (subs || []).filter((s) => s.status === "cancelled");
 
       // Fetch paid invoices filtered by date range
@@ -62,7 +59,7 @@ export function useSubblyKPIs() {
 
       // Subbly amounts are in cents, convert to dollars
       const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
-      const newSubCount = newSubs.length;
+      const newSubCount = (subs || []).length;
       const totalCount = (subs || []).length;
 
       return {
