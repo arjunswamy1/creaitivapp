@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useBudgetPlanner, CampaignBudget } from "@/hooks/useBudgetPlanner";
+import { useState, useMemo, useEffect } from "react";
+import { useBudgetPlanner, useBudgetBaseline, CampaignBudget } from "@/hooks/useBudgetPlanner";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import {
   Target, DollarSign, Sparkles, TrendingUp, TrendingDown,
   Users, BarChart3, Settings, ArrowLeft, Chrome, Facebook,
+  CalendarDays,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Link } from "react-router-dom";
@@ -19,7 +20,14 @@ function BudgetPlannerContent() {
   const [submittedGoal, setSubmittedGoal] = useState<number | null>(null);
   const [editedBudgets, setEditedBudgets] = useState<Record<string, number>>({});
 
+  const { data: baseline, isLoading: baselineLoading } = useBudgetBaseline(activeClient?.id);
   const { data: plan, isLoading, error } = useBudgetPlanner(submittedGoal, activeClient?.id);
+
+  useEffect(() => {
+    if (baseline?.last_year_baseline?.suggested_goal && !goalInput && !submittedGoal) {
+      setGoalInput(baseline.last_year_baseline.suggested_goal.toString());
+    }
+  }, [baseline]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,18 +38,13 @@ function BudgetPlannerContent() {
     }
   };
 
-  // Merge edited budgets with plan data
   const campaignBudgets = useMemo(() => {
     if (!plan) return [];
     return plan.campaign_budgets.map((c) => {
       const key = `${c.platform}::${c.platform_campaign_id}`;
       const editedDaily = editedBudgets[key];
       if (editedDaily !== undefined) {
-        return {
-          ...c,
-          daily_budget: editedDaily,
-          monthly_budget: Math.round(editedDaily * plan.days_in_month),
-        };
+        return { ...c, daily_budget: editedDaily, monthly_budget: Math.round(editedDaily * plan.days_in_month) };
       }
       return c;
     });
@@ -64,12 +67,13 @@ function BudgetPlannerContent() {
   const platformColor = (p: string) =>
     p === "google" ? "text-amber-400" : "text-blue-400";
 
+  const bl = baseline?.last_year_baseline || plan?.last_year_baseline;
+
   return (
     <div className="min-h-screen bg-background px-6 pb-12">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader />
 
-        {/* Page header */}
         <div className="flex items-center gap-4 mb-6">
           <Link to="/">
             <Button variant="ghost" size="icon" className="shrink-0">
@@ -82,22 +86,47 @@ function BudgetPlannerContent() {
               Budget Planner
             </h2>
             <p className="text-sm text-muted-foreground">
-              Set a subscriber goal and get AI-powered budget recommendations by platform and campaign
+              Plan {baseline?.target_month || "next month"} budgets based on your subscriber growth goals
             </p>
           </div>
         </div>
+
+        {/* Last year baseline card */}
+        {(bl || baselineLoading) && (
+          <div className="glass-card p-5 mb-6">
+            {baselineLoading && !bl ? (
+              <Skeleton className="h-16 rounded-lg" />
+            ) : bl ? (
+              <div className="flex items-start gap-4 flex-wrap">
+                <div className="flex items-center gap-2 text-sm">
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  <span className="text-muted-foreground">Last year baseline:</span>
+                  <span className="font-bold font-mono">{bl.new_subscribers.toLocaleString()}</span>
+                  <span className="text-muted-foreground">new subscribers in {bl.month}</span>
+                </div>
+                <div className="h-5 w-px bg-border hidden md:block" />
+                <div className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  <span className="text-muted-foreground">25% growth target:</span>
+                  <span className="font-bold font-mono text-primary">{bl.suggested_goal.toLocaleString()}</span>
+                  <span className="text-muted-foreground">subscribers</span>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Goal input */}
         <div className="glass-card p-6 mb-6">
           <form onSubmit={handleSubmit} className="flex items-end gap-4">
             <div className="flex-1 max-w-xs">
               <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                New Subscriber Goal (next month)
+                New Subscriber Goal for {baseline?.target_month || "next month"}
               </label>
               <Input
                 type="number"
                 min={1}
-                placeholder="e.g. 200"
+                placeholder={bl ? `e.g. ${bl.suggested_goal}` : "e.g. 200"}
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
                 className="font-mono text-lg"
@@ -291,7 +320,11 @@ function BudgetPlannerContent() {
             {/* Lookback stats */}
             <div className="glass-card p-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">Analysis Based On</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Last Year ({plan.last_year_baseline.month})</p>
+                  <p className="font-mono font-bold">{plan.last_year_baseline.new_subscribers.toLocaleString()} subs</p>
+                </div>
                 <div>
                   <p className="text-xs text-muted-foreground">90-Day Total Spend</p>
                   <p className="font-mono font-bold">${plan.lookback_stats.total_spend_90d.toLocaleString()}</p>

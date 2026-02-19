@@ -22,32 +22,49 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  let body: { target_subs: number; client_id: string; month?: string };
+  let body: { target_subs?: number; client_id: string };
   try {
     body = await req.json();
   } catch {
     return errResponse("Invalid JSON body", 400);
   }
 
-  const { target_subs, client_id, month } = body;
-  if (!target_subs || !client_id) {
-    return errResponse("target_subs and client_id are required", 400);
+  const { client_id } = body;
+  let { target_subs } = body;
+  if (!client_id) {
+    return errResponse("client_id is required", 400);
   }
 
-  // Determine target month (default: next month)
+  // Always forecast for next month based on today's date
   const now = new Date();
   let targetYear: number, targetMonth: number;
-  if (month) {
-    const [y, m] = month.split("-").map(Number);
-    targetYear = y;
-    targetMonth = m;
-  } else {
-    targetYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
-    targetMonth = now.getMonth() === 11 ? 1 : now.getMonth() + 2;
-  }
+  targetYear = now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+  targetMonth = now.getMonth() === 11 ? 1 : now.getMonth() + 2;
 
   const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
   const targetMonthName = new Date(targetYear, targetMonth - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  // Fetch last year's same-month Subbly new subscribers as baseline
+  const lastYearStart = `${targetYear - 1}-${String(targetMonth).padStart(2, "0")}-01T05:00:00.000Z`;
+  const lastYearEndDate = new Date(targetYear - 1, targetMonth, 0); // last day of that month
+  const lastYearEndNextDay = formatDate(new Date(lastYearEndDate.getFullYear(), lastYearEndDate.getMonth(), lastYearEndDate.getDate() + 1));
+  const lastYearEnd = lastYearEndNextDay + "T04:59:59.999Z";
+
+  const { data: lastYearSubs, error: lyErr } = await supabase
+    .from("subbly_subscriptions")
+    .select("id")
+    .eq("client_id", client_id)
+    .gte("subbly_created_at", lastYearStart)
+    .lte("subbly_created_at", lastYearEnd);
+
+  if (lyErr) return errResponse(lyErr.message);
+  const lastYearSubCount = (lastYearSubs || []).length;
+  const suggestedGoal = Math.ceil(lastYearSubCount * 1.25);
+
+  // If no target_subs provided, use the suggested goal
+  if (!target_subs || target_subs <= 0) {
+    target_subs = suggestedGoal > 0 ? suggestedGoal : 100;
+  }
 
   // 90-day lookback
   const lookbackEnd = formatDate(now);
@@ -282,6 +299,8 @@ Focus on: whether the budget is achievable, risks, platform allocation rationale
     }
   }
 
+  const lastYearMonthName = new Date(targetYear - 1, targetMonth - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
+
   const result = {
     target_month: targetMonthName,
     days_in_month: daysInTargetMonth,
@@ -291,6 +310,11 @@ Focus on: whether the budget is achievable, risks, platform allocation rationale
     recent_30d_cac: Math.round(recent30CAC * 100) / 100,
     cac_trend_pct: cacTrend,
     total_budget: totalBudgetNeeded,
+    last_year_baseline: {
+      month: lastYearMonthName,
+      new_subscribers: lastYearSubCount,
+      suggested_goal: suggestedGoal,
+    },
     platform_budgets: Object.entries(platformBudgets).map(([platform, budget]) => ({
       platform,
       monthly_budget: budget,
