@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
 
     // Sync subscriptions
     console.log("sync-subbly: fetching subscriptions");
-    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY);
+    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, {}, 5);
     console.log("sync-subbly: got", subs.length, "subscriptions");
     let subsUpserted = 0;
 
@@ -147,6 +147,7 @@ Deno.serve(async (req) => {
         last_payment_at: s.last_payment_at ?? null,
         successful_charges_count: s.successful_charges_count ?? 0,
         past_due: s.past_due ?? false,
+        subbly_created_at: s.created_at ?? null,
         synced_at: new Date().toISOString(),
       }));
 
