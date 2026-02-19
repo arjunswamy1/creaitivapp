@@ -262,9 +262,21 @@ const Settings = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
       let domain = shopDomain.trim().replace(/^https?:\/\//, "").replace(/\/$/, "").replace(/^www\./, "");
-      // If user entered a custom domain (e.g. phantasmagorical.co), they need to provide the myshopify.com domain
-      // If it already contains .myshopify.com, use as-is; otherwise append it
-      const fullDomain = domain.includes(".myshopify.com") ? domain : `${domain}.myshopify.com`;
+      // If it already has .myshopify.com, use as-is
+      // Otherwise strip any TLD (e.g. phantasmagorical.co → phantasmagorical) and append .myshopify.com
+      let fullDomain: string;
+      if (domain.includes(".myshopify.com")) {
+        fullDomain = domain;
+      } else {
+        // Strip everything after the first dot to get just the store name
+        const storeName = domain.split(".")[0];
+        if (!storeName) {
+          toast({ title: "Error", description: "Please enter a valid Shopify store name (e.g. mystore or mystore.myshopify.com)", variant: "destructive" });
+          setConnecting(null);
+          return;
+        }
+        fullDomain = `${storeName}.myshopify.com`;
+      }
       const res = await supabase.functions.invoke("shopify-oauth-initiate", {
         headers: { Authorization: `Bearer ${session.access_token}` },
         body: { shop: fullDomain, client_id: activeClient?.id || null },
