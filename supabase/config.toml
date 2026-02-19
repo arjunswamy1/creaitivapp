@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.sync-shopify-orders]
 verify_jwt = false
+
+[functions.sync-subbly]
+verify_jwt = false
