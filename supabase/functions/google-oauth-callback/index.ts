@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
           metadata: { customers },
           client_id: state.client_id || null,
         },
-        { onConflict: "user_id,platform" }
+        { onConflict: "user_id,platform,client_id" }
       );
 
     if (upsertError) {
