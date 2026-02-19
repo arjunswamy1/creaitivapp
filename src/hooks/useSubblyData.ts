@@ -27,15 +27,17 @@ export function useSubblyKPIs() {
     queryFn: async (): Promise<SubblyKPIs> => {
       if (!clientId) throw new Error("No client");
 
-      // Fetch subscriptions
+      // Fetch subscriptions created within the date range
       const { data: subs, error: subErr } = await supabase
         .from("subbly_subscriptions")
-        .select("status, quantity, successful_charges_count")
-        .eq("client_id", clientId);
+        .select("status, quantity, successful_charges_count, created_at")
+        .eq("client_id", clientId)
+        .gte("created_at", fromStr)
+        .lte("created_at", toStr + "T23:59:59.999Z");
 
       if (subErr) throw subErr;
 
-      const activeSubs = (subs || []).filter((s) =>
+      const newSubs = (subs || []).filter((s) =>
         ["active", "trial", "pre_order"].includes(s.status)
       );
       const cancelledSubs = (subs || []).filter((s) => s.status === "cancelled");
@@ -53,16 +55,16 @@ export function useSubblyKPIs() {
 
       // Subbly amounts are in cents, convert to dollars
       const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
-      const activeCount = activeSubs.length;
+      const newSubCount = newSubs.length;
       const totalCount = (subs || []).length;
 
       return {
-        activeSubscriptions: activeCount,
-        mrr: totalCount > 0 ? Math.round(totalRevenue / Math.max(1, (subs || []).reduce((s, sub) => s + (sub.successful_charges_count || 1), 0)) * activeCount) : 0,
+        activeSubscriptions: newSubCount,
+        mrr: totalCount > 0 ? Math.round(totalRevenue / Math.max(1, (subs || []).reduce((s, sub) => s + (sub.successful_charges_count || 1), 0)) * newSubCount) : 0,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         churnedCount: cancelledSubs.length,
         churnRate: totalCount > 0 ? Math.round((cancelledSubs.length / totalCount) * 10000) / 100 : 0,
-        avgRevenuePerSub: activeCount > 0 ? Math.round((totalRevenue / activeCount) * 100) / 100 : 0,
+        avgRevenuePerSub: newSubCount > 0 ? Math.round((totalRevenue / newSubCount) * 100) / 100 : 0,
       };
     },
   });
