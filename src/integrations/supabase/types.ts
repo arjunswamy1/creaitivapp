@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           campaign_name: string
           clicks: number
+          client_id: string | null
           conversions: number
           created_at: string
           date: string
@@ -35,6 +36,7 @@ export type Database = {
         Insert: {
           campaign_name: string
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date: string
@@ -52,6 +54,7 @@ export type Database = {
         Update: {
           campaign_name?: string
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date?: string
@@ -66,11 +69,20 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ad_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ad_daily_metrics: {
         Row: {
           clicks: number
+          client_id: string | null
           conversions: number
           cpc: number | null
           cpm: number | null
@@ -88,6 +100,7 @@ export type Database = {
         }
         Insert: {
           clicks?: number
+          client_id?: string | null
           conversions?: number
           cpc?: number | null
           cpm?: number | null
@@ -105,6 +118,7 @@ export type Database = {
         }
         Update: {
           clicks?: number
+          client_id?: string | null
           conversions?: number
           cpc?: number | null
           cpm?: number | null
@@ -120,13 +134,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ad_daily_metrics_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ad_sets: {
         Row: {
           adset_name: string
           campaign_name: string | null
           clicks: number
+          client_id: string | null
           conversions: number
           created_at: string
           date: string
@@ -146,6 +169,7 @@ export type Database = {
           adset_name: string
           campaign_name?: string | null
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date: string
@@ -165,6 +189,7 @@ export type Database = {
           adset_name?: string
           campaign_name?: string | null
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date?: string
@@ -180,7 +205,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ad_sets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ad_sync_log: {
         Row: {
@@ -221,6 +254,7 @@ export type Database = {
           adset_name: string | null
           campaign_name: string | null
           clicks: number
+          client_id: string | null
           conversions: number
           created_at: string
           date: string
@@ -242,6 +276,7 @@ export type Database = {
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date: string
@@ -263,6 +298,7 @@ export type Database = {
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
+          client_id?: string | null
           conversions?: number
           created_at?: string
           date?: string
@@ -279,10 +315,19 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       alert_settings: {
         Row: {
+          client_id: string | null
           created_at: string
           enabled: boolean
           id: string
@@ -293,6 +338,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           enabled?: boolean
           id?: string
@@ -303,6 +349,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           enabled?: boolean
           id?: string
@@ -312,6 +359,114 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "alert_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_dashboard_config: {
+        Row: {
+          client_id: string
+          created_at: string
+          custom_metrics: Json | null
+          enabled_kpis: string[] | null
+          enabled_platforms: string[] | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          custom_metrics?: Json | null
+          enabled_kpis?: string[] | null
+          enabled_platforms?: string[] | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          custom_metrics?: Json | null
+          enabled_kpis?: string[] | null
+          enabled_platforms?: string[] | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_dashboard_config_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_members: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["client_role"]
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["client_role"]
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["client_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          brand_colors: Json | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          brand_colors?: Json | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          brand_colors?: Json | null
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
         Relationships: []
       }
       platform_connections: {
@@ -319,6 +474,7 @@ export type Database = {
           access_token: string
           account_id: string | null
           account_name: string | null
+          client_id: string | null
           connected_at: string
           id: string
           metadata: Json | null
@@ -333,6 +489,7 @@ export type Database = {
           access_token: string
           account_id?: string | null
           account_name?: string | null
+          client_id?: string | null
           connected_at?: string
           id?: string
           metadata?: Json | null
@@ -347,6 +504,7 @@ export type Database = {
           access_token?: string
           account_id?: string | null
           account_name?: string | null
+          client_id?: string | null
           connected_at?: string
           id?: string
           metadata?: Json | null
@@ -357,7 +515,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "platform_connections_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -391,10 +557,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_client_ids: { Args: { _user_id: string }; Returns: string[] }
+      is_agency_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_client_member: {
+        Args: { _client_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      client_role: "agency_admin" | "client_admin" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -521,6 +692,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      client_role: ["agency_admin", "client_admin", "viewer"],
+    },
   },
 } as const
