@@ -71,73 +71,86 @@ Deno.serve(async (req) => {
     return errResponse(subErr.message);
   }
 
-  // Fetch historical daily data for regression (spend + subs)
-  const { data: allAdMetrics, error: allAdErr } = await supabase
-    .from("ad_daily_metrics")
-    .select("date, spend")
-    .order("date", { ascending: true });
-
-  if (allAdErr) {
-    return errResponse(allAdErr.message);
-  }
-
-  const { data: allSubs, error: allSubErr } = await supabase
-    .from("subbly_subscriptions")
-    .select("subbly_created_at")
-    .not("subbly_created_at", "is", null)
-    .order("subbly_created_at", { ascending: true });
-
-  if (allSubErr) {
-    return errResponse(allSubErr.message);
-  }
-
-  // Build daily spend map
-  const dailySpend = new Map<string, number>();
-  for (const row of allAdMetrics || []) {
-    const d = row.date;
-    dailySpend.set(d, (dailySpend.get(d) || 0) + Number(row.spend));
-  }
-
-  // Build daily subs map
-  const dailySubs = new Map<string, number>();
-  for (const sub of allSubs || []) {
-    if (!sub.subbly_created_at) continue;
-    const d = sub.subbly_created_at.split("T")[0];
-    dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
-  }
-
-  // Merge into aligned daily series
-  const allDates = [...new Set([...dailySpend.keys(), ...dailySubs.keys()])].sort();
-  if (allDates.length < 3) {
-    return errResponse("Not enough data for forecasting (need 3+ days)", 400);
-  }
-
-  const dailyData = allDates.map((d, i) => ({
-    index: i,
-    spend: dailySpend.get(d) || 0,
-    subs: dailySubs.get(d) || 0,
-  }));
-
   // MTD actuals
   const actualSpend = (monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0);
   const actualSubs = (monthSubs || []).length;
-  const daysWithData = new Set((monthAdMetrics || []).map(r => r.date)).size;
 
-  // Linear regression for projections
-  const spendReg = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.spend));
-  const subsReg = linearRegression(dailyData.map(d => d.index), dailyData.map(d => d.subs));
-  const n = dailyData.length;
+  // Build daily MTD maps for this month
+  const mtdDailySpend = new Map<string, number>();
+  for (const row of monthAdMetrics || []) {
+    mtdDailySpend.set(row.date, (mtdDailySpend.get(row.date) || 0) + Number(row.spend));
+  }
+
+  const mtdDailySubs = new Map<string, number>();
+  for (const sub of monthSubs || []) {
+    if (!sub.subbly_created_at) continue;
+    const d = sub.subbly_created_at.split("T")[0];
+    mtdDailySubs.set(d, (mtdDailySubs.get(d) || 0) + 1);
+  }
+
+  // Build ordered MTD daily series
+  const mtdDates: string[] = [];
+  for (let i = 1; i <= today; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), i);
+    mtdDates.push(formatDate(d));
+  }
+
+  const mtdSeries = mtdDates.map(d => ({
+    date: d,
+    spend: mtdDailySpend.get(d) || 0,
+    subs: mtdDailySubs.get(d) || 0,
+  }));
+
+  const daysWithData = mtdSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
+
+  // Use weighted recent average for projection (last 7 days weighted 2x vs earlier days)
+  const recentWindow = 7;
+  const recentDays = mtdSeries.slice(-recentWindow);
+  const olderDays = mtdSeries.slice(0, -recentWindow);
+
+  const recentAvgSubs = recentDays.length > 0
+    ? recentDays.reduce((s, d) => s + d.subs, 0) / recentDays.length
+    : 0;
+  const olderAvgSubs = olderDays.length > 0
+    ? olderDays.reduce((s, d) => s + d.subs, 0) / olderDays.length
+    : recentAvgSubs;
+
+  const recentAvgSpend = recentDays.length > 0
+    ? recentDays.reduce((s, d) => s + d.spend, 0) / recentDays.length
+    : 0;
+  const olderAvgSpend = olderDays.length > 0
+    ? olderDays.reduce((s, d) => s + d.spend, 0) / olderDays.length
+    : recentAvgSpend;
+
+  // Weighted average: recent gets 2x weight
+  const recentWeight = 2;
+  const olderWeight = 1;
+  const totalWeight = (olderDays.length > 0 ? olderWeight : 0) + recentWeight;
+
+  const projDailySubs = olderDays.length > 0
+    ? (recentAvgSubs * recentWeight + olderAvgSubs * olderWeight) / totalWeight
+    : recentAvgSubs;
+  const projDailySpend = olderDays.length > 0
+    ? (recentAvgSpend * recentWeight + olderAvgSpend * olderWeight) / totalWeight
+    : recentAvgSpend;
+
+  // Also compute trend direction from last 3 days vs overall avg
+  const last3 = mtdSeries.slice(-3);
+  const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
+  const overallAvgSubs = actualSubs / daysWithData;
+  const trendMultiplier = overallAvgSubs > 0 ? Math.min(1.5, Math.max(0.7, last3AvgSubs / overallAvgSubs)) : 1;
+
+  const adjustedDailySubs = projDailySubs * trendMultiplier;
 
   let projectedSpend = 0;
   let projectedSubs = 0;
   const dailyForecast: any[] = [];
 
   for (let i = 1; i <= remainingDays; i++) {
-    const idx = n + i - 1;
     const forecastDate = new Date(now);
     forecastDate.setDate(forecastDate.getDate() + i);
-    const daySpend = Math.max(0, Math.round(spendReg.slope * idx + spendReg.intercept));
-    const daySubs = Math.max(0, Math.round(subsReg.slope * idx + subsReg.intercept));
+    const daySpend = Math.max(0, Math.round(projDailySpend));
+    const daySubs = Math.max(0, Math.round(adjustedDailySubs));
 
     projectedSpend += daySpend;
     projectedSubs += daySubs;
@@ -172,6 +185,7 @@ Deno.serve(async (req) => {
     avg_daily_subs: avgDailySubs,
     avg_daily_spend: avgDailySpend,
     daily_forecast: dailyForecast,
+    trend_direction: trendMultiplier > 1.05 ? "accelerating" : trendMultiplier < 0.95 ? "decelerating" : "steady",
   };
 
   // AI insight
@@ -182,11 +196,12 @@ Deno.serve(async (req) => {
       const prompt = `You are a performance marketing analyst for a DTC subscription brand. Provide a concise 3-4 sentence monthly forecast summary.
 
 Month: ${monthName}
-Days elapsed: ${today} of ${totalDaysInMonth}
+Days elapsed: ${today} of ${totalDaysInMonth} (${remainingDays} remaining)
 Actuals MTD: ${actualSubs} new subscriptions, $${Math.round(actualSpend)} total ad spend, CAC $${stats.actual_cac}
 Avg daily: ${avgDailySubs} subs/day, $${avgDailySpend} spend/day
+Recent trend (last 3 days): ${last3AvgSubs.toFixed(1)} subs/day (${stats.trend_direction})
 
-Forecast for full month: ${monthTotalSubs} total new subscriptions, $${Math.round(monthTotalSpend)} total spend, CAC $${monthCAC}
+Forecast for full month: ${monthTotalSubs} total new subscriptions (+${projectedSubs} projected remaining), $${Math.round(monthTotalSpend)} total spend, projected CAC $${monthCAC}
 
 Focus on: subscription growth trajectory, CAC efficiency, and actionable advice to improve acquisition.`;
 
@@ -229,15 +244,3 @@ function formatDate(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
-function linearRegression(x: number[], y: number[]) {
-  const n = x.length;
-  const sumX = x.reduce((a, b) => a + b, 0);
-  const sumY = y.reduce((a, b) => a + b, 0);
-  const sumXY = x.reduce((a, xi, i) => a + xi * y[i], 0);
-  const sumX2 = x.reduce((a, xi) => a + xi * xi, 0);
-
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-
-  return { slope: isNaN(slope) ? 0 : slope, intercept: isNaN(intercept) ? 0 : intercept };
-}
