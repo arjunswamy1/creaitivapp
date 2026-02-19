@@ -3,7 +3,7 @@ import SpendRevenueChart from "@/components/SpendRevenueChart";
 import ChannelBreakdown from "@/components/ChannelBreakdown";
 import ForecastCard from "@/components/ForecastCard";
 import SubblyKPIRow from "@/components/SubblyKPIRow";
-import FunnelChart from "@/components/FunnelChart";
+
 import { useCrossChannelKPIs } from "@/hooks/useCrossChannelData";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -50,9 +50,8 @@ const CrossChannelView = () => {
         <ChannelBreakdown />
       </div>
 
-      {/* Funnel + Forecast Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <FunnelChart />
+      {/* Forecast */}
+      <div className="mb-6">
         <ForecastCard />
       </div>
     </>
