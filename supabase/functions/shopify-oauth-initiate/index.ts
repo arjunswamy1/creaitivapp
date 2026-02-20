@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
 
     const state = btoa(JSON.stringify({ user_id: userId, shop: shopDomain, client_id: bodyClientId || null }));
 
-    const scopes = "read_orders,read_products";
+    const scopes = "read_orders,read_products,read_inventory";
 
     const authUrl =
       `https://${shopDomain}/admin/oauth/authorize` +

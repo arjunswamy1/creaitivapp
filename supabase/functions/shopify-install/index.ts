@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
 
   const clientId = Deno.env.get("SHOPIFY_CLIENT_ID")!;
   const redirectUri = `${Deno.env.get("SUPABASE_URL")}/functions/v1/shopify-oauth-callback`;
-  const scopes = "read_orders,read_products";
+  const scopes = "read_orders,read_products,read_inventory";
 
   // State without user_id since this is initiated from Shopify side
   const state = btoa(JSON.stringify({ shop, client_id: null }));
