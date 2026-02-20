@@ -28,8 +28,9 @@ export interface BudgetPlan {
   days_in_month: number;
   target_subs: number;
   projection_cac: number;
-  blended_90d_cac: number;
-  recent_30d_cac: number;
+  cac_30d: number;
+  cac_60d: number;
+  cac_90d: number;
   cac_trend_pct: number;
   total_budget: number;
   last_year_baseline: {
@@ -42,6 +43,8 @@ export interface BudgetPlan {
   lookback_stats: {
     total_spend_90d: number;
     total_subs_90d: number;
+    total_spend_60d: number;
+    total_subs_60d: number;
     total_spend_30d: number;
     total_subs_30d: number;
     active_campaigns: number;
