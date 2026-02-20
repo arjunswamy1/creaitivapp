@@ -102,12 +102,17 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
     const since = formatDate(startDate);
     const until = formatDate(endDate);
 
-    // Clear existing data so only selected account data remains
+    // Clear existing data scoped to this client (not all user's meta data)
+    const deleteFilter = (table: string) => {
+      let q = supabase.from(table).delete().eq("user_id", userId).eq("platform", "meta");
+      if (clientId) q = q.eq("client_id", clientId);
+      return q;
+    };
     await Promise.all([
-      supabase.from("ad_daily_metrics").delete().eq("user_id", userId).eq("platform", "meta"),
-      supabase.from("ad_campaigns").delete().eq("user_id", userId).eq("platform", "meta"),
-      supabase.from("ad_sets").delete().eq("user_id", userId).eq("platform", "meta"),
-      supabase.from("ads").delete().eq("user_id", userId).eq("platform", "meta"),
+      deleteFilter("ad_daily_metrics"),
+      deleteFilter("ad_campaigns"),
+      deleteFilter("ad_sets"),
+      deleteFilter("ads"),
     ]);
 
     let totalRecords = 0;
