@@ -100,22 +100,76 @@ Deno.serve(async (req) => {
 
         if (orders.length === 0) break;
 
-        // Upsert individual orders into shopify_orders table
-        const orderRows = orders.map((order: any) => ({
-          client_id: clientId,
-          shopify_order_id: order.id,
-          order_number: order.name || `#${order.order_number}`,
-          total_price: parseFloat(order.total_price || "0"),
-          subtotal_price: parseFloat(order.subtotal_price || "0"),
-          total_tax: parseFloat(order.total_tax || "0"),
-          total_discounts: parseFloat(order.total_discounts || "0"),
-          currency: order.currency || "USD",
-          financial_status: order.financial_status || "unknown",
-          fulfillment_status: order.fulfillment_status || null,
-          order_date: order.created_at,
-          customer_id: order.customer?.id || null,
-          line_items_count: (order.line_items || []).length,
-        }));
+        // Collect unique variant IDs to fetch costs
+        const variantIds = new Set<number>();
+        for (const order of orders) {
+          for (const item of order.line_items || []) {
+            if (item.variant_id) variantIds.add(item.variant_id);
+          }
+        }
+
+        // Batch fetch inventory item costs via variants
+        const variantCosts = new Map<number, number>();
+        const variantIdArray = Array.from(variantIds);
+        for (let i = 0; i < variantIdArray.length; i += 250) {
+          const batch = variantIdArray.slice(i, i + 250);
+          const variantUrl = `https://${shopDomain}/admin/api/2024-01/variants.json?ids=${batch.join(",")}&fields=id,inventory_item_id`;
+          const varRes = await fetch(variantUrl, {
+            headers: { "X-Shopify-Access-Token": accessToken },
+          });
+          if (varRes.ok) {
+            const varData = await varRes.json();
+            const invItemIds = (varData.variants || []).map((v: any) => v.inventory_item_id).filter(Boolean);
+            if (invItemIds.length > 0) {
+              const invUrl = `https://${shopDomain}/admin/api/2024-01/inventory_items.json?ids=${invItemIds.join(",")}&fields=id,cost`;
+              const invRes = await fetch(invUrl, {
+                headers: { "X-Shopify-Access-Token": accessToken },
+              });
+              if (invRes.ok) {
+                const invData = await invRes.json();
+                const invCostMap = new Map<number, number>();
+                for (const inv of invData.inventory_items || []) {
+                  invCostMap.set(inv.id, parseFloat(inv.cost || "0"));
+                }
+                for (const v of varData.variants || []) {
+                  const cost = invCostMap.get(v.inventory_item_id) || 0;
+                  variantCosts.set(v.id, cost);
+                }
+              }
+            }
+          }
+        }
+
+        // Calculate COGS per order and prepare rows
+        const orderRows = orders.map((order: any) => {
+          let orderCOGS = 0;
+          for (const item of order.line_items || []) {
+            const unitCost = variantCosts.get(item.variant_id) || 0;
+            orderCOGS += unitCost * (item.quantity || 1);
+          }
+
+          const totalShipping = (order.shipping_lines || []).reduce(
+            (s: number, sl: any) => s + parseFloat(sl.price || "0"), 0
+          );
+
+          return {
+            client_id: clientId,
+            shopify_order_id: order.id,
+            order_number: order.name || `#${order.order_number}`,
+            total_price: parseFloat(order.total_price || "0"),
+            subtotal_price: parseFloat(order.subtotal_price || "0"),
+            total_tax: parseFloat(order.total_tax || "0"),
+            total_discounts: parseFloat(order.total_discounts || "0"),
+            total_cost: orderCOGS,
+            total_shipping: totalShipping,
+            currency: order.currency || "USD",
+            financial_status: order.financial_status || "unknown",
+            fulfillment_status: order.fulfillment_status || null,
+            order_date: order.created_at,
+            customer_id: order.customer?.id || null,
+            line_items_count: (order.line_items || []).length,
+          };
+        });
 
         if (orderRows.length > 0) {
           const { error: upsertError } = await adminSupabase

@@ -683,8 +683,10 @@ export type Database = {
           shopify_order_id: number
           subtotal_price: number
           synced_at: string
+          total_cost: number
           total_discounts: number
           total_price: number
+          total_shipping: number
           total_tax: number
           updated_at: string
         }
@@ -702,8 +704,10 @@ export type Database = {
           shopify_order_id: number
           subtotal_price?: number
           synced_at?: string
+          total_cost?: number
           total_discounts?: number
           total_price?: number
+          total_shipping?: number
           total_tax?: number
           updated_at?: string
         }
@@ -721,8 +725,10 @@ export type Database = {
           shopify_order_id?: number
           subtotal_price?: number
           synced_at?: string
+          total_cost?: number
           total_discounts?: number
           total_price?: number
+          total_shipping?: number
           total_tax?: number
           updated_at?: string
         }

@@ -12,33 +12,47 @@ const CrossChannelView = () => {
   const { data: kpis, isLoading } = useCrossChannelKPIs();
   const { dashboardConfig } = useClient();
   const revenueSource = dashboardConfig?.revenue_source || "subbly";
-  const ordersLabel = revenueSource === "shopify" ? "New Orders" : "New Subscriptions";
+  const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
+  const showGoogle = platforms.includes("google");
+  const ordersLabel = revenueSource === "shopify" ? "New Customers" : "New Subscriptions";
+
+  // Determine how many primary KPI cards to show
+  const primaryCards = [
+    { show: true, title: "Total Spend", value: `$${(kpis?.totalSpend ?? 0).toLocaleString()}`, change: kpis?.changes.totalSpend, invert: true },
+    { show: showGoogle, title: "Google Spend", value: `$${(kpis?.googleSpend ?? 0).toLocaleString()}`, change: kpis?.changes.googleSpend, invert: true },
+    { show: true, title: "Meta Spend", value: `$${(kpis?.metaSpend ?? 0).toLocaleString()}`, change: kpis?.changes.metaSpend, invert: true },
+    { show: true, title: "Total CAC", value: kpis?.totalCAC ? `$${kpis.totalCAC.toLocaleString()}` : "—", change: kpis?.changes.totalCAC, invert: true },
+  ].filter(c => c.show);
 
   return (
     <>
       {/* Primary KPI Row */}
+      <div className={`grid grid-cols-2 md:grid-cols-${primaryCards.length} gap-4 mb-6`}>
+        {isLoading ? (
+          Array.from({ length: primaryCards.length }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+        ) : (
+          primaryCards.map((card) => (
+            <KPICard key={card.title} title={card.title} value={card.value} change={card.change} invertColor={card.invert} />
+          ))
+        )}
+      </div>
+
+      {/* Secondary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
-            <KPICard title="Total Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} change={kpis?.changes.totalSpend} invertColor />
-            <KPICard title="Google Spend" value={`$${(kpis?.googleSpend ?? 0).toLocaleString()}`} change={kpis?.changes.googleSpend} invertColor />
-            <KPICard title="Meta Spend" value={`$${(kpis?.metaSpend ?? 0).toLocaleString()}`} change={kpis?.changes.metaSpend} invertColor />
-            <KPICard title="Total CAC" value={kpis?.totalCAC ? `$${kpis.totalCAC.toLocaleString()}` : "—"} change={kpis?.changes.totalCAC} invertColor />
-          </>
-        )}
-      </div>
-
-      {/* Secondary KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        {isLoading ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
-        ) : (
-          <>
             <KPICard title={ordersLabel} value={(kpis?.newSubscriptions ?? 0).toLocaleString()} change={kpis?.changes.newSubscriptions} />
             <KPICard title="Total Revenue" value={`$${(kpis?.totalRevenue ?? 0).toLocaleString()}`} change={kpis?.changes.totalRevenue} />
             <KPICard title="Blended ROAS" value={`${kpis?.blendedROAS ?? 0}x`} change={kpis?.changes.blendedROAS} />
+            {revenueSource === "shopify" && (
+              <KPICard
+                title="Profit"
+                value={`$${(kpis?.profit ?? 0).toLocaleString()}`}
+                change={kpis?.changes.profit}
+              />
+            )}
           </>
         )}
       </div>

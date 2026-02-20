@@ -1,10 +1,14 @@
 import { useForecast } from "@/hooks/useAdData";
+import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, Target, Sparkles, CalendarDays, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const ForecastCard = () => {
   const { data: forecast, isLoading, error } = useForecast();
+  const { dashboardConfig } = useClient();
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
+  const subsLabel = revenueSource === "shopify" ? "Customers" : "Subs";
 
   if (error) {
     return (
@@ -54,13 +58,13 @@ const ForecastCard = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <MetricCard
           icon={<Users className="w-3.5 h-3.5" />}
-          label="MTD New Subs"
+          label={`MTD New ${subsLabel}`}
           value={forecast.actual_subs}
           sublabel={`${forecast.avg_daily_subs}/day avg`}
         />
         <MetricCard
           icon={<Users className="w-3.5 h-3.5" />}
-          label="Projected Month Subs"
+          label={`Projected Month ${subsLabel}`}
           value={forecast.month_total_subs}
           sublabel={`+${forecast.projected_remaining_subs} remaining`}
           highlight
