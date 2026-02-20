@@ -32,18 +32,17 @@ Deno.serve(async (req) => {
   let targetConnections: { user_id: string; access_token: string; metadata: any; selected_ad_account: any; client_id: string | null }[] = [];
 
   if (userId) {
-    const { data: conn } = await supabaseAdmin
+    const { data: conns } = await supabaseAdmin
       .from("platform_connections")
       .select("user_id, access_token, metadata, selected_ad_account, client_id")
       .eq("user_id", userId)
-      .eq("platform", "meta")
-      .maybeSingle();
-    if (!conn) {
+      .eq("platform", "meta");
+    if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ error: "No Meta connection found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    targetConnections = [conn];
+    targetConnections = conns;
   } else {
     const { data: connections } = await supabaseAdmin
       .from("platform_connections")
