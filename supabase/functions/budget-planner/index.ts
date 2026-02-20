@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  let body: { target_subs?: number; client_id: string };
+  let body: { target_subs?: number; client_id: string; revenue_source?: string };
   try {
     body = await req.json();
   } catch {
@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
 
   const { client_id } = body;
   let { target_subs } = body;
+  const revenueSource = body.revenue_source || "subbly";
   if (!client_id) {
     return errResponse("client_id is required", 400);
   }
@@ -44,21 +45,41 @@ Deno.serve(async (req) => {
   const daysInTargetMonth = new Date(targetYear, targetMonth, 0).getDate();
   const targetMonthName = new Date(targetYear, targetMonth - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
 
-  // Fetch last year's same-month Subbly new subscribers as baseline
-  const lastYearStart = `${targetYear - 1}-${String(targetMonth).padStart(2, "0")}-01T05:00:00.000Z`;
-  const lastYearEndDate = new Date(targetYear - 1, targetMonth, 0); // last day of that month
-  const lastYearEndNextDay = formatDate(new Date(lastYearEndDate.getFullYear(), lastYearEndDate.getMonth(), lastYearEndDate.getDate() + 1));
-  const lastYearEnd = lastYearEndNextDay + "T04:59:59.999Z";
+  // Fetch last year's same-month baseline as YoY reference
+  let lastYearCount = 0;
+  if (revenueSource === "shopify") {
+    const lastYearStartDate = `${targetYear - 1}-${String(targetMonth).padStart(2, "0")}-01T00:00:00.000Z`;
+    const lastYearEndDate = new Date(targetYear - 1, targetMonth, 0);
+    const lastYearEndStr = formatDate(new Date(lastYearEndDate.getFullYear(), lastYearEndDate.getMonth(), lastYearEndDate.getDate() + 1)) + "T23:59:59.999Z";
 
-  const { data: lastYearSubs, error: lyErr } = await supabase
-    .from("subbly_subscriptions")
-    .select("id")
-    .eq("client_id", client_id)
-    .gte("subbly_created_at", lastYearStart)
-    .lte("subbly_created_at", lastYearEnd);
+    const { data: lastYearOrders, error: lyErr } = await supabase
+      .from("shopify_orders")
+      .select("id")
+      .eq("client_id", client_id)
+      .in("financial_status", ["paid", "partially_refunded"])
+      .gte("order_date", lastYearStartDate)
+      .lte("order_date", lastYearEndStr);
 
-  if (lyErr) return errResponse(lyErr.message);
-  const lastYearSubCount = (lastYearSubs || []).length;
+    if (lyErr) return errResponse(lyErr.message);
+    lastYearCount = (lastYearOrders || []).length;
+  } else {
+    const lastYearStart = `${targetYear - 1}-${String(targetMonth).padStart(2, "0")}-01T05:00:00.000Z`;
+    const lastYearEndDate = new Date(targetYear - 1, targetMonth, 0);
+    const lastYearEndNextDay = formatDate(new Date(lastYearEndDate.getFullYear(), lastYearEndDate.getMonth(), lastYearEndDate.getDate() + 1));
+    const lastYearEnd = lastYearEndNextDay + "T04:59:59.999Z";
+
+    const { data: lastYearSubs, error: lyErr } = await supabase
+      .from("subbly_subscriptions")
+      .select("id")
+      .eq("client_id", client_id)
+      .gte("subbly_created_at", lastYearStart)
+      .lte("subbly_created_at", lastYearEnd);
+
+    if (lyErr) return errResponse(lyErr.message);
+    lastYearCount = (lastYearSubs || []).length;
+  }
+
+  const lastYearSubCount = lastYearCount;
   const suggestedGoal = Math.ceil(lastYearSubCount * 1.25);
 
   // If no target_subs provided, use the suggested goal
@@ -92,37 +113,62 @@ Deno.serve(async (req) => {
 
   if (dailyErr) return errResponse(dailyErr.message);
 
-  // Fetch subbly subscriptions for the same period
+  // Fetch orders/subscriptions for the same period based on revenue source
   const fromUTC = lookbackStart + "T00:00:00.000Z";
   const toUTC = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) + "T04:59:59.999Z";
 
-  // Fetch ALL subs - default Supabase limit is 1000 which skews CAC calculations
-  let allSubs: { id: string; subbly_created_at: string | null }[] = [];
-  let subOffset = 0;
-  const SUB_PAGE_SIZE = 1000;
-  while (true) {
-    const { data: page, error: subErr } = await supabase
-      .from("subbly_subscriptions")
-      .select("id, subbly_created_at")
-      .eq("client_id", client_id)
-      .gte("subbly_created_at", fromUTC)
-      .lte("subbly_created_at", toUTC)
-      .range(subOffset, subOffset + SUB_PAGE_SIZE - 1);
-
-    allSubs = allSubs.concat(page || []);
-    if (!page || page.length < SUB_PAGE_SIZE) break;
-    subOffset += SUB_PAGE_SIZE;
-  }
-  const subsData = allSubs;
-
-  
-
-  // Build daily subs map
+  // Build daily orders map
   const dailySubs = new Map<string, number>();
-  for (const sub of subsData || []) {
-    if (!sub.subbly_created_at) continue;
-    const d = sub.subbly_created_at.split("T")[0];
-    dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
+
+  if (revenueSource === "shopify") {
+    // Use Shopify orders
+    let allOrders: any[] = [];
+    let orderOffset = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      const { data: page, error: ordErr } = await supabase
+        .from("shopify_orders")
+        .select("id, order_date")
+        .eq("client_id", client_id)
+        .in("financial_status", ["paid", "partially_refunded"])
+        .gte("order_date", fromUTC)
+        .lte("order_date", toUTC)
+        .range(orderOffset, orderOffset + PAGE_SIZE - 1);
+
+      allOrders = allOrders.concat(page || []);
+      if (!page || page.length < PAGE_SIZE) break;
+      orderOffset += PAGE_SIZE;
+    }
+
+    for (const order of allOrders) {
+      if (!order.order_date) continue;
+      const d = order.order_date.split("T")[0];
+      dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
+    }
+  } else {
+    // Use Subbly subscriptions
+    let allSubs: { id: string; subbly_created_at: string | null }[] = [];
+    let subOffset = 0;
+    const SUB_PAGE_SIZE = 1000;
+    while (true) {
+      const { data: page, error: subErr } = await supabase
+        .from("subbly_subscriptions")
+        .select("id, subbly_created_at")
+        .eq("client_id", client_id)
+        .gte("subbly_created_at", fromUTC)
+        .lte("subbly_created_at", toUTC)
+        .range(subOffset, subOffset + SUB_PAGE_SIZE - 1);
+
+      allSubs = allSubs.concat(page || []);
+      if (!page || page.length < SUB_PAGE_SIZE) break;
+      subOffset += SUB_PAGE_SIZE;
+    }
+
+    for (const sub of allSubs) {
+      if (!sub.subbly_created_at) continue;
+      const d = sub.subbly_created_at.split("T")[0];
+      dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
+    }
   }
 
   // Multi-period CAC analysis: 30d, 60d, 90d with recency weighting

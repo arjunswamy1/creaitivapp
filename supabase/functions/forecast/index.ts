@@ -32,6 +32,17 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Parse body for client_id and revenue_source
+  let clientId: string | null = null;
+  let revenueSource = "subbly";
+  try {
+    const body = await req.json();
+    clientId = body.client_id || null;
+    revenueSource = body.revenue_source || "subbly";
+  } catch {
+    // No body is fine for backwards compat
+  }
+
   // Determine current month boundaries
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -44,48 +55,79 @@ Deno.serve(async (req) => {
   const monthStartStr = formatDate(monthStart);
   const todayStr = formatDate(now);
 
-  // Fetch MTD ad spend (all platforms)
-  const { data: monthAdMetrics, error: adErr } = await supabase
+  // Fetch MTD ad spend (all platforms except shopify), scoped by client_id
+  let adQuery = supabase
     .from("ad_daily_metrics")
     .select("date, spend")
+    .neq("platform", "shopify")
     .gte("date", monthStartStr)
     .lte("date", todayStr)
     .order("date", { ascending: true });
+
+  if (clientId) adQuery = adQuery.eq("client_id", clientId);
+
+  const { data: monthAdMetrics, error: adErr } = await adQuery;
 
   if (adErr) {
     return errResponse(adErr.message);
   }
 
-  // Fetch MTD Subbly new subscriptions
-  const fromUTC = monthStartStr + "T05:00:00.000Z";
+  // Fetch MTD orders/subscriptions based on revenue source
+  const fromUTC = monthStartStr + "T00:00:00.000Z";
   const tomorrowStr = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
   const toUTC = tomorrowStr + "T04:59:59.999Z";
 
-  const { data: monthSubs, error: subErr } = await supabase
-    .from("subbly_subscriptions")
-    .select("id, subbly_created_at")
-    .gte("subbly_created_at", fromUTC)
-    .lte("subbly_created_at", toUTC);
+  let actualOrders = 0;
+  const mtdDailyOrders = new Map<string, number>();
 
-  if (subErr) {
-    return errResponse(subErr.message);
+  if (revenueSource === "shopify") {
+    // Use Shopify orders
+    let orderQuery = supabase
+      .from("shopify_orders")
+      .select("order_date")
+      .in("financial_status", ["paid", "partially_refunded"])
+      .gte("order_date", fromUTC)
+      .lte("order_date", toUTC);
+
+    if (clientId) orderQuery = orderQuery.eq("client_id", clientId);
+
+    const { data: orders, error: ordErr } = await orderQuery;
+    if (ordErr) return errResponse(ordErr.message);
+
+    actualOrders = (orders || []).length;
+    for (const row of orders || []) {
+      if (!(row as any).order_date) continue;
+      const d = (row as any).order_date.split("T")[0];
+      mtdDailyOrders.set(d, (mtdDailyOrders.get(d) || 0) + 1);
+    }
+  } else {
+    // Use Subbly subscriptions
+    let subQuery = supabase
+      .from("subbly_subscriptions")
+      .select("id, subbly_created_at")
+      .gte("subbly_created_at", fromUTC)
+      .lte("subbly_created_at", toUTC);
+
+    if (clientId) subQuery = subQuery.eq("client_id", clientId);
+
+    const { data: monthSubs, error: subErr } = await subQuery;
+    if (subErr) return errResponse(subErr.message);
+
+    actualOrders = (monthSubs || []).length;
+    for (const sub of monthSubs || []) {
+      if (!sub.subbly_created_at) continue;
+      const d = sub.subbly_created_at.split("T")[0];
+      mtdDailyOrders.set(d, (mtdDailyOrders.get(d) || 0) + 1);
+    }
   }
 
   // MTD actuals
   const actualSpend = (monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0);
-  const actualSubs = (monthSubs || []).length;
 
   // Build daily MTD maps for this month
   const mtdDailySpend = new Map<string, number>();
   for (const row of monthAdMetrics || []) {
     mtdDailySpend.set(row.date, (mtdDailySpend.get(row.date) || 0) + Number(row.spend));
-  }
-
-  const mtdDailySubs = new Map<string, number>();
-  for (const sub of monthSubs || []) {
-    if (!sub.subbly_created_at) continue;
-    const d = sub.subbly_created_at.split("T")[0];
-    mtdDailySubs.set(d, (mtdDailySubs.get(d) || 0) + 1);
   }
 
   // Build ordered MTD daily series
@@ -98,7 +140,7 @@ Deno.serve(async (req) => {
   const mtdSeries = mtdDates.map(d => ({
     date: d,
     spend: mtdDailySpend.get(d) || 0,
-    subs: mtdDailySubs.get(d) || 0,
+    subs: mtdDailyOrders.get(d) || 0,
   }));
 
   const daysWithData = mtdSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
@@ -137,8 +179,7 @@ Deno.serve(async (req) => {
   // Also compute trend direction from last 3 days vs overall avg
   const last3 = mtdSeries.slice(-3);
   const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
-  const overallAvgSubs = actualSubs / daysWithData;
-  // Use a dampened trend: blend 70% base projection with 30% recent trend
+  const overallAvgSubs = actualOrders / daysWithData;
   const rawTrend = overallAvgSubs > 0 ? last3AvgSubs / overallAvgSubs : 1;
   const trendMultiplier = Math.min(1.25, Math.max(0.8, 0.7 + 0.3 * rawTrend));
 
@@ -165,20 +206,22 @@ Deno.serve(async (req) => {
   }
 
   const monthTotalSpend = actualSpend + projectedSpend;
-  const monthTotalSubs = actualSubs + projectedSubs;
+  const monthTotalSubs = actualOrders + projectedSubs;
   const monthCAC = monthTotalSubs > 0 ? Math.round((monthTotalSpend / monthTotalSubs) * 100) / 100 : 0;
 
-  const avgDailySubs = daysWithData > 0 ? Math.round((actualSubs / daysWithData) * 10) / 10 : 0;
+  const avgDailySubs = daysWithData > 0 ? Math.round((actualOrders / daysWithData) * 10) / 10 : 0;
   const avgDailySpend = daysWithData > 0 ? Math.round(actualSpend / daysWithData) : 0;
+
+  const ordersLabel = revenueSource === "shopify" ? "customers" : "subscriptions";
 
   const stats = {
     month: monthName,
     days_elapsed: today,
     days_remaining: remainingDays,
     total_days: totalDaysInMonth,
-    actual_subs: actualSubs,
+    actual_subs: actualOrders,
     actual_spend: Math.round(actualSpend),
-    actual_cac: actualSubs > 0 ? Math.round((actualSpend / actualSubs) * 100) / 100 : 0,
+    actual_cac: actualOrders > 0 ? Math.round((actualSpend / actualOrders) * 100) / 100 : 0,
     projected_remaining_subs: projectedSubs,
     projected_remaining_spend: Math.round(projectedSpend),
     month_total_subs: monthTotalSubs,
@@ -195,17 +238,17 @@ Deno.serve(async (req) => {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (LOVABLE_API_KEY) {
     try {
-      const prompt = `You are a performance marketing analyst for a DTC subscription brand. Provide a concise 3-4 sentence monthly forecast summary.
+      const prompt = `You are a performance marketing analyst for a DTC ${revenueSource === "shopify" ? "e-commerce" : "subscription"} brand. Provide a concise 3-4 sentence monthly forecast summary.
 
 Month: ${monthName}
 Days elapsed: ${today} of ${totalDaysInMonth} (${remainingDays} remaining)
-Actuals MTD: ${actualSubs} new subscriptions, $${Math.round(actualSpend)} total ad spend, CAC $${stats.actual_cac}
-Avg daily: ${avgDailySubs} subs/day, $${avgDailySpend} spend/day
-Recent trend (last 3 days): ${last3AvgSubs.toFixed(1)} subs/day (${stats.trend_direction})
+Actuals MTD: ${actualOrders} new ${ordersLabel}, $${Math.round(actualSpend)} total ad spend, CAC $${stats.actual_cac}
+Avg daily: ${avgDailySubs} ${ordersLabel}/day, $${avgDailySpend} spend/day
+Recent trend (last 3 days): ${last3AvgSubs.toFixed(1)} ${ordersLabel}/day (${stats.trend_direction})
 
-Forecast for full month: ${monthTotalSubs} total new subscriptions (+${projectedSubs} projected remaining), $${Math.round(monthTotalSpend)} total spend, projected CAC $${monthCAC}
+Forecast for full month: ${monthTotalSubs} total new ${ordersLabel} (+${projectedSubs} projected remaining), $${Math.round(monthTotalSpend)} total spend, projected CAC $${monthCAC}
 
-Focus on: subscription growth trajectory, CAC efficiency, and actionable advice to improve acquisition.`;
+Focus on: ${revenueSource === "shopify" ? "customer acquisition trajectory" : "subscription growth trajectory"}, CAC efficiency, and actionable advice to improve acquisition.`;
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -245,4 +288,3 @@ function errResponse(msg: string, status = 500) {
 function formatDate(d: Date): string {
   return d.toISOString().split("T")[0];
 }
-
