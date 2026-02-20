@@ -100,45 +100,61 @@ Deno.serve(async (req) => {
 
         if (orders.length === 0) break;
 
-        // Collect unique variant IDs to fetch costs
-        const variantIds = new Set<number>();
+        // Collect unique product IDs to fetch variant costs
+        const productIds = new Set<number>();
         for (const order of orders) {
           for (const item of order.line_items || []) {
-            if (item.variant_id) variantIds.add(item.variant_id);
+            if (item.product_id) productIds.add(item.product_id);
           }
         }
 
-        // Batch fetch inventory item costs via variants
+        // Batch fetch products to get variants with inventory_item_ids
         const variantCosts = new Map<number, number>();
-        const variantIdArray = Array.from(variantIds);
-        for (let i = 0; i < variantIdArray.length; i += 250) {
-          const batch = variantIdArray.slice(i, i + 250);
-          const variantUrl = `https://${shopDomain}/admin/api/2024-01/variants.json?ids=${batch.join(",")}&fields=id,inventory_item_id`;
-          const varRes = await fetch(variantUrl, {
+        const productIdArray = Array.from(productIds);
+        for (let i = 0; i < productIdArray.length; i += 250) {
+          const batch = productIdArray.slice(i, i + 250);
+          const prodUrl = `https://${shopDomain}/admin/api/2024-01/products.json?ids=${batch.join(",")}&fields=id,variants`;
+          const prodRes = await fetch(prodUrl, {
             headers: { "X-Shopify-Access-Token": accessToken },
           });
-          if (varRes.ok) {
-            const varData = await varRes.json();
-            const invItemIds = (varData.variants || []).map((v: any) => v.inventory_item_id).filter(Boolean);
-            if (invItemIds.length > 0) {
-              const invUrl = `https://${shopDomain}/admin/api/2024-01/inventory_items.json?ids=${invItemIds.join(",")}&fields=id,cost`;
-              const invRes = await fetch(invUrl, {
-                headers: { "X-Shopify-Access-Token": accessToken },
-              });
-              if (invRes.ok) {
-                const invData = await invRes.json();
-                const invCostMap = new Map<number, number>();
-                for (const inv of invData.inventory_items || []) {
-                  invCostMap.set(inv.id, parseFloat(inv.cost || "0"));
-                }
-                for (const v of varData.variants || []) {
-                  const cost = invCostMap.get(v.inventory_item_id) || 0;
-                  variantCosts.set(v.id, cost);
-                }
+          if (!prodRes.ok) {
+            console.error("Products fetch error:", prodRes.status, await prodRes.text());
+            continue;
+          }
+          const prodData = await prodRes.json();
+          const invItemIds: number[] = [];
+          const variantInvMap = new Map<number, number>(); // inventory_item_id -> variant_id
+          for (const product of prodData.products || []) {
+            for (const v of product.variants || []) {
+              if (v.inventory_item_id) {
+                invItemIds.push(v.inventory_item_id);
+                variantInvMap.set(v.inventory_item_id, v.id);
+              }
+            }
+          }
+
+          // Fetch inventory items in batches of 100 (Shopify limit)
+          for (let j = 0; j < invItemIds.length; j += 100) {
+            const invBatch = invItemIds.slice(j, j + 100);
+            const invUrl = `https://${shopDomain}/admin/api/2024-01/inventory_items.json?ids=${invBatch.join(",")}&fields=id,cost`;
+            const invRes = await fetch(invUrl, {
+              headers: { "X-Shopify-Access-Token": accessToken },
+            });
+            if (!invRes.ok) {
+              console.error("Inventory fetch error:", invRes.status, await invRes.text());
+              continue;
+            }
+            const invData = await invRes.json();
+            for (const inv of invData.inventory_items || []) {
+              const variantId = variantInvMap.get(inv.id);
+              if (variantId) {
+                variantCosts.set(variantId, parseFloat(inv.cost || "0"));
               }
             }
           }
         }
+        
+        console.log(`Fetched costs for ${variantCosts.size} variants from ${productIds.size} products`);
 
         // Calculate COGS per order and prepare rows
         const orderRows = orders.map((order: any) => {
