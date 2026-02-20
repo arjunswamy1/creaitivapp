@@ -79,12 +79,17 @@ Deno.serve(async (req) => {
 
   let actualOrders = 0;
   const mtdDailyOrders = new Map<string, number>();
+  let mtdRevenue = 0;
+  let mtdCOGS = 0;
+  let mtdTaxesShipping = 0;
+  let mtdDiscounts = 0;
+  const mtdDailyRevenue = new Map<string, number>();
+  const mtdDailyCosts = new Map<string, { cogs: number; taxes: number; discounts: number }>();
 
   if (revenueSource === "shopify") {
-    // Use Shopify orders
     let orderQuery = supabase
       .from("shopify_orders")
-      .select("order_date")
+      .select("order_date, total_price, total_cost, total_tax, total_shipping, total_discounts")
       .in("financial_status", ["paid", "partially_refunded"])
       .gte("order_date", fromUTC)
       .lte("order_date", toUTC);
@@ -95,13 +100,26 @@ Deno.serve(async (req) => {
     if (ordErr) return errResponse(ordErr.message);
 
     actualOrders = (orders || []).length;
-    for (const row of orders || []) {
-      if (!(row as any).order_date) continue;
-      const d = (row as any).order_date.split("T")[0];
+    for (const row of (orders || []) as any[]) {
+      if (!row.order_date) continue;
+      const d = row.order_date.split("T")[0];
       mtdDailyOrders.set(d, (mtdDailyOrders.get(d) || 0) + 1);
+      const rev = Number(row.total_price || 0);
+      mtdRevenue += rev;
+      mtdDailyRevenue.set(d, (mtdDailyRevenue.get(d) || 0) + rev);
+      const cogs = Number(row.total_cost || 0);
+      const taxes = Number(row.total_tax || 0) + Number(row.total_shipping || 0);
+      const discounts = Number(row.total_discounts || 0);
+      mtdCOGS += cogs;
+      mtdTaxesShipping += taxes;
+      mtdDiscounts += discounts;
+      const existing = mtdDailyCosts.get(d) || { cogs: 0, taxes: 0, discounts: 0 };
+      existing.cogs += cogs;
+      existing.taxes += taxes;
+      existing.discounts += discounts;
+      mtdDailyCosts.set(d, existing);
     }
   } else {
-    // Use Subbly subscriptions
     let subQuery = supabase
       .from("subbly_subscriptions")
       .select("id, subbly_created_at")
@@ -124,13 +142,11 @@ Deno.serve(async (req) => {
   // MTD actuals
   const actualSpend = (monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0);
 
-  // Build daily MTD maps for this month
   const mtdDailySpend = new Map<string, number>();
   for (const row of monthAdMetrics || []) {
     mtdDailySpend.set(row.date, (mtdDailySpend.get(row.date) || 0) + Number(row.spend));
   }
 
-  // Build ordered MTD daily series
   const mtdDates: string[] = [];
   for (let i = 1; i <= today; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), i);
@@ -141,42 +157,32 @@ Deno.serve(async (req) => {
     date: d,
     spend: mtdDailySpend.get(d) || 0,
     subs: mtdDailyOrders.get(d) || 0,
+    revenue: mtdDailyRevenue.get(d) || 0,
+    cogs: mtdDailyCosts.get(d)?.cogs || 0,
+    taxes: mtdDailyCosts.get(d)?.taxes || 0,
+    discounts: mtdDailyCosts.get(d)?.discounts || 0,
   }));
 
   const daysWithData = mtdSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
 
-  // Use weighted recent average for projection (last 7 days weighted 2x vs earlier days)
   const recentWindow = 7;
   const recentDays = mtdSeries.slice(-recentWindow);
   const olderDays = mtdSeries.slice(0, -recentWindow);
 
-  const recentAvgSubs = recentDays.length > 0
-    ? recentDays.reduce((s, d) => s + d.subs, 0) / recentDays.length
-    : 0;
-  const olderAvgSubs = olderDays.length > 0
-    ? olderDays.reduce((s, d) => s + d.subs, 0) / olderDays.length
-    : recentAvgSubs;
+  const weightedAvg = (arr: typeof mtdSeries, older: typeof mtdSeries, field: string) => {
+    const recentAvg = arr.length > 0 ? arr.reduce((s, d) => s + Number((d as any)[field]), 0) / arr.length : 0;
+    const olderAvg = older.length > 0 ? older.reduce((s, d) => s + Number((d as any)[field]), 0) / older.length : recentAvg;
+    if (older.length > 0) return (recentAvg * 2 + olderAvg * 1) / 3;
+    return recentAvg;
+  };
 
-  const recentAvgSpend = recentDays.length > 0
-    ? recentDays.reduce((s, d) => s + d.spend, 0) / recentDays.length
-    : 0;
-  const olderAvgSpend = olderDays.length > 0
-    ? olderDays.reduce((s, d) => s + d.spend, 0) / olderDays.length
-    : recentAvgSpend;
+  const projDailySubs = weightedAvg(recentDays, olderDays, "subs");
+  const projDailySpend = weightedAvg(recentDays, olderDays, "spend");
+  const projDailyRevenue = weightedAvg(recentDays, olderDays, "revenue");
+  const projDailyCOGS = weightedAvg(recentDays, olderDays, "cogs");
+  const projDailyTaxes = weightedAvg(recentDays, olderDays, "taxes");
+  const projDailyDiscounts = weightedAvg(recentDays, olderDays, "discounts");
 
-  // Weighted average: recent gets 2x weight
-  const recentWeight = 2;
-  const olderWeight = 1;
-  const totalWeight = (olderDays.length > 0 ? olderWeight : 0) + recentWeight;
-
-  const projDailySubs = olderDays.length > 0
-    ? (recentAvgSubs * recentWeight + olderAvgSubs * olderWeight) / totalWeight
-    : recentAvgSubs;
-  const projDailySpend = olderDays.length > 0
-    ? (recentAvgSpend * recentWeight + olderAvgSpend * olderWeight) / totalWeight
-    : recentAvgSpend;
-
-  // Also compute trend direction from last 3 days vs overall avg
   const last3 = mtdSeries.slice(-3);
   const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
   const overallAvgSubs = actualOrders / daysWithData;
@@ -187,6 +193,10 @@ Deno.serve(async (req) => {
 
   let projectedSpend = 0;
   let projectedSubs = 0;
+  let projectedRevenue = 0;
+  let projectedCOGS = 0;
+  let projectedTaxes = 0;
+  let projectedDiscounts = 0;
   const dailyForecast: any[] = [];
 
   for (let i = 1; i <= remainingDays; i++) {
@@ -197,6 +207,10 @@ Deno.serve(async (req) => {
 
     projectedSpend += daySpend;
     projectedSubs += daySubs;
+    projectedRevenue += Math.max(0, projDailyRevenue);
+    projectedCOGS += Math.max(0, projDailyCOGS);
+    projectedTaxes += Math.max(0, projDailyTaxes);
+    projectedDiscounts += Math.max(0, projDailyDiscounts);
 
     dailyForecast.push({
       date: formatDate(forecastDate),
@@ -211,6 +225,14 @@ Deno.serve(async (req) => {
 
   const avgDailySubs = daysWithData > 0 ? Math.round((actualOrders / daysWithData) * 10) / 10 : 0;
   const avgDailySpend = daysWithData > 0 ? Math.round(actualSpend / daysWithData) : 0;
+
+  // Profit calculations
+  const actualProfit = Math.round((mtdRevenue - actualSpend - mtdCOGS - mtdTaxesShipping - mtdDiscounts) * 100) / 100;
+  const monthTotalRevenue = mtdRevenue + projectedRevenue;
+  const monthTotalCOGS = mtdCOGS + projectedCOGS;
+  const monthTotalTaxes = mtdTaxesShipping + projectedTaxes;
+  const monthTotalDiscounts = mtdDiscounts + projectedDiscounts;
+  const monthTotalProfit = Math.round((monthTotalRevenue - monthTotalSpend - monthTotalCOGS - monthTotalTaxes - monthTotalDiscounts) * 100) / 100;
 
   const ordersLabel = revenueSource === "shopify" ? "customers" : "subscriptions";
 
@@ -231,6 +253,18 @@ Deno.serve(async (req) => {
     avg_daily_spend: avgDailySpend,
     daily_forecast: dailyForecast,
     trend_direction: trendMultiplier > 1.05 ? "accelerating" : trendMultiplier < 0.95 ? "decelerating" : "steady",
+    // Profit fields (populated for Shopify clients)
+    actual_revenue: Math.round(mtdRevenue * 100) / 100,
+    actual_cogs: Math.round(mtdCOGS * 100) / 100,
+    actual_taxes_shipping: Math.round(mtdTaxesShipping * 100) / 100,
+    actual_discounts: Math.round(mtdDiscounts * 100) / 100,
+    actual_profit: actualProfit,
+    month_total_revenue: Math.round(monthTotalRevenue * 100) / 100,
+    month_total_cogs: Math.round(monthTotalCOGS * 100) / 100,
+    month_total_taxes_shipping: Math.round(monthTotalTaxes * 100) / 100,
+    month_total_discounts: Math.round(monthTotalDiscounts * 100) / 100,
+    month_total_profit: monthTotalProfit,
+    revenue_source: revenueSource,
   };
 
   // AI insight
@@ -238,17 +272,21 @@ Deno.serve(async (req) => {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (LOVABLE_API_KEY) {
     try {
+      const profitContext = revenueSource === "shopify"
+        ? `\nMTD Revenue: $${Math.round(mtdRevenue)}, MTD COGS: $${Math.round(mtdCOGS)}, MTD Taxes/Shipping: $${Math.round(mtdTaxesShipping)}, MTD Discounts: $${Math.round(mtdDiscounts)}\nMTD Profit: $${actualProfit}\nProjected Month Profit: $${monthTotalProfit} (Revenue $${Math.round(monthTotalRevenue)} - Spend $${Math.round(monthTotalSpend)} - COGS $${Math.round(monthTotalCOGS)} - Taxes/Shipping $${Math.round(monthTotalTaxes)} - Discounts $${Math.round(monthTotalDiscounts)})`
+        : "";
+
       const prompt = `You are a performance marketing analyst for a DTC ${revenueSource === "shopify" ? "e-commerce" : "subscription"} brand. Provide a concise 3-4 sentence monthly forecast summary.
 
 Month: ${monthName}
 Days elapsed: ${today} of ${totalDaysInMonth} (${remainingDays} remaining)
 Actuals MTD: ${actualOrders} new ${ordersLabel}, $${Math.round(actualSpend)} total ad spend, CAC $${stats.actual_cac}
 Avg daily: ${avgDailySubs} ${ordersLabel}/day, $${avgDailySpend} spend/day
-Recent trend (last 3 days): ${last3AvgSubs.toFixed(1)} ${ordersLabel}/day (${stats.trend_direction})
+Recent trend (last 3 days): ${last3AvgSubs.toFixed(1)} ${ordersLabel}/day (${stats.trend_direction})${profitContext}
 
 Forecast for full month: ${monthTotalSubs} total new ${ordersLabel} (+${projectedSubs} projected remaining), $${Math.round(monthTotalSpend)} total spend, projected CAC $${monthCAC}
 
-Focus on: ${revenueSource === "shopify" ? "customer acquisition trajectory" : "subscription growth trajectory"}, CAC efficiency, and actionable advice to improve acquisition.`;
+Focus on: ${revenueSource === "shopify" ? "profitability trajectory, margin optimization," : "subscription growth trajectory,"} CAC efficiency, and actionable advice to improve ${revenueSource === "shopify" ? "profit" : "acquisition"}.`;
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
