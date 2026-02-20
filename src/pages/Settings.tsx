@@ -21,6 +21,7 @@ import {
   Hash,
   Trash2,
 } from "lucide-react";
+import ClientInviteManager from "@/components/ClientInviteManager";
 import {
   Select,
   SelectContent,
@@ -426,6 +427,9 @@ const Settings = () => {
             </div>
           )}
         </section>
+
+        {/* Client Access Invites */}
+        <ClientInviteManager />
 
         {/* Alert Settings */}
         <section className="mb-8">

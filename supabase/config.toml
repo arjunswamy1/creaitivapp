@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.sync-subbly]
 verify_jwt = false
+
+[functions.invite-client-user]
+verify_jwt = false

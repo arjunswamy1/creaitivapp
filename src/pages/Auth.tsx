@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,12 @@ import { Navigate } from "react-router-dom";
 import creaitvLogo from "@/assets/creaitiv-logo.png";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [searchParams] = useSearchParams();
+  const inviteEmail = searchParams.get("email") || "";
+  const inviteToken = searchParams.get("invite");
+
+  const [isLogin, setIsLogin] = useState(!inviteToken);
+  const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -87,9 +91,11 @@ const Auth = () => {
             {isLogin ? "Welcome back" : "Create account"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "hsl(230,10%,60%)" }}>
-            {isLogin
-              ? "Sign in to view your performance data"
-              : "Get access to your marketing dashboard"}
+            {inviteToken
+              ? "Create an account to access your dashboard"
+              : isLogin
+                ? "Sign in to view your performance data"
+                : "Get access to your marketing dashboard"}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
