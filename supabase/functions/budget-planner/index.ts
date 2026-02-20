@@ -96,14 +96,26 @@ Deno.serve(async (req) => {
   const fromUTC = lookbackStart + "T00:00:00.000Z";
   const toUTC = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)) + "T04:59:59.999Z";
 
-  const { data: subsData, error: subErr } = await supabase
-    .from("subbly_subscriptions")
-    .select("id, subbly_created_at")
-    .eq("client_id", client_id)
-    .gte("subbly_created_at", fromUTC)
-    .lte("subbly_created_at", toUTC);
+  // Fetch ALL subs - default Supabase limit is 1000 which skews CAC calculations
+  let allSubs: { id: string; subbly_created_at: string | null }[] = [];
+  let subOffset = 0;
+  const SUB_PAGE_SIZE = 1000;
+  while (true) {
+    const { data: page, error: subErr } = await supabase
+      .from("subbly_subscriptions")
+      .select("id, subbly_created_at")
+      .eq("client_id", client_id)
+      .gte("subbly_created_at", fromUTC)
+      .lte("subbly_created_at", toUTC)
+      .range(subOffset, subOffset + SUB_PAGE_SIZE - 1);
 
-  if (subErr) return errResponse(subErr.message);
+    allSubs = allSubs.concat(page || []);
+    if (!page || page.length < SUB_PAGE_SIZE) break;
+    subOffset += SUB_PAGE_SIZE;
+  }
+  const subsData = allSubs;
+
+  
 
   // Build daily subs map
   const dailySubs = new Map<string, number>();
