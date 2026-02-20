@@ -16,6 +16,13 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  // Parse optional client_id from request body
+  let bodyClientId: string | null = null;
+  try {
+    const body = await req.json();
+    bodyClientId = body?.client_id || null;
+  } catch { /* no body */ }
+
   let userId: string | null = null;
   const authHeader = req.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
@@ -32,11 +39,15 @@ Deno.serve(async (req) => {
   let targetConnections: { user_id: string; access_token: string; metadata: any; selected_ad_account: any; client_id: string | null }[] = [];
 
   if (userId) {
-    const { data: conns } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("platform_connections")
       .select("user_id, access_token, metadata, selected_ad_account, client_id")
       .eq("user_id", userId)
       .eq("platform", "meta");
+    if (bodyClientId) {
+      query = query.eq("client_id", bodyClientId);
+    }
+    const { data: conns } = await query;
     if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ error: "No Meta connection found" }), {
         status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },

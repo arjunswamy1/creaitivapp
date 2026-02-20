@@ -37,11 +37,14 @@ const DashboardHeader = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-meta-ads");
+      const { data, error } = await supabase.functions.invoke("sync-meta-ads", {
+        body: { client_id: activeClient?.id || null },
+      });
       if (error) throw error;
       setLastSynced(new Date().toISOString());
       queryClient.invalidateQueries();
-      toast.success(`Synced ${data?.records_synced || 0} records`);
+      const totalSynced = data?.results?.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0) || 0;
+      toast.success(`Synced ${totalSynced} records`);
     } catch (err: any) {
       toast.error("Sync failed: " + (err.message || "Unknown error"));
     } finally {
