@@ -98,7 +98,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setDate(startDate.getDate() - 90); // 90-day window to avoid edge function timeouts
     const since = formatDate(startDate);
     const until = formatDate(endDate);
 
@@ -147,7 +147,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             roas: m.spend > 0 ? m.revenue / m.spend : null,
           };
         });
-        await batchUpsert(supabase, "ad_daily_metrics", batch, "user_id,platform,date");
+        await batchUpsert(supabase, "ad_daily_metrics", batch, "user_id,platform,date,client_id");
         records += batch.length;
       }
 
