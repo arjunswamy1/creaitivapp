@@ -1,20 +1,26 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, ComposedChart } from "recharts";
 import { useSpendSubsDaily } from "@/hooks/useCrossChannelData";
+import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SpendRevenueChart = () => {
   const { data: dailyData, isLoading } = useSpendSubsDaily();
+  const { dashboardConfig } = useClient();
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
+  const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
+  const showGoogle = platforms.includes("google");
 
   if (isLoading) {
     return <Skeleton className="h-[380px] rounded-xl" />;
   }
 
-  const hasGoogle = dailyData?.some((d) => d.googleSpend > 0);
+  const hasGoogle = showGoogle && dailyData?.some((d) => d.googleSpend > 0);
+  const subsLabel = revenueSource === "shopify" ? "New Customers" : "New Subs";
 
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold">Spend vs New Subscribers</h3>
+        <h3 className="text-lg font-semibold">Spend vs {subsLabel}</h3>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-meta" />
@@ -28,7 +34,7 @@ const SpendRevenueChart = () => {
           )}
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-accent" />
-            <span className="text-muted-foreground">New Subs</span>
+            <span className="text-muted-foreground">{subsLabel}</span>
           </div>
         </div>
       </div>
@@ -58,7 +64,7 @@ const SpendRevenueChart = () => {
               fontSize: "12px",
             }}
             formatter={(value: number, name: string) => {
-              if (name === "newSubs") return [value, "New Subs"];
+              if (name === "newSubs") return [value, subsLabel];
               return [`$${value.toLocaleString()}`, name === "metaSpend" ? "Meta Spend" : "Google Spend"];
             }}
           />

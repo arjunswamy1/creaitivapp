@@ -190,11 +190,12 @@ export function useDailyMetrics() {
 
 export function useChannelBreakdown() {
   const { fromStr, toStr } = useDateStrings();
-  const { activeClient } = useClient();
+  const { activeClient, dashboardConfig } = useClient();
   const clientId = activeClient?.id;
+  const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
 
   return useQuery({
-    queryKey: ["channel-breakdown", fromStr, toStr, clientId],
+    queryKey: ["channel-breakdown", fromStr, toStr, clientId, platforms],
     queryFn: async (): Promise<ChannelSummary[]> => {
       let query = supabase
         .from("ad_daily_metrics")
@@ -210,6 +211,8 @@ export function useChannelBreakdown() {
 
       const byPlatform = new Map<string, { spend: number; revenue: number; clicks: number; impressions: number; conversions: number }>();
       for (const row of data) {
+        // Skip platforms not enabled for this client
+        if (!platforms.includes(row.platform) && row.platform !== "shopify") continue;
         const existing = byPlatform.get(row.platform) || { spend: 0, revenue: 0, clicks: 0, impressions: 0, conversions: 0 };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);

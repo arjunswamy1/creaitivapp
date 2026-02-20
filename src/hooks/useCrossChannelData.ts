@@ -28,6 +28,9 @@ export interface CrossChannelKPIs {
   totalCAC: number;
   totalRevenue: number;
   blendedROAS: number;
+  profit: number;
+  totalCOGS: number;
+  totalTaxes: number;
   changes: {
     totalSpend: number | null;
     googleSpend: number | null;
@@ -36,6 +39,7 @@ export interface CrossChannelKPIs {
     totalCAC: number | null;
     totalRevenue: number | null;
     blendedROAS: number | null;
+    profit: number | null;
   };
 }
 
@@ -60,6 +64,22 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
   return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend) };
 }
 
+async function fetchShopifyCosts(clientId: string, fromStr: string, toStr: string) {
+  const { data, error } = await supabase
+    .from("shopify_orders" as any)
+    .select("total_cost, total_tax, total_shipping")
+    .eq("client_id", clientId)
+    .in("financial_status", ["paid", "partially_refunded"])
+    .gte("order_date", fromStr + "T00:00:00.000Z")
+    .lte("order_date", toStr + "T23:59:59.999Z");
+
+  if (error) throw error;
+  const rows = (data || []) as any[];
+  const cogs = rows.reduce((s: number, o: any) => s + Number(o.total_cost || 0), 0);
+  const taxes = rows.reduce((s: number, o: any) => s + Number(o.total_tax || 0) + Number(o.total_shipping || 0), 0);
+  return { cogs, taxes };
+}
+
 export function useCrossChannelKPIs() {
   const { fromStr, toStr, prevFrom, prevTo, dateRange } = useDateStrings();
   const { activeClient, dashboardConfig } = useClient();
@@ -79,6 +99,23 @@ export function useCrossChannelKPIs() {
         getClientRevenue(clientId, revenueSource, fromStr, toStr, dateRange),
       ]);
 
+      // Fetch COGS and taxes for Shopify clients
+      let currentCOGS = 0;
+      let currentTaxes = 0;
+      let prevCOGS = 0;
+      let prevTaxes = 0;
+
+      if (revenueSource === "shopify") {
+        const [currentCosts, prevCosts] = await Promise.all([
+          fetchShopifyCosts(clientId, fromStr, toStr),
+          fetchShopifyCosts(clientId, prevFrom, prevTo),
+        ]);
+        currentCOGS = currentCosts.cogs;
+        currentTaxes = currentCosts.taxes;
+        prevCOGS = prevCosts.cogs;
+        prevTaxes = prevCosts.taxes;
+      }
+
       // Previous period
       const prevDateRange = { from: subDays(dateRange.from, differenceInDays(dateRange.to, dateRange.from) + 1), to: subDays(dateRange.from, 1) };
       const [prevAds, prevOrders, prevRevenue] = await Promise.all([
@@ -92,6 +129,9 @@ export function useCrossChannelKPIs() {
       const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentRevenue / currentAds.totalSpend) * 100) / 100 : 0;
       const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevRevenue / prevAds.totalSpend) * 100) / 100 : 0;
 
+      const currentProfit = Math.round((currentRevenue - currentAds.totalSpend - currentCOGS - currentTaxes) * 100) / 100;
+      const prevProfit = Math.round((prevRevenue - prevAds.totalSpend - prevCOGS - prevTaxes) * 100) / 100;
+
       return {
         totalSpend: currentAds.totalSpend,
         googleSpend: currentAds.googleSpend,
@@ -100,6 +140,9 @@ export function useCrossChannelKPIs() {
         totalCAC: currentCAC,
         totalRevenue: Math.round(currentRevenue * 100) / 100,
         blendedROAS: currentROAS,
+        profit: currentProfit,
+        totalCOGS: Math.round(currentCOGS * 100) / 100,
+        totalTaxes: Math.round(currentTaxes * 100) / 100,
         changes: {
           totalSpend: pctChange(currentAds.totalSpend, prevAds.totalSpend),
           googleSpend: pctChange(currentAds.googleSpend, prevAds.googleSpend),
@@ -108,6 +151,7 @@ export function useCrossChannelKPIs() {
           totalCAC: pctChange(currentCAC, prevCAC),
           totalRevenue: pctChange(currentRevenue, prevRevenue),
           blendedROAS: pctChange(currentROAS, prevROAS),
+          profit: pctChange(currentProfit, prevProfit),
         },
       };
     },
