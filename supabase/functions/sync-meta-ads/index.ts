@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
   let bodyClientId: string | null = null;
   try {
     const body = await req.json();
-    bodyClientId = body?.client_id || null;
+    bodyClientId = body?.client_id || body?.clientId || null;
   } catch { /* no body */ }
 
   let userId: string | null = null;
