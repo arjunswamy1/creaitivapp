@@ -157,7 +157,7 @@ function BudgetPlannerContent() {
         {plan && !isLoading && (
           <div className="space-y-6">
             {/* Overview cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 icon={<Users className="w-4 h-4" />}
                 label="Subscriber Goal"
@@ -173,15 +173,9 @@ function BudgetPlannerContent() {
               />
               <StatCard
                 icon={<TrendingUp className="w-4 h-4" />}
-                label="Projected CAC"
+                label="Weighted CAC"
                 value={`$${plan.projection_cac}`}
-                sublabel="Based on recent 30d"
-              />
-              <StatCard
-                icon={<BarChart3 className="w-4 h-4" />}
-                label="90-Day CAC"
-                value={`$${plan.blended_90d_cac}`}
-                sublabel={`${plan.cac_trend_pct > 0 ? "+" : ""}${plan.cac_trend_pct}% trend`}
+                sublabel="50/30/20 weighted avg"
               />
               <StatCard
                 icon={<Settings className="w-4 h-4" />}
@@ -189,6 +183,47 @@ function BudgetPlannerContent() {
                 value={plan.lookback_stats.active_campaigns.toString()}
                 sublabel={`${plan.days_in_month} days in month`}
               />
+            </div>
+
+            {/* Multi-period CAC breakdown */}
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-primary" />
+                Multi-Period CAC Analysis
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Last 30 Days", cac: plan.cac_30d, weight: "50%", spend: plan.lookback_stats.total_spend_30d, subs: plan.lookback_stats.total_subs_30d },
+                  { label: "Last 60 Days", cac: plan.cac_60d, weight: "30%", spend: plan.lookback_stats.total_spend_60d, subs: plan.lookback_stats.total_subs_60d },
+                  { label: "Last 90 Days", cac: plan.cac_90d, weight: "20%", spend: plan.lookback_stats.total_spend_90d, subs: plan.lookback_stats.total_subs_90d },
+                  { label: "Weighted Projection", cac: plan.projection_cac, weight: null, spend: null, subs: null, highlight: true },
+                ].map((period) => (
+                  <div key={period.label} className={`rounded-lg p-4 ${period.highlight ? "bg-primary/10 border border-primary/20" : "bg-secondary/40"}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-muted-foreground">{period.label}</span>
+                      {period.weight && (
+                        <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded-full text-muted-foreground">
+                          {period.weight} weight
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-2xl font-bold font-mono ${period.highlight ? "text-primary" : ""}`}>
+                      ${period.cac}
+                    </p>
+                    {period.spend !== null && (
+                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                        <p>${period.spend!.toLocaleString()} spend</p>
+                        <p>{period.subs!.toLocaleString()} subs</p>
+                      </div>
+                    )}
+                    {period.highlight && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {plan.cac_trend_pct > 0 ? "↑" : plan.cac_trend_pct < 0 ? "↓" : "→"} {plan.cac_trend_pct > 0 ? "+" : ""}{plan.cac_trend_pct}% 30d vs 90d
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Platform split */}
@@ -320,26 +355,22 @@ function BudgetPlannerContent() {
             {/* Lookback stats */}
             <div className="glass-card p-6">
               <h3 className="text-sm font-semibold text-muted-foreground mb-3">Analysis Based On</h3>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Last Year ({plan.last_year_baseline.month})</p>
                   <p className="font-mono font-bold">{plan.last_year_baseline.new_subscribers.toLocaleString()} subs</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">90-Day Total Spend</p>
-                  <p className="font-mono font-bold">${plan.lookback_stats.total_spend_90d.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">30-Day: Spend / Subs</p>
+                  <p className="font-mono font-bold">${plan.lookback_stats.total_spend_30d.toLocaleString()} / {plan.lookback_stats.total_subs_30d}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">90-Day Total Subs</p>
-                  <p className="font-mono font-bold">{plan.lookback_stats.total_subs_90d.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">60-Day: Spend / Subs</p>
+                  <p className="font-mono font-bold">${plan.lookback_stats.total_spend_60d.toLocaleString()} / {plan.lookback_stats.total_subs_60d}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">30-Day Total Spend</p>
-                  <p className="font-mono font-bold">${plan.lookback_stats.total_spend_30d.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">30-Day Total Subs</p>
-                  <p className="font-mono font-bold">{plan.lookback_stats.total_subs_30d.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">90-Day: Spend / Subs</p>
+                  <p className="font-mono font-bold">${plan.lookback_stats.total_spend_90d.toLocaleString()} / {plan.lookback_stats.total_subs_90d}</p>
                 </div>
               </div>
             </div>

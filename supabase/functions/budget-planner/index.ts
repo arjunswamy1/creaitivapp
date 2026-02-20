@@ -113,58 +113,62 @@ Deno.serve(async (req) => {
     dailySubs.set(d, (dailySubs.get(d) || 0) + 1);
   }
 
-  // Platform-level analysis
-  const platformStats = new Map<string, { spend: number; days: Set<string> }>();
-  for (const row of dailyMetrics || []) {
-    const s = platformStats.get(row.platform) || { spend: 0, days: new Set<string>() };
-    s.spend += Number(row.spend);
-    s.days.add(row.date);
-    platformStats.set(row.platform, s);
-  }
-
-  // Daily spend by platform for trend analysis
-  const dailySpendByPlatform = new Map<string, Map<string, number>>();
-  for (const row of dailyMetrics || []) {
-    if (!dailySpendByPlatform.has(row.platform)) dailySpendByPlatform.set(row.platform, new Map());
-    const pMap = dailySpendByPlatform.get(row.platform)!;
-    pMap.set(row.date, (pMap.get(row.date) || 0) + Number(row.spend));
-  }
-
-  // Total subs and spend for blended CAC
-  const totalSubs = (subsData || []).length;
-  let totalSpend = 0;
-  for (const [, s] of platformStats) totalSpend += s.spend;
-  const blendedCAC = totalSubs > 0 ? totalSpend / totalSubs : 0;
-
-  // Recent 30-day CAC trend (for trend comparison)
+  // Multi-period CAC analysis: 30d, 60d, 90d with recency weighting
   const recent30Start = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30));
-  let recent30Spend = 0;
-  let recent30Subs = 0;
+  const recent60Start = formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 60));
+
+  // Compute spend/subs for each period window
+  let spend30 = 0, spend60 = 0, spend90 = 0;
+  let subs30 = 0, subs60 = 0, subs90 = 0;
+
   for (const row of dailyMetrics || []) {
-    if (row.date >= recent30Start) recent30Spend += Number(row.spend);
+    const s = Number(row.spend);
+    spend90 += s;
+    if (row.date >= recent60Start) spend60 += s;
+    if (row.date >= recent30Start) spend30 += s;
   }
   for (const [date, count] of dailySubs) {
-    if (date >= recent30Start) recent30Subs += count;
+    subs90 += count;
+    if (date >= recent60Start) subs60 += count;
+    if (date >= recent30Start) subs30 += count;
   }
-  const recent30CAC = recent30Subs > 0 ? recent30Spend / recent30Subs : blendedCAC;
 
-  // Use recent CAC for projections (more accurate for next month)
-  const projectionCAC = recent30CAC > 0 ? recent30CAC : blendedCAC;
+  const cac30 = subs30 > 0 ? spend30 / subs30 : 0;
+  const cac60 = subs60 > 0 ? spend60 / subs60 : 0;
+  const cac90 = subs90 > 0 ? spend90 / subs90 : 0;
+
+  // Weighted projection CAC: 50% weight on 30d, 30% on 60d, 20% on 90d
+  // Only include periods that have data
+  let weightedCAC = 0;
+  let totalWeight = 0;
+  if (cac30 > 0) { weightedCAC += cac30 * 0.50; totalWeight += 0.50; }
+  if (cac60 > 0) { weightedCAC += cac60 * 0.30; totalWeight += 0.30; }
+  if (cac90 > 0) { weightedCAC += cac90 * 0.20; totalWeight += 0.20; }
+  const projectionCAC = totalWeight > 0 ? weightedCAC / totalWeight : 0;
+
   const totalBudgetNeeded = Math.round(target_subs * projectionCAC);
 
-  // Calculate platform split based on spend-weighted efficiency
-  // Use recent 30 days for platform split to reflect current allocation patterns
-  const platformRecent: Record<string, number> = {};
+  // Platform split: use weighted recent spending (60% last 30d, 40% prior 30-60d)
+  const platformRecent30: Record<string, number> = {};
+  const platformRecent60Only: Record<string, number> = {}; // 31-60 day band
   for (const row of dailyMetrics || []) {
     if (row.date >= recent30Start) {
-      platformRecent[row.platform] = (platformRecent[row.platform] || 0) + Number(row.spend);
+      platformRecent30[row.platform] = (platformRecent30[row.platform] || 0) + Number(row.spend);
+    } else if (row.date >= recent60Start) {
+      platformRecent60Only[row.platform] = (platformRecent60Only[row.platform] || 0) + Number(row.spend);
     }
   }
 
-  const totalRecentSpend = Object.values(platformRecent).reduce((a, b) => a + b, 0);
+  // Blend platform splits: heavier on recent
+  const allPlatforms = new Set([...Object.keys(platformRecent30), ...Object.keys(platformRecent60Only)]);
+  const platformWeightedSpend: Record<string, number> = {};
+  for (const p of allPlatforms) {
+    platformWeightedSpend[p] = (platformRecent30[p] || 0) * 0.6 + (platformRecent60Only[p] || 0) * 0.4;
+  }
+  const totalWeightedSpend = Object.values(platformWeightedSpend).reduce((a, b) => a + b, 0);
   const platformSplit: Record<string, number> = {};
-  for (const [platform, spend] of Object.entries(platformRecent)) {
-    platformSplit[platform] = totalRecentSpend > 0 ? spend / totalRecentSpend : 0;
+  for (const [platform, spend] of Object.entries(platformWeightedSpend)) {
+    platformSplit[platform] = totalWeightedSpend > 0 ? spend / totalWeightedSpend : 0;
   }
 
   // Allocate budget by platform
@@ -250,7 +254,7 @@ Deno.serve(async (req) => {
   campaignBudgets.sort((a, b) => b.monthly_budget - a.monthly_budget);
 
   // Trend analysis
-  const cacTrend = blendedCAC > 0 ? Math.round(((recent30CAC - blendedCAC) / blendedCAC) * 1000) / 10 : 0;
+  const cacTrend = cac90 > 0 ? Math.round(((cac30 - cac90) / cac90) * 1000) / 10 : 0;
 
   // AI insight
   let aiInsight = "";
@@ -270,14 +274,20 @@ Deno.serve(async (req) => {
 Target: ${target_subs} new subscriptions in ${targetMonthName} (${daysInTargetMonth} days)
 Total budget recommended: $${totalBudgetNeeded.toLocaleString()}
 Platform split: ${platformSummary}
-90-day blended CAC: $${Math.round(blendedCAC * 100) / 100}
-Recent 30-day CAC: $${Math.round(recent30CAC * 100) / 100} (${cacTrend > 0 ? "+" : ""}${cacTrend}% vs 90-day)
+
+Multi-period CAC analysis:
+- Last 30 days: $${r2(cac30)} (${subs30} subs from $${r2(spend30)} spend) — weight 50%
+- Last 60 days: $${r2(cac60)} (${subs60} subs from $${r2(spend60)} spend) — weight 30%
+- Last 90 days: $${r2(cac90)} (${subs90} subs from $${r2(spend90)} spend) — weight 20%
+- Weighted projection CAC: $${r2(projectionCAC)}
+- CAC trend (30d vs 90d): ${cacTrend > 0 ? "+" : ""}${cacTrend}%
+
 Active campaigns: ${activeCampaigns.length}
 
 Top campaigns by budget:
 ${topCampaigns}
 
-Focus on: whether the budget is achievable, risks, platform allocation rationale, and specific campaign-level recommendations for optimization.`;
+Focus on: whether the budget is achievable given the multi-period CAC trend, risks from CAC volatility, platform allocation rationale, and specific campaign-level recommendations for optimization.`;
 
       const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -288,7 +298,7 @@ Focus on: whether the budget is achievable, risks, platform allocation rationale
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [{ role: "user", content: prompt }],
-          max_tokens: 400,
+          max_tokens: 500,
         }),
       });
 
@@ -305,9 +315,10 @@ Focus on: whether the budget is achievable, risks, platform allocation rationale
     target_month: targetMonthName,
     days_in_month: daysInTargetMonth,
     target_subs,
-    projection_cac: Math.round(projectionCAC * 100) / 100,
-    blended_90d_cac: Math.round(blendedCAC * 100) / 100,
-    recent_30d_cac: Math.round(recent30CAC * 100) / 100,
+    projection_cac: r2(projectionCAC),
+    cac_30d: r2(cac30),
+    cac_60d: r2(cac60),
+    cac_90d: r2(cac90),
     cac_trend_pct: cacTrend,
     total_budget: totalBudgetNeeded,
     last_year_baseline: {
@@ -323,10 +334,12 @@ Focus on: whether the budget is achievable, risks, platform allocation rationale
     })),
     campaign_budgets: campaignBudgets,
     lookback_stats: {
-      total_spend_90d: Math.round(totalSpend),
-      total_subs_90d: totalSubs,
-      total_spend_30d: Math.round(recent30Spend),
-      total_subs_30d: recent30Subs,
+      total_spend_90d: Math.round(spend90),
+      total_subs_90d: subs90,
+      total_spend_60d: Math.round(spend60),
+      total_subs_60d: subs60,
+      total_spend_30d: Math.round(spend30),
+      total_subs_30d: subs30,
       active_campaigns: activeCampaigns.length,
     },
     ai_insight: aiInsight,
@@ -346,4 +359,8 @@ function errResponse(msg: string, status = 500) {
 
 function formatDate(d: Date): string {
   return d.toISOString().split("T")[0];
+}
+
+function r2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
