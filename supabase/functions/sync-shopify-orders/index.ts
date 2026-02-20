@@ -156,6 +156,70 @@ Deno.serve(async (req) => {
         
         console.log(`Fetched costs for ${variantCosts.size} variants from ${productIds.size} products`);
 
+        // Fallback: collect variant_ids that weren't resolved via product lookup
+        const missingVariantIds = new Set<number>();
+        for (const order of orders) {
+          for (const item of order.line_items || []) {
+            if (item.variant_id && !variantCosts.has(item.variant_id)) {
+              missingVariantIds.add(item.variant_id);
+            }
+          }
+        }
+
+        // Fetch missing variants individually (handles deleted/draft products)
+        if (missingVariantIds.size > 0) {
+          console.log(`Fetching ${missingVariantIds.size} missing variants via GraphQL`);
+          const missingArr = Array.from(missingVariantIds);
+          
+          // Use GraphQL nodes query to batch-fetch variant costs (up to 250 per query)
+          for (let k = 0; k < missingArr.length; k += 100) {
+            const batch = missingArr.slice(k, k + 100);
+            const gids = batch.map(id => `"gid://shopify/ProductVariant/${id}"`).join(", ");
+            const graphqlQuery = `{
+              nodes(ids: [${gids}]) {
+                ... on ProductVariant {
+                  id
+                  legacyResourceId
+                  inventoryItem {
+                    unitCost {
+                      amount
+                    }
+                  }
+                }
+              }
+            }`;
+
+            try {
+              const gqlRes = await fetch(
+                `https://${shopDomain}/admin/api/2024-01/graphql.json`,
+                {
+                  method: "POST",
+                  headers: {
+                    "X-Shopify-Access-Token": accessToken,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ query: graphqlQuery }),
+                }
+              );
+              if (gqlRes.ok) {
+                const gqlData = await gqlRes.json();
+                for (const node of gqlData.data?.nodes || []) {
+                  if (node?.legacyResourceId && node?.inventoryItem?.unitCost?.amount) {
+                    const varId = parseInt(node.legacyResourceId);
+                    const cost = parseFloat(node.inventoryItem.unitCost.amount);
+                    variantCosts.set(varId, cost);
+                  }
+                }
+              } else {
+                console.error("GraphQL error:", gqlRes.status, await gqlRes.text());
+              }
+            } catch (e) {
+              console.error("GraphQL fetch error:", e);
+            }
+          }
+          console.log(`After fallback: ${variantCosts.size} total variant costs`);
+        }
+
         // Calculate COGS per order and prepare rows
         const orderRows = orders.map((order: any) => {
           let orderCOGS = 0;
