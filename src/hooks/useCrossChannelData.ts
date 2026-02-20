@@ -31,6 +31,7 @@ export interface CrossChannelKPIs {
   profit: number;
   totalCOGS: number;
   totalTaxes: number;
+  totalDiscounts: number;
   changes: {
     totalSpend: number | null;
     googleSpend: number | null;
@@ -67,7 +68,7 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
 async function fetchShopifyCosts(clientId: string, fromStr: string, toStr: string) {
   const { data, error } = await supabase
     .from("shopify_orders" as any)
-    .select("total_cost, total_tax, total_shipping")
+    .select("total_cost, total_tax, total_shipping, total_discounts")
     .eq("client_id", clientId)
     .in("financial_status", ["paid", "partially_refunded"])
     .gte("order_date", fromStr + "T00:00:00.000Z")
@@ -77,7 +78,8 @@ async function fetchShopifyCosts(clientId: string, fromStr: string, toStr: strin
   const rows = (data || []) as any[];
   const cogs = rows.reduce((s: number, o: any) => s + Number(o.total_cost || 0), 0);
   const taxes = rows.reduce((s: number, o: any) => s + Number(o.total_tax || 0) + Number(o.total_shipping || 0), 0);
-  return { cogs, taxes };
+  const discounts = rows.reduce((s: number, o: any) => s + Number(o.total_discounts || 0), 0);
+  return { cogs, taxes, discounts };
 }
 
 export function useCrossChannelKPIs() {
@@ -100,10 +102,8 @@ export function useCrossChannelKPIs() {
       ]);
 
       // Fetch COGS and taxes for Shopify clients
-      let currentCOGS = 0;
-      let currentTaxes = 0;
-      let prevCOGS = 0;
-      let prevTaxes = 0;
+      let currentCOGS = 0, currentTaxes = 0, currentDiscounts = 0;
+      let prevCOGS = 0, prevTaxes = 0, prevDiscounts = 0;
 
       if (revenueSource === "shopify") {
         const [currentCosts, prevCosts] = await Promise.all([
@@ -112,8 +112,10 @@ export function useCrossChannelKPIs() {
         ]);
         currentCOGS = currentCosts.cogs;
         currentTaxes = currentCosts.taxes;
+        currentDiscounts = currentCosts.discounts;
         prevCOGS = prevCosts.cogs;
         prevTaxes = prevCosts.taxes;
+        prevDiscounts = prevCosts.discounts;
       }
 
       // Previous period
@@ -129,8 +131,8 @@ export function useCrossChannelKPIs() {
       const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentRevenue / currentAds.totalSpend) * 100) / 100 : 0;
       const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevRevenue / prevAds.totalSpend) * 100) / 100 : 0;
 
-      const currentProfit = Math.round((currentRevenue - currentAds.totalSpend - currentCOGS - currentTaxes) * 100) / 100;
-      const prevProfit = Math.round((prevRevenue - prevAds.totalSpend - prevCOGS - prevTaxes) * 100) / 100;
+      const currentProfit = Math.round((currentRevenue - currentAds.totalSpend - currentCOGS - currentTaxes - currentDiscounts) * 100) / 100;
+      const prevProfit = Math.round((prevRevenue - prevAds.totalSpend - prevCOGS - prevTaxes - prevDiscounts) * 100) / 100;
 
       return {
         totalSpend: currentAds.totalSpend,
@@ -143,6 +145,7 @@ export function useCrossChannelKPIs() {
         profit: currentProfit,
         totalCOGS: Math.round(currentCOGS * 100) / 100,
         totalTaxes: Math.round(currentTaxes * 100) / 100,
+        totalDiscounts: Math.round(currentDiscounts * 100) / 100,
         changes: {
           totalSpend: pctChange(currentAds.totalSpend, prevAds.totalSpend),
           googleSpend: pctChange(currentAds.googleSpend, prevAds.googleSpend),
