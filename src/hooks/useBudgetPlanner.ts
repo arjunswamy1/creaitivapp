@@ -53,13 +53,13 @@ export interface BudgetPlan {
 }
 
 // Fetch baseline (no target_subs needed)
-export function useBudgetBaseline(clientId: string | undefined) {
+export function useBudgetBaseline(clientId: string | undefined, revenueSource?: string) {
   return useQuery<BudgetPlan>({
-    queryKey: ["budget-baseline", clientId],
+    queryKey: ["budget-baseline", clientId, revenueSource],
     enabled: !!clientId,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("budget-planner", {
-        body: { client_id: clientId },
+        body: { client_id: clientId, revenue_source: revenueSource || "subbly" },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -69,13 +69,13 @@ export function useBudgetBaseline(clientId: string | undefined) {
   });
 }
 
-export function useBudgetPlanner(targetSubs: number | null, clientId: string | undefined) {
+export function useBudgetPlanner(targetSubs: number | null, clientId: string | undefined, revenueSource?: string) {
   return useQuery<BudgetPlan>({
-    queryKey: ["budget-planner", targetSubs, clientId],
+    queryKey: ["budget-planner", targetSubs, clientId, revenueSource],
     enabled: !!targetSubs && targetSubs > 0 && !!clientId,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke("budget-planner", {
-        body: { target_subs: targetSubs, client_id: clientId },
+        body: { target_subs: targetSubs, client_id: clientId, revenue_source: revenueSource || "subbly" },
       });
 
       if (error) throw error;

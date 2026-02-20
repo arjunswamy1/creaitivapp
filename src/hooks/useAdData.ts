@@ -562,15 +562,20 @@ export function useMetaKPIsWithSubblyRevenue() {
 }
 
 export function useForecast() {
+  const { activeClient, dashboardConfig } = useClient();
+  const clientId = activeClient?.id;
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
+
   return useQuery({
-    queryKey: ["forecast-monthly"],
+    queryKey: ["forecast-monthly", clientId, revenueSource],
+    enabled: !!clientId,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
       const { data, error } = await supabase.functions.invoke("forecast", {
         headers: { Authorization: `Bearer ${session.access_token}` },
-        body: {},
+        body: { client_id: clientId, revenue_source: revenueSource },
       });
 
       if (error) throw error;

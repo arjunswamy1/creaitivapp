@@ -15,13 +15,16 @@ import DashboardHeader from "@/components/DashboardHeader";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 
 function BudgetPlannerContent() {
-  const { activeClient } = useClient();
+  const { activeClient, dashboardConfig } = useClient();
+  const revenueSource = dashboardConfig?.revenue_source || "subbly";
+  const ordersLabel = revenueSource === "shopify" ? "Customer" : "Subscriber";
+  const ordersLabelPlural = revenueSource === "shopify" ? "Customers" : "Subscribers";
   const [goalInput, setGoalInput] = useState("");
   const [submittedGoal, setSubmittedGoal] = useState<number | null>(null);
   const [editedBudgets, setEditedBudgets] = useState<Record<string, number>>({});
 
-  const { data: baseline, isLoading: baselineLoading } = useBudgetBaseline(activeClient?.id);
-  const { data: plan, isLoading, error } = useBudgetPlanner(submittedGoal, activeClient?.id);
+  const { data: baseline, isLoading: baselineLoading } = useBudgetBaseline(activeClient?.id, revenueSource);
+  const { data: plan, isLoading, error } = useBudgetPlanner(submittedGoal, activeClient?.id, revenueSource);
 
   useEffect(() => {
     if (baseline?.last_year_baseline?.suggested_goal && !goalInput && !submittedGoal) {
@@ -86,7 +89,7 @@ function BudgetPlannerContent() {
               Budget Planner
             </h2>
             <p className="text-sm text-muted-foreground">
-              Plan {baseline?.target_month || "next month"} budgets based on your subscriber growth goals
+              Plan {baseline?.target_month || "next month"} budgets based on your {revenueSource === "shopify" ? "customer acquisition" : "subscriber growth"} goals
             </p>
           </div>
         </div>
@@ -102,14 +105,14 @@ function BudgetPlannerContent() {
                   <CalendarDays className="w-4 h-4 text-primary" />
                   <span className="text-muted-foreground">Last year baseline:</span>
                   <span className="font-bold font-mono">{bl.new_subscribers.toLocaleString()}</span>
-                  <span className="text-muted-foreground">new subscribers in {bl.month}</span>
+                  <span className="text-muted-foreground">new {ordersLabelPlural.toLowerCase()} in {bl.month}</span>
                 </div>
                 <div className="h-5 w-px bg-border hidden md:block" />
                 <div className="flex items-center gap-2 text-sm">
                   <TrendingUp className="w-4 h-4 text-emerald-400" />
                   <span className="text-muted-foreground">25% growth target:</span>
                   <span className="font-bold font-mono text-primary">{bl.suggested_goal.toLocaleString()}</span>
-                  <span className="text-muted-foreground">subscribers</span>
+                  <span className="text-muted-foreground">{ordersLabelPlural.toLowerCase()}</span>
                 </div>
               </div>
             ) : null}
@@ -121,7 +124,7 @@ function BudgetPlannerContent() {
           <form onSubmit={handleSubmit} className="flex items-end gap-4">
             <div className="flex-1 max-w-xs">
               <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                New Subscriber Goal for {baseline?.target_month || "next month"}
+                New {ordersLabel} Goal for {baseline?.target_month || "next month"}
               </label>
               <Input
                 type="number"
@@ -160,7 +163,7 @@ function BudgetPlannerContent() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard
                 icon={<Users className="w-4 h-4" />}
-                label="Subscriber Goal"
+                label={`${ordersLabel} Goal`}
                 value={plan.target_subs.toLocaleString()}
                 sublabel={plan.target_month}
               />
@@ -358,7 +361,7 @@ function BudgetPlannerContent() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Last Year ({plan.last_year_baseline.month})</p>
-                  <p className="font-mono font-bold">{plan.last_year_baseline.new_subscribers.toLocaleString()} subs</p>
+                  <p className="font-mono font-bold">{plan.last_year_baseline.new_subscribers.toLocaleString()} {ordersLabelPlural.toLowerCase()}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">30-Day: Spend / Subs</p>
