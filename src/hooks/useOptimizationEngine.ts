@@ -78,6 +78,22 @@ export interface RiskAssessment {
   };
 }
 
+export interface CACTrend {
+  cac_3d: number;
+  cac_7d: number;
+  cac_baseline: number;
+  cac_3d_vs_baseline_pct: number;
+  cac_3d_vs_7d_pct: number;
+  spend_3d: number;
+  spend_7d: number;
+  conversions_3d: number;
+  conversions_7d: number;
+  signal: "increase" | "hold" | "reduce" | "pause_losers";
+  signal_label: string;
+  signal_detail: string;
+  losing_creatives: { name: string; cpa: number; spend: number; campaign: string }[];
+}
+
 export interface OptimizationResult {
   baseline: BaselineForecast;
   spend_adjusted: SpendScenario[];
@@ -86,6 +102,7 @@ export interface OptimizationResult {
   recommendations: Recommendation[];
   risk: RiskAssessment;
   ai_insight: string;
+  cac_trend: CACTrend;
   data_quality: {
     days_with_data: number;
     total_days_analyzed: number;

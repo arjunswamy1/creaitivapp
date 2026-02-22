@@ -138,6 +138,9 @@ Deno.serve(async (req) => {
     // === MODULE 2: Variance Detection ===
     const variances = computeVariances(dailyAgg, baseline);
 
+    // === MODULE 2.5: CAC Trend Analysis ===
+    const cacTrend = computeCACTrend(dailyAgg, campaigns || [], adData || [], baseline);
+
     // === MODULE 3: Recommendations ===
     const recommendations = generateRecommendations(
       dailyAgg, campaigns || [], adData || [], baseline, variances, riskAssessment
@@ -222,6 +225,7 @@ Deno.serve(async (req) => {
       recommendations,
       risk: riskAssessment,
       ai_insight: aiInsight,
+      cac_trend: cacTrend,
       data_quality: {
         days_with_data: daysWithData,
         total_days_analyzed: dailyAgg.length,
@@ -563,6 +567,93 @@ function generateRecommendations(
   }
 
   return recs;
+}
+
+function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], baseline: any) {
+  const last3 = daily.slice(-3);
+  const last7 = daily.slice(-7);
+
+  const spend3 = last3.reduce((s, d) => s + d.spend, 0);
+  const conv3 = last3.reduce((s, d) => s + d.conversions, 0);
+  const spend7 = last7.reduce((s, d) => s + d.spend, 0);
+  const conv7 = last7.reduce((s, d) => s + d.conversions, 0);
+
+  const cac3 = conv3 > 0 ? spend3 / conv3 : 0;
+  const cac7 = conv7 > 0 ? spend7 / conv7 : 0;
+  const baselineCac = baseline.projected_cpa;
+
+  const cac3VsBaseline = baselineCac > 0 ? Math.round(((cac3 - baselineCac) / baselineCac) * 1000) / 10 : 0;
+  const cac3Vs7 = cac7 > 0 ? Math.round(((cac3 - cac7) / cac7) * 1000) / 10 : 0;
+
+  // Determine signal
+  let signal: "increase" | "hold" | "reduce" | "pause_losers" = "hold";
+  let signal_label = "";
+  let signal_detail = "";
+
+  if (cac3 > 0 && cac7 > 0) {
+    if (cac3 <= baselineCac * 0.9 && cac3 <= cac7) {
+      // 3d CAC is ≤90% of baseline AND trending down — scale opportunity
+      signal = "increase";
+      signal_label = "Scale: Increase Budget +5%";
+      signal_detail = `CAC has dropped to $${Math.round(cac3)} over the last 3 days (${Math.abs(cac3VsBaseline)}% below baseline). Efficiency is improving — consider a 5% budget increase.`;
+    } else if (cac3 > baselineCac * 1.2 && cac3 > cac7 * 1.1) {
+      // 3d CAC is >120% of baseline AND rising vs 7d — deteriorating
+      signal = "pause_losers";
+      signal_label = "Alert: Pause Losing Creatives";
+      signal_detail = `CAC spiked to $${Math.round(cac3)} over the last 3 days (${Math.round(cac3VsBaseline)}% above baseline, ${Math.round(cac3Vs7)}% above 7d avg). Identify and pause underperforming creatives.`;
+    } else if (cac3 > baselineCac * 1.1) {
+      // 3d CAC is elevated but not spiking
+      signal = "reduce";
+      signal_label = "Caution: Consider Reducing Spend";
+      signal_detail = `CAC is trending up to $${Math.round(cac3)} (${Math.round(cac3VsBaseline)}% above baseline). Monitor closely and reduce budget if trend continues.`;
+    } else {
+      signal = "hold";
+      signal_label = "Stable: Hold Current Budget";
+      signal_detail = `CAC is $${Math.round(cac3)} over 3 days vs $${Math.round(cac7)} over 7 days — within normal range of baseline $${Math.round(baselineCac)}.`;
+    }
+  }
+
+  // Find top losing creatives (high CPA ads from last 7 days)
+  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string }>();
+  for (const ad of (ads || [])) {
+    const key = ad.ad_name;
+    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "" };
+    existing.spend += Number(ad.spend || 0);
+    existing.conversions += Number(ad.conversions || 0);
+    existing.clicks += Number(ad.clicks || 0);
+    existing.impressions += Number(ad.impressions || 0);
+    adAgg.set(key, existing);
+  }
+
+  const losingCreatives: { name: string; cpa: number; spend: number; campaign: string }[] = [];
+  for (const [name, ad] of adAgg.entries()) {
+    const adCpa = ad.conversions > 0 ? ad.spend / ad.conversions : (ad.spend > 0 ? Infinity : 0);
+    if (ad.spend > baseline.avg_daily_spend * 0.5 && (adCpa > baselineCac * 1.3 || (ad.conversions === 0 && ad.spend > baseline.avg_daily_spend))) {
+      losingCreatives.push({
+        name,
+        cpa: adCpa === Infinity ? -1 : Math.round(adCpa),
+        spend: Math.round(ad.spend),
+        campaign: ad.campaign,
+      });
+    }
+  }
+  losingCreatives.sort((a, b) => b.spend - a.spend);
+
+  return {
+    cac_3d: Math.round(cac3 * 100) / 100,
+    cac_7d: Math.round(cac7 * 100) / 100,
+    cac_baseline: Math.round(baselineCac * 100) / 100,
+    cac_3d_vs_baseline_pct: cac3VsBaseline,
+    cac_3d_vs_7d_pct: cac3Vs7,
+    spend_3d: Math.round(spend3),
+    spend_7d: Math.round(spend7),
+    conversions_3d: conv3,
+    conversions_7d: conv7,
+    signal,
+    signal_label: signal_label,
+    signal_detail: signal_detail,
+    losing_creatives: losingCreatives.slice(0, 5),
+  };
 }
 
 function computeRiskScore(daily: DailyData[], daysWithData: number, baseline: any) {
