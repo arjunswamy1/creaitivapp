@@ -91,8 +91,8 @@ export interface CACTrend {
   signal: "increase" | "hold" | "reduce" | "pause_losers";
   signal_label: string;
   signal_detail: string;
-  losing_creatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string }[];
-  losing_keywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number }[];
+  losing_creatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string; status: string | null }[];
+  losing_keywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number; status: string | null }[];
 }
 
 export interface OptimizationResult {
