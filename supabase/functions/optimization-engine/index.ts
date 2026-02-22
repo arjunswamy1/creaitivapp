@@ -83,8 +83,9 @@ Deno.serve(async (req) => {
 
     const revenueSource = configData?.revenue_source || "subbly";
 
-    // Fetch actual revenue (Shopify or Subbly)
+    // Fetch actual revenue + transaction counts (Shopify or Subbly)
     let totalRevenue30d = 0;
+    let transactionCount30d = 0;
     const last30Str = fmt(last30);
     if (revenueSource === "shopify") {
       const { data: orders } = await supabase
@@ -95,6 +96,7 @@ Deno.serve(async (req) => {
         .gte("order_date", last30Str + "T00:00:00Z")
         .lte("order_date", todayStr + "T23:59:59Z");
       totalRevenue30d = (orders || []).reduce((s, o) => s + Number(o.total_price || 0), 0);
+      transactionCount30d = (orders || []).length;
     } else {
       const { data: invoices } = await supabase
         .from("subbly_invoices")
@@ -104,6 +106,14 @@ Deno.serve(async (req) => {
         .gte("invoice_date", last30Str + "T00:00:00Z")
         .lte("invoice_date", todayStr + "T23:59:59Z");
       totalRevenue30d = (invoices || []).reduce((s, i) => s + Number(i.amount || 0) / 100, 0);
+      // For Subbly, count subscriptions instead of invoices
+      const { data: subs } = await supabase
+        .from("subbly_subscriptions")
+        .select("id")
+        .eq("client_id", clientId)
+        .gte("subbly_created_at", last30Str + "T05:00:00Z")
+        .lte("subbly_created_at", todayStr + "T23:59:59Z");
+      transactionCount30d = (subs || []).length;
     }
 
     // Aggregate daily data
@@ -118,7 +128,7 @@ Deno.serve(async (req) => {
     }
 
     // === MODULE 1: Scenario Forecasting ===
-    const baseline = computeBaselineForecast(dailyAgg, totalRevenue30d, daysWithData);
+    const baseline = computeBaselineForecast(dailyAgg, totalRevenue30d, daysWithData, transactionCount30d, revenueSource);
     const spendAdjusted = computeSpendAdjustedForecast(baseline, scenarioParams.spend_change_pct);
     const efficiencyAdjusted = computeEfficiencyForecast(baseline, scenarioParams);
 
@@ -250,26 +260,29 @@ function aggregateDaily(rows: any[]): DailyData[] {
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number) {
+function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number, transactionCount: number, revenueSource: string) {
   const last30 = daily.slice(-30);
   const totalSpend = last30.reduce((s, d) => s + d.spend, 0);
   const totalConversions = last30.reduce((s, d) => s + d.conversions, 0);
   const totalClicks = last30.reduce((s, d) => s + d.clicks, 0);
   const totalImpressions = last30.reduce((s, d) => s + d.impressions, 0);
 
-  const avgDailySpend = daysWithData > 0 ? totalSpend / Math.min(daysWithData, 30) : 0;
-  const avgDailyConversions = daysWithData > 0 ? totalConversions / Math.min(daysWithData, 30) : 0;
-  const avgDailyRevenue = daysWithData > 0 ? actualRevenue / Math.min(daysWithData, 30) : 0;
+  const activeDays = Math.min(daysWithData, 30);
+  const avgDailySpend = daysWithData > 0 ? totalSpend / activeDays : 0;
+  const avgDailyConversions = daysWithData > 0 ? totalConversions / activeDays : 0;
+  const avgDailyRevenue = daysWithData > 0 ? actualRevenue / activeDays : 0;
+  const avgDailyTransactions = daysWithData > 0 ? transactionCount / activeDays : 0;
 
   const projectedSpend = avgDailySpend * 30;
   const projectedRevenue = avgDailyRevenue * 30;
   const projectedCPA = avgDailyConversions > 0 ? avgDailySpend / avgDailyConversions : 0;
   const projectedMER = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
+  const projectedTransactions = Math.round(avgDailyTransactions * 30);
 
   // Confidence based on data volume and variance
   const spendValues = last30.map(d => d.spend).filter(v => v > 0);
   const spendVariance = computeCV(spendValues);
-  const volumeScore = Math.min(1, daysWithData / 60); // more data = more confidence
+  const volumeScore = Math.min(1, daysWithData / 60);
   const stabilityScore = Math.max(0, 1 - spendVariance);
   const confidenceScore = Math.round((volumeScore * 0.4 + stabilityScore * 0.6) * 100) / 100;
 
@@ -299,6 +312,10 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
     cvr: totalClicks > 0 ? Math.round((totalConversions / totalClicks) * 10000) / 100 : 0,
     confidence_score: confidenceScore,
     daily_projections: dailyProjections,
+    projected_transactions: projectedTransactions,
+    transaction_count_30d: transactionCount,
+    avg_daily_transactions: Math.round(avgDailyTransactions * 10) / 10,
+    transaction_label: revenueSource === "shopify" ? "Purchases" : "Subscribers",
   };
 }
 

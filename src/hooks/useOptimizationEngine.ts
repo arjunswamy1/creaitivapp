@@ -21,6 +21,10 @@ export interface BaselineForecast {
   cvr: number;
   confidence_score: number;
   daily_projections: { date: string; projected_spend: number; projected_revenue: number; projected_conversions: number }[];
+  projected_transactions: number;
+  transaction_count_30d: number;
+  avg_daily_transactions: number;
+  transaction_label: string;
 }
 
 export interface SpendScenario {
