@@ -9,6 +9,7 @@ import BaselineForecastCard from "@/components/optimization/BaselineForecastCard
 import ScenarioSimulator from "@/components/optimization/ScenarioSimulator";
 import VarianceMonitor from "@/components/optimization/VarianceMonitor";
 import RecommendationFeed from "@/components/optimization/RecommendationFeed";
+import CACTrendCard from "@/components/optimization/CACTrendCard";
 import { useQueryClient } from "@tanstack/react-query";
 
 const OptimizationEngine = () => {
@@ -115,7 +116,12 @@ const OptimizationEngine = () => {
               />
             </div>
 
-            {/* Row 2: Variance + Recommendations */}
+            {/* Row 2: CAC Trend */}
+            {data.cac_trend && (
+              <CACTrendCard cacTrend={data.cac_trend} />
+            )}
+
+            {/* Row 3: Variance + Recommendations */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <VarianceMonitor variances={data.variances} />
               <RecommendationFeed recommendations={data.recommendations} />
