@@ -1,4 +1,4 @@
-import { RefreshCw, Settings, Target } from "lucide-react";
+import { RefreshCw, Settings, Target, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -99,6 +99,14 @@ const DashboardHeader = () => {
           </TooltipProvider>
         )}
         <DateRangePicker />
+        {isAgencyAdmin && (
+          <Link to="/optimization">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+              <Cpu className="w-3.5 h-3.5" />
+              Optimize
+            </Button>
+          </Link>
+        )}
         {isAgencyAdmin && (
           <Link to="/budget-planner">
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
