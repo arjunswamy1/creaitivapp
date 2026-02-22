@@ -138,8 +138,16 @@ Deno.serve(async (req) => {
     // === MODULE 2: Variance Detection ===
     const variances = computeVariances(dailyAgg, baseline);
 
+    // Fetch keyword data for Google losing keywords
+    const { data: keywordData } = await supabase
+      .from("keywords")
+      .select("keyword_text, campaign_name, adset_name, platform_campaign_id, match_type, quality_score, spend, clicks, impressions, conversions, date")
+      .eq("client_id", clientId)
+      .gte("date", fmt(last30))
+      .lte("date", todayStr);
+
     // === MODULE 2.5: CAC Trend Analysis ===
-    const cacTrend = computeCACTrend(dailyAgg, campaigns || [], adData || [], baseline);
+    const cacTrend = computeCACTrend(dailyAgg, campaigns || [], adData || [], baseline, keywordData || []);
 
     // === MODULE 3: Recommendations ===
     const recommendations = generateRecommendations(
@@ -569,7 +577,7 @@ function generateRecommendations(
   return recs;
 }
 
-function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], baseline: any) {
+function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], baseline: any, keywords: any[]) {
   const last3 = daily.slice(-3);
   const last7 = daily.slice(-7);
 
@@ -592,17 +600,14 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
 
   if (cac3 > 0 && cac7 > 0) {
     if (cac3 <= baselineCac * 0.9 && cac3 <= cac7) {
-      // 3d CAC is ≤90% of baseline AND trending down — scale opportunity
       signal = "increase";
       signal_label = "Scale: Increase Budget +5%";
       signal_detail = `CAC has dropped to $${Math.round(cac3)} over the last 3 days (${Math.abs(cac3VsBaseline)}% below baseline). Efficiency is improving — consider a 5% budget increase.`;
     } else if (cac3 > baselineCac * 1.2 && cac3 > cac7 * 1.1) {
-      // 3d CAC is >120% of baseline AND rising vs 7d — deteriorating
       signal = "pause_losers";
       signal_label = "Alert: Pause Losing Creatives";
       signal_detail = `CAC spiked to $${Math.round(cac3)} over the last 3 days (${Math.round(cac3VsBaseline)}% above baseline, ${Math.round(cac3Vs7)}% above 7d avg). Identify and pause underperforming creatives.`;
     } else if (cac3 > baselineCac * 1.1) {
-      // 3d CAC is elevated but not spiking
       signal = "reduce";
       signal_label = "Caution: Consider Reducing Spend";
       signal_detail = `CAC is trending up to $${Math.round(cac3)} (${Math.round(cac3VsBaseline)}% above baseline). Monitor closely and reduce budget if trend continues.`;
@@ -613,7 +618,7 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
     }
   }
 
-  // Find top losing creatives (high CPA ads from last 7 days)
+  // Find top losing META creatives (high CPA ads from last 7 days)
   const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; thumbnail_url: string | null; platform: string }>();
   for (const ad of (ads || [])) {
     const key = ad.ad_name;
@@ -627,8 +632,10 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
     adAgg.set(key, existing);
   }
 
+  // Separate Meta losing creatives
   const losingCreatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string }[] = [];
   for (const [name, ad] of adAgg.entries()) {
+    if (ad.platform !== "meta") continue;
     const adCpa = ad.conversions > 0 ? ad.spend / ad.conversions : (ad.spend > 0 ? Infinity : 0);
     if (ad.spend > baseline.avg_daily_spend * 0.5 && (adCpa > baselineCac * 1.3 || (ad.conversions === 0 && ad.spend > baseline.avg_daily_spend))) {
       losingCreatives.push({
@@ -642,6 +649,41 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
     }
   }
   losingCreatives.sort((a, b) => b.spend - a.spend);
+
+  // Find problematic Google keywords
+  const kwAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; adset: string; match_type: string; quality_score: number | null }>();
+  for (const kw of (keywords || [])) {
+    const key = `${kw.keyword_text}::${kw.platform_campaign_id}::${kw.match_type || ""}`;
+    const existing = kwAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: kw.campaign_name || "", adset: kw.adset_name || "", match_type: kw.match_type || "", quality_score: null };
+    existing.spend += Number(kw.spend || 0);
+    existing.conversions += Number(kw.conversions || 0);
+    existing.clicks += Number(kw.clicks || 0);
+    existing.impressions += Number(kw.impressions || 0);
+    if (kw.quality_score != null) existing.quality_score = Number(kw.quality_score);
+    kwAgg.set(key, existing);
+  }
+
+  const losingKeywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number }[] = [];
+  for (const [key, kw] of kwAgg.entries()) {
+    const kwName = key.split("::")[0];
+    const kwCpa = kw.conversions > 0 ? kw.spend / kw.conversions : (kw.spend > 0 ? Infinity : 0);
+    const kwCtr = kw.impressions > 0 ? Math.round((kw.clicks / kw.impressions) * 10000) / 100 : 0;
+    if (kw.spend > baseline.avg_daily_spend * 0.3 && (kwCpa > baselineCac * 1.3 || (kw.conversions === 0 && kw.spend > baseline.avg_daily_spend * 0.5))) {
+      losingKeywords.push({
+        keyword: kwName,
+        cpa: kwCpa === Infinity ? -1 : Math.round(kwCpa),
+        spend: Math.round(kw.spend),
+        clicks: kw.clicks,
+        conversions: kw.conversions,
+        campaign: kw.campaign,
+        ad_group: kw.adset,
+        match_type: kw.match_type,
+        quality_score: kw.quality_score,
+        ctr: kwCtr,
+      });
+    }
+  }
+  losingKeywords.sort((a, b) => b.spend - a.spend);
 
   return {
     cac_3d: Math.round(cac3 * 100) / 100,
@@ -657,6 +699,7 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
     signal_label: signal_label,
     signal_detail: signal_detail,
     losing_creatives: losingCreatives.slice(0, 5),
+    losing_keywords: losingKeywords.slice(0, 10),
   };
 }
 
