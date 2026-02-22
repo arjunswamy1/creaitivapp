@@ -25,6 +25,10 @@ export interface BaselineForecast {
   transaction_count_30d: number;
   avg_daily_transactions: number;
   transaction_label: string;
+  forecast_month: string;
+  days_in_month: number;
+  days_elapsed: number;
+  days_remaining: number;
 }
 
 export interface SpendScenario {

@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       confidence_score: baseline.confidence_score,
       risk_level: riskAssessment.risk_level,
       lookback_days: lookbackDays,
-      forecast_days: 30,
+      forecast_days: baseline.days_in_month,
       daily_projections: baseline.daily_projections,
       metadata: { revenue_source: revenueSource, days_with_data: daysWithData },
     });
@@ -285,11 +285,25 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
   const avgDailyRevenue = daysWithData > 0 ? actualRevenue / activeDays : 0;
   const avgDailyTransactions = daysWithData > 0 ? transactionCount / activeDays : 0;
 
-  const projectedSpend = avgDailySpend * 30;
-  const projectedRevenue = avgDailyRevenue * 30;
+  // Calculate remaining days in current month
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const currentDay = now.getDate();
+  const daysElapsed = currentDay;
+  const daysRemaining = daysInMonth - currentDay;
+  const forecastDays = daysInMonth;
+
+  // Month-to-date actuals (use weighted avg from lookback data)
+  const mtdSpend = avgDailySpend * daysElapsed;
+  const mtdRevenue = avgDailyRevenue * daysElapsed;
+
+  const projectedSpend = avgDailySpend * forecastDays;
+  const projectedRevenue = avgDailyRevenue * forecastDays;
   const projectedCPA = avgDailyConversions > 0 ? avgDailySpend / avgDailyConversions : 0;
   const projectedMER = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
-  const projectedTransactions = Math.round(avgDailyTransactions * 30);
+  const projectedTransactions = Math.round(avgDailyTransactions * forecastDays);
 
   // Confidence based on data volume and variance
   const spendValues = last30.map(d => d.spend).filter(v => v > 0);
@@ -298,10 +312,13 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
   const stabilityScore = Math.max(0, 1 - spendVariance);
   const confidenceScore = Math.round((volumeScore * 0.4 + stabilityScore * 0.6) * 100) / 100;
 
-  // Daily projections
+  // Month name for display
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthName = monthNames[currentMonth];
+
+  // Daily projections for remaining days in month
   const dailyProjections = [];
-  const now = new Date();
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= daysRemaining; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() + i);
     dailyProjections.push({
@@ -328,6 +345,10 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
     transaction_count_30d: transactionCount,
     avg_daily_transactions: Math.round(avgDailyTransactions * 10) / 10,
     transaction_label: revenueSource === "shopify" ? "Purchases" : "Subscribers",
+    forecast_month: monthName,
+    days_in_month: daysInMonth,
+    days_elapsed: daysElapsed,
+    days_remaining: daysRemaining,
   };
 }
 

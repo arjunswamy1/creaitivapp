@@ -11,12 +11,17 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
   const riskColor = risk.risk_level === "Low" ? "text-green-500" : risk.risk_level === "Medium" ? "text-yellow-500" : "text-red-500";
   const riskBg = risk.risk_level === "Low" ? "bg-green-500/10 border-green-500/20" : risk.risk_level === "Medium" ? "bg-yellow-500/10 border-yellow-500/20" : "bg-red-500/10 border-red-500/20";
 
+  const monthLabel = baseline.forecast_month || "30-Day";
+  const monthProgress = baseline.days_in_month > 0
+    ? Math.round((baseline.days_elapsed / baseline.days_in_month) * 100)
+    : 0;
+
   return (
     <div className="glass-card p-6">
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Target className="w-5 h-5 text-primary" />
-          Baseline Forecast (30-Day)
+          {monthLabel} Forecast
         </h3>
         <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${riskBg} ${riskColor}`}>
           <Shield className="w-3 h-3" />
@@ -54,6 +59,17 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
           highlight={baseline.projected_mer > 1}
         />
       </div>
+
+      {/* Month Progress */}
+      {baseline.days_in_month > 0 && (
+        <div className="mb-5">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>Day {baseline.days_elapsed} of {baseline.days_in_month} ({baseline.days_remaining} days remaining)</span>
+            <span>{monthProgress}%</span>
+          </div>
+          <Progress value={monthProgress} className="h-2" />
+        </div>
+      )}
 
       {/* Daily averages */}
       <div className="grid grid-cols-4 gap-3 mb-5">
