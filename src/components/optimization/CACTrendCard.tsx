@@ -1,5 +1,5 @@
 import { CACTrend } from "@/hooks/useOptimizationEngine";
-import { TrendingUp, TrendingDown, Pause, ArrowUpCircle, MinusCircle, AlertTriangle, DollarSign } from "lucide-react";
+import { TrendingDown, Pause, ArrowUpCircle, MinusCircle, AlertTriangle, DollarSign, ImageOff } from "lucide-react";
 
 interface Props {
   cacTrend: CACTrend;
@@ -26,9 +26,9 @@ const signalConfig = {
   },
   pause_losers: {
     icon: Pause,
-    color: "text-red-500",
-    bg: "bg-red-500/10 border-red-500/20",
-    badgeBg: "bg-red-500/20 text-red-600",
+    color: "text-destructive",
+    bg: "bg-destructive/10 border-destructive/20",
+    badgeBg: "bg-destructive/20 text-destructive",
   },
 };
 
@@ -92,26 +92,60 @@ const CACTrendCard = ({ cacTrend }: Props) => {
         </div>
       </div>
 
-      {/* Losing Creatives */}
+      {/* Losing Creatives with Thumbnails */}
       {cacTrend.losing_creatives.length > 0 && (
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-2.5">
             <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
-            Underperforming Creatives
+            Creatives to Kill ({cacTrend.losing_creatives.length})
           </div>
-          <div className="space-y-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {cacTrend.losing_creatives.map((creative, i) => (
-              <div key={i} className="flex items-center justify-between bg-secondary/30 rounded-lg px-3 py-2 text-xs">
-                <span className="truncate max-w-[55%] text-foreground/80" title={creative.name}>
-                  {creative.name}
-                </span>
-                <div className="flex items-center gap-3 text-muted-foreground shrink-0">
-                  <span>
-                    CPA: <span className="font-mono text-red-500">{creative.cpa === -1 ? "∞" : `$${creative.cpa}`}</span>
-                  </span>
-                  <span>
-                    Spend: <span className="font-mono">${creative.spend}</span>
-                  </span>
+              <div key={i} className="flex gap-3 bg-secondary/30 rounded-lg p-2.5 border border-border/50">
+                {/* Thumbnail */}
+                <div className="w-14 h-14 rounded-md overflow-hidden bg-secondary/60 shrink-0 flex items-center justify-center">
+                  {creative.thumbnail_url ? (
+                    <img
+                      src={creative.thumbnail_url}
+                      alt={creative.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement;
+                        el.style.display = "none";
+                        const parent = el.parentElement;
+                        if (parent) {
+                          const fallback = document.createElement("div");
+                          fallback.className = "flex items-center justify-center w-full h-full";
+                          fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/40"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                          parent.appendChild(fallback);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <ImageOff className="w-4 h-4 text-muted-foreground/40" />
+                  )}
+                </div>
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate text-foreground/80" title={creative.name}>
+                    {creative.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate mt-0.5" title={creative.campaign}>
+                    {creative.campaign}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1.5 text-[10px]">
+                    <span className="text-muted-foreground">
+                      CPA: <span className="font-mono text-destructive font-semibold">{creative.cpa === -1 ? "∞ (no conv)" : `$${creative.cpa}`}</span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Spend: <span className="font-mono">${creative.spend}</span>
+                    </span>
+                  </div>
+                  {creative.platform && (
+                    <span className="text-[9px] bg-secondary px-1.5 py-0.5 rounded mt-1 inline-block capitalize text-muted-foreground">
+                      {creative.platform}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -137,7 +171,7 @@ function MetricBox({ label, value, delta, deltaLabel, invertColor }: {
       <p className="text-[10px] text-muted-foreground mb-1">{label}</p>
       <p className="text-base font-bold font-mono">{value}</p>
       {hasDelta && (
-        <p className={`text-[10px] font-mono mt-0.5 ${isGood ? "text-green-500" : "text-red-500"}`}>
+        <p className={`text-[10px] font-mono mt-0.5 ${isGood ? "text-accent" : "text-destructive"}`}>
           {delta! > 0 ? "+" : ""}{delta}% {deltaLabel}
         </p>
       )}

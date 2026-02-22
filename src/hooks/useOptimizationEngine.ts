@@ -91,7 +91,7 @@ export interface CACTrend {
   signal: "increase" | "hold" | "reduce" | "pause_losers";
   signal_label: string;
   signal_detail: string;
-  losing_creatives: { name: string; cpa: number; spend: number; campaign: string }[];
+  losing_creatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string }[];
 }
 
 export interface OptimizationResult {

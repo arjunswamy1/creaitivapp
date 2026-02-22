@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     last30.setDate(last30.getDate() - 30);
     const { data: adData } = await supabase
       .from("ads")
-      .select("ad_name, campaign_name, spend, impressions, clicks, conversions, frequency, date")
+      .select("ad_name, campaign_name, spend, impressions, clicks, conversions, frequency, date, thumbnail_url, platform")
       .eq("client_id", clientId)
       .gte("date", fmt(last30))
       .lte("date", todayStr);
@@ -614,18 +614,20 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
   }
 
   // Find top losing creatives (high CPA ads from last 7 days)
-  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string }>();
+  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; thumbnail_url: string | null; platform: string }>();
   for (const ad of (ads || [])) {
     const key = ad.ad_name;
-    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "" };
+    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "", thumbnail_url: null, platform: ad.platform || "" };
     existing.spend += Number(ad.spend || 0);
     existing.conversions += Number(ad.conversions || 0);
     existing.clicks += Number(ad.clicks || 0);
     existing.impressions += Number(ad.impressions || 0);
+    if (ad.thumbnail_url && !existing.thumbnail_url) existing.thumbnail_url = ad.thumbnail_url;
+    if (ad.platform) existing.platform = ad.platform;
     adAgg.set(key, existing);
   }
 
-  const losingCreatives: { name: string; cpa: number; spend: number; campaign: string }[] = [];
+  const losingCreatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string }[] = [];
   for (const [name, ad] of adAgg.entries()) {
     const adCpa = ad.conversions > 0 ? ad.spend / ad.conversions : (ad.spend > 0 ? Infinity : 0);
     if (ad.spend > baseline.avg_daily_spend * 0.5 && (adCpa > baselineCac * 1.3 || (ad.conversions === 0 && ad.spend > baseline.avg_daily_spend))) {
@@ -634,6 +636,8 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
         cpa: adCpa === Infinity ? -1 : Math.round(adCpa),
         spend: Math.round(ad.spend),
         campaign: ad.campaign,
+        thumbnail_url: ad.thumbnail_url,
+        platform: ad.platform,
       });
     }
   }
