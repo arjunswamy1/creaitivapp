@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import BudgetPlanner from "./pages/BudgetPlanner";
+import OptimizationEngine from "./pages/OptimizationEngine";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <BudgetPlanner />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/optimization"
+                  element={
+                    <ProtectedRoute>
+                      <OptimizationEngine />
                     </ProtectedRoute>
                   }
                 />

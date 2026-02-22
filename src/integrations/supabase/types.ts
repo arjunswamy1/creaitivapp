@@ -549,6 +549,68 @@ export type Database = {
         }
         Relationships: []
       }
+      forecast_snapshots: {
+        Row: {
+          client_id: string
+          confidence_score: number
+          created_at: string
+          daily_projections: Json
+          forecast_days: number
+          id: string
+          lookback_days: number
+          metadata: Json
+          projected_cpa: number
+          projected_mer: number
+          projected_revenue: number
+          projected_spend: number
+          risk_level: string
+          scenario_params: Json
+          snapshot_type: string
+        }
+        Insert: {
+          client_id: string
+          confidence_score?: number
+          created_at?: string
+          daily_projections?: Json
+          forecast_days?: number
+          id?: string
+          lookback_days?: number
+          metadata?: Json
+          projected_cpa?: number
+          projected_mer?: number
+          projected_revenue?: number
+          projected_spend?: number
+          risk_level?: string
+          scenario_params?: Json
+          snapshot_type?: string
+        }
+        Update: {
+          client_id?: string
+          confidence_score?: number
+          created_at?: string
+          daily_projections?: Json
+          forecast_days?: number
+          id?: string
+          lookback_days?: number
+          metadata?: Json
+          projected_cpa?: number
+          projected_mer?: number
+          projected_revenue?: number
+          projected_spend?: number
+          risk_level?: string
+          scenario_params?: Json
+          snapshot_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forecast_snapshots_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       keywords: {
         Row: {
           adset_name: string | null
@@ -622,6 +684,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "keywords_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      optimization_recommendations: {
+        Row: {
+          action: string
+          client_id: string
+          confidence_score: number
+          created_at: string
+          entity: string
+          evidence: Json
+          id: string
+          projected_impact: string | null
+          risk_score: string
+          source_metrics: Json
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          client_id: string
+          confidence_score?: number
+          created_at?: string
+          entity: string
+          evidence?: Json
+          id?: string
+          projected_impact?: string | null
+          risk_score?: string
+          source_metrics?: Json
+          status?: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          client_id?: string
+          confidence_score?: number
+          created_at?: string
+          entity?: string
+          evidence?: Json
+          id?: string
+          projected_impact?: string | null
+          risk_score?: string
+          source_metrics?: Json
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "optimization_recommendations_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -897,6 +1015,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "subbly_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      variance_reports: {
+        Row: {
+          actual_value: number
+          client_id: string
+          created_at: string
+          forecast_value: number
+          id: string
+          metadata: Json
+          metric: string
+          report_date: string
+          severity: string
+          variance_percent: number
+        }
+        Insert: {
+          actual_value?: number
+          client_id: string
+          created_at?: string
+          forecast_value?: number
+          id?: string
+          metadata?: Json
+          metric: string
+          report_date?: string
+          severity?: string
+          variance_percent?: number
+        }
+        Update: {
+          actual_value?: number
+          client_id?: string
+          created_at?: string
+          forecast_value?: number
+          id?: string
+          metadata?: Json
+          metric?: string
+          report_date?: string
+          severity?: string
+          variance_percent?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "variance_reports_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
