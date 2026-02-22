@@ -35,6 +35,8 @@ export interface SpendScenario {
   projected_mer: number;
   delta_revenue: number;
   delta_revenue_pct: number;
+  projected_transactions: number;
+  transaction_label: string;
 }
 
 export interface EfficiencyScenario {

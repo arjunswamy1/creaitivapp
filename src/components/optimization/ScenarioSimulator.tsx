@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SpendScenario, EfficiencyScenario, BaselineForecast } from "@/hooks/useOptimizationEngine";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, DollarSign, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Zap, Users, ShoppingCart } from "lucide-react";
 
 interface Props {
   baseline: BaselineForecast;
@@ -15,12 +15,16 @@ interface Props {
 const ScenarioSimulator = ({ baseline, spendScenarios, efficiencyScenarios, onRunScenario, isRunning }: Props) => {
   const [customSpend, setCustomSpend] = useState(0);
 
+  const transactionLabel = spendScenarios[0]?.transaction_label || baseline.transaction_label || "Subscribers";
+  const TransactionIcon = transactionLabel === "Purchases" ? ShoppingCart : Users;
+
   const customScenario = customSpend !== 0 ? {
     spend_change_pct: customSpend,
     projected_spend: Math.round(baseline.projected_spend * (1 + customSpend / 100)),
     projected_revenue: Math.round(baseline.projected_revenue * Math.pow(1 + customSpend / 100, 0.7)),
     delta_revenue: Math.round(baseline.projected_revenue * (Math.pow(1 + customSpend / 100, 0.7) - 1)),
     delta_revenue_pct: Math.round((Math.pow(1 + customSpend / 100, 0.7) - 1) * 1000) / 10,
+    projected_transactions: Math.round(baseline.projected_transactions * Math.pow(1 + customSpend / 100, 0.7)),
   } : null;
 
   return (
@@ -68,6 +72,10 @@ const ScenarioSimulator = ({ baseline, spendScenarios, efficiencyScenarios, onRu
                   <span>CPA: ${s.projected_cpa}</span>
                   <span>MER: {s.projected_mer}x</span>
                 </div>
+                <div className="mt-1.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <TransactionIcon className="w-3 h-3" />
+                  <span>{s.projected_transactions} {transactionLabel}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -89,12 +97,16 @@ const ScenarioSimulator = ({ baseline, spendScenarios, efficiencyScenarios, onRu
               className="mb-3"
             />
             {customScenario && (
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-4 text-xs flex-wrap">
                 <span className="text-muted-foreground">
                   Spend: <span className="font-mono text-foreground">${customScenario.projected_spend.toLocaleString()}</span>
                 </span>
                 <span className="text-muted-foreground">
                   Revenue: <span className="font-mono text-foreground">${customScenario.projected_revenue.toLocaleString()}</span>
+                </span>
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <TransactionIcon className="w-3 h-3" />
+                  <span className="font-mono text-foreground">{customScenario.projected_transactions}</span> {transactionLabel}
                 </span>
                 <span className={`font-mono ${customScenario.delta_revenue > 0 ? "text-green-500" : "text-red-500"}`}>
                   {customScenario.delta_revenue > 0 ? "+" : ""}{customScenario.delta_revenue_pct}%

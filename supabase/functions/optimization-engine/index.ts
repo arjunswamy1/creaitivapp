@@ -326,15 +326,15 @@ function computeSpendAdjustedForecast(baseline: any, spendChangePct?: number) {
 
   return scenarios.map(pct => {
     const spendMultiplier = 1 + pct / 100;
-    // Diminishing returns: ROAS declines as spend increases
-    // elasticity factor: each 10% spend increase = ~3% ROAS decline
-    const elasticity = 0.7; // <1 means diminishing returns
+    const elasticity = 0.7;
     const roasMultiplier = Math.pow(spendMultiplier, elasticity - 1);
     const adjustedMER = baseline.projected_mer * roasMultiplier;
 
     const projectedSpend = baseline.projected_spend * spendMultiplier;
     const projectedRevenue = projectedSpend * adjustedMER;
     const projectedCPA = baseline.projected_cpa * Math.pow(spendMultiplier, 1 - elasticity);
+    // Transactions scale with the same diminishing returns as revenue
+    const projectedTransactions = Math.round(baseline.projected_transactions * Math.pow(spendMultiplier, elasticity));
 
     return {
       spend_change_pct: pct,
@@ -346,6 +346,8 @@ function computeSpendAdjustedForecast(baseline: any, spendChangePct?: number) {
       delta_revenue_pct: baseline.projected_revenue > 0
         ? Math.round(((projectedRevenue - baseline.projected_revenue) / baseline.projected_revenue) * 1000) / 10
         : 0,
+      projected_transactions: projectedTransactions,
+      transaction_label: baseline.transaction_label,
     };
   });
 }
