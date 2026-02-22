@@ -1,5 +1,5 @@
 import { BaselineForecast, RiskAssessment } from "@/hooks/useOptimizationEngine";
-import { TrendingUp, DollarSign, Target, Shield, BarChart3 } from "lucide-react";
+import { TrendingUp, DollarSign, Target, Shield, BarChart3, ShoppingCart, Users } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface Props {
@@ -25,7 +25,7 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
         <MetricTile
           icon={<DollarSign className="w-4 h-4" />}
           label="Projected Revenue"
@@ -35,6 +35,12 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
           icon={<DollarSign className="w-4 h-4" />}
           label="Projected Spend"
           value={`$${baseline.projected_spend.toLocaleString()}`}
+        />
+        <MetricTile
+          icon={baseline.transaction_label === "Purchases" ? <ShoppingCart className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+          label={`Projected ${baseline.transaction_label}`}
+          value={baseline.projected_transactions.toLocaleString()}
+          highlight
         />
         <MetricTile
           icon={<Target className="w-4 h-4" />}
@@ -50,7 +56,7 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
       </div>
 
       {/* Daily averages */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-4 gap-3 mb-5">
         <div className="bg-secondary/40 rounded-lg p-3">
           <p className="text-xs text-muted-foreground mb-1">Avg Daily Spend</p>
           <p className="text-base font-bold font-mono">${baseline.avg_daily_spend.toLocaleString()}</p>
@@ -62,6 +68,10 @@ const BaselineForecastCard = ({ baseline, risk }: Props) => {
         <div className="bg-secondary/40 rounded-lg p-3">
           <p className="text-xs text-muted-foreground mb-1">Avg Daily Conversions</p>
           <p className="text-base font-bold font-mono">{baseline.avg_daily_conversions}</p>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Avg Daily {baseline.transaction_label}</p>
+          <p className="text-base font-bold font-mono">{baseline.avg_daily_transactions}</p>
         </div>
       </div>
 
