@@ -2,14 +2,17 @@ import KPICard from "@/components/KPICard";
 import SpendRevenueChart from "@/components/SpendRevenueChart";
 import ChannelBreakdown from "@/components/ChannelBreakdown";
 import ForecastCard from "@/components/ForecastCard";
+import BaselineForecastCard from "@/components/optimization/BaselineForecastCard";
 import SubblyKPIRow from "@/components/SubblyKPIRow";
 
 import { useCrossChannelKPIs } from "@/hooks/useCrossChannelData";
+import { useOptimizationEngine } from "@/hooks/useOptimizationEngine";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const CrossChannelView = () => {
   const { data: kpis, isLoading } = useCrossChannelKPIs();
+  const { data: optData, isLoading: optLoading } = useOptimizationEngine();
   const { dashboardConfig } = useClient();
   const revenueSource = dashboardConfig?.revenue_source || "subbly";
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
@@ -68,9 +71,15 @@ const CrossChannelView = () => {
         <ChannelBreakdown />
       </div>
 
-      {/* Forecast */}
+      {/* Baseline Forecast from Optimization Engine */}
       <div className="mb-6">
-        <ForecastCard />
+        {optLoading ? (
+          <Skeleton className="h-[320px] rounded-xl" />
+        ) : optData?.baseline && optData?.risk ? (
+          <BaselineForecastCard baseline={optData.baseline} risk={optData.risk} />
+        ) : (
+          <ForecastCard />
+        )}
       </div>
     </>
   );
