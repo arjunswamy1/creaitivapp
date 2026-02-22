@@ -1,7 +1,8 @@
 import { CACTrend } from "@/hooks/useOptimizationEngine";
-import { TrendingDown, Pause, ArrowUpCircle, MinusCircle, AlertTriangle, DollarSign, ImageOff, Search } from "lucide-react";
+import { TrendingDown, Pause, ArrowUpCircle, MinusCircle, AlertTriangle, DollarSign, ImageOff, Search, CheckCircle2, XCircle } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   cacTrend: CACTrend;
@@ -32,6 +33,28 @@ const signalConfig = {
     bg: "bg-destructive/10 border-destructive/20",
     badgeBg: "bg-destructive/20 text-destructive",
   },
+};
+
+const isKilled = (status: string | null) => {
+  if (!status) return false;
+  const s = status.toLowerCase();
+  return s === "paused" || s === "removed" || s === "deleted" || s === "archived" || s === "disabled";
+};
+
+const statusStyle = (status: string | null) => {
+  if (isKilled(status)) return { bg: "bg-muted/40 border-border/30" };
+  return { bg: "bg-secondary/30 border-border/50" };
+};
+
+const StatusBadge = ({ status }: { status: string | null }) => {
+  if (!status) return null;
+  const killed = isKilled(status);
+  return (
+    <Badge variant={killed ? "secondary" : "outline"} className={`text-[9px] px-1.5 py-0 h-4 shrink-0 ${killed ? "text-muted-foreground" : "text-foreground/70"}`}>
+      {killed && <CheckCircle2 className="w-2.5 h-2.5 mr-0.5 text-accent" />}
+      {status}
+    </Badge>
+  );
 };
 
 const CACTrendCard = ({ cacTrend }: Props) => {
@@ -127,14 +150,14 @@ const CACTrendCard = ({ cacTrend }: Props) => {
               <TabsContent value="meta">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {cacTrend.losing_creatives.map((creative, i) => (
-                    <div key={i} className="flex gap-3 bg-secondary/30 rounded-lg p-2.5 border border-border/50">
+                    <div key={i} className={`flex gap-3 rounded-lg p-2.5 border ${statusStyle(creative.status).bg}`}>
                       {/* Thumbnail */}
-                      <div className="w-14 h-14 rounded-md overflow-hidden bg-secondary/60 shrink-0 flex items-center justify-center">
+                      <div className="w-14 h-14 rounded-md overflow-hidden bg-secondary/60 shrink-0 flex items-center justify-center relative">
                         {creative.thumbnail_url ? (
                           <img
                             src={creative.thumbnail_url}
                             alt={creative.name}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${isKilled(creative.status) ? "opacity-40 grayscale" : ""}`}
                             onError={(e) => {
                               const el = e.target as HTMLImageElement;
                               el.style.display = "none";
@@ -150,12 +173,20 @@ const CACTrendCard = ({ cacTrend }: Props) => {
                         ) : (
                           <ImageOff className="w-4 h-4 text-muted-foreground/40" />
                         )}
+                        {isKilled(creative.status) && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <XCircle className="w-5 h-5 text-destructive/70" />
+                          </div>
+                        )}
                       </div>
                       {/* Details */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate text-foreground/80" title={creative.name}>
-                          {creative.name}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-xs font-medium truncate ${isKilled(creative.status) ? "line-through text-muted-foreground" : "text-foreground/80"}`} title={creative.name}>
+                            {creative.name}
+                          </p>
+                          <StatusBadge status={creative.status} />
+                        </div>
                         <p className="text-[10px] text-muted-foreground truncate mt-0.5" title={creative.campaign}>
                           {creative.campaign}
                         </p>
@@ -184,6 +215,7 @@ const CACTrendCard = ({ cacTrend }: Props) => {
                         <TableHead className="text-[10px] h-8 px-2.5">Keyword</TableHead>
                         <TableHead className="text-[10px] h-8 px-2.5">Ad Group</TableHead>
                         <TableHead className="text-[10px] h-8 px-2.5">Match</TableHead>
+                        <TableHead className="text-[10px] h-8 px-2.5">Status</TableHead>
                         <TableHead className="text-[10px] h-8 px-2.5 text-right">CPA</TableHead>
                         <TableHead className="text-[10px] h-8 px-2.5 text-right">Spend</TableHead>
                         <TableHead className="text-[10px] h-8 px-2.5 text-right">Conv</TableHead>
@@ -193,8 +225,8 @@ const CACTrendCard = ({ cacTrend }: Props) => {
                     </TableHeader>
                     <TableBody>
                       {cacTrend.losing_keywords.map((kw, i) => (
-                        <TableRow key={i} className="hover:bg-secondary/30">
-                          <TableCell className="text-xs px-2.5 py-2 font-medium max-w-[140px] truncate" title={kw.keyword}>
+                        <TableRow key={i} className={`hover:bg-secondary/30 ${isKilled(kw.status) ? "opacity-50" : ""}`}>
+                          <TableCell className={`text-xs px-2.5 py-2 font-medium max-w-[140px] truncate ${isKilled(kw.status) ? "line-through" : ""}`} title={kw.keyword}>
                             {kw.keyword}
                           </TableCell>
                           <TableCell className="text-[10px] px-2.5 py-2 text-muted-foreground max-w-[100px] truncate" title={kw.ad_group}>
@@ -204,6 +236,9 @@ const CACTrendCard = ({ cacTrend }: Props) => {
                             <span className="bg-secondary px-1.5 py-0.5 rounded text-muted-foreground capitalize">
                               {kw.match_type || "—"}
                             </span>
+                          </TableCell>
+                          <TableCell className="text-[10px] px-2.5 py-2">
+                            <StatusBadge status={kw.status} />
                           </TableCell>
                           <TableCell className="text-xs px-2.5 py-2 text-right font-mono font-semibold text-destructive">
                             {kw.cpa === -1 ? "∞" : `$${kw.cpa}`}

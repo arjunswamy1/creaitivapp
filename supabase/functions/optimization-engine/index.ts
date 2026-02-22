@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     last30.setDate(last30.getDate() - 30);
     const { data: adData } = await supabase
       .from("ads")
-      .select("ad_name, campaign_name, spend, impressions, clicks, conversions, frequency, date, thumbnail_url, platform")
+      .select("ad_name, campaign_name, spend, impressions, clicks, conversions, frequency, date, thumbnail_url, platform, status")
       .eq("client_id", clientId)
       .gte("date", fmt(last30))
       .lte("date", todayStr);
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     // Fetch keyword data for Google losing keywords
     const { data: keywordData } = await supabase
       .from("keywords")
-      .select("keyword_text, campaign_name, adset_name, platform_campaign_id, match_type, quality_score, spend, clicks, impressions, conversions, date")
+      .select("keyword_text, campaign_name, adset_name, platform_campaign_id, match_type, quality_score, spend, clicks, impressions, conversions, date, status")
       .eq("client_id", clientId)
       .gte("date", fmt(last30))
       .lte("date", todayStr);
@@ -619,21 +619,22 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
   }
 
   // Find top losing META creatives (high CPA ads from last 7 days)
-  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; thumbnail_url: string | null; platform: string }>();
+  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; thumbnail_url: string | null; platform: string; status: string | null }>();
   for (const ad of (ads || [])) {
     const key = ad.ad_name;
-    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "", thumbnail_url: null, platform: ad.platform || "" };
+    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "", thumbnail_url: null, platform: ad.platform || "", status: null };
     existing.spend += Number(ad.spend || 0);
     existing.conversions += Number(ad.conversions || 0);
     existing.clicks += Number(ad.clicks || 0);
     existing.impressions += Number(ad.impressions || 0);
     if (ad.thumbnail_url && !existing.thumbnail_url) existing.thumbnail_url = ad.thumbnail_url;
     if (ad.platform) existing.platform = ad.platform;
+    if (ad.status) existing.status = ad.status;
     adAgg.set(key, existing);
   }
 
   // Separate Meta losing creatives
-  const losingCreatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string }[] = [];
+  const losingCreatives: { name: string; cpa: number; spend: number; campaign: string; thumbnail_url: string | null; platform: string; status: string | null }[] = [];
   for (const [name, ad] of adAgg.entries()) {
     if (ad.platform !== "meta") continue;
     const adCpa = ad.conversions > 0 ? ad.spend / ad.conversions : (ad.spend > 0 ? Infinity : 0);
@@ -645,25 +646,27 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
         campaign: ad.campaign,
         thumbnail_url: ad.thumbnail_url,
         platform: ad.platform,
+        status: ad.status,
       });
     }
   }
   losingCreatives.sort((a, b) => b.spend - a.spend);
 
   // Find problematic Google keywords
-  const kwAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; adset: string; match_type: string; quality_score: number | null }>();
+  const kwAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; adset: string; match_type: string; quality_score: number | null; status: string | null }>();
   for (const kw of (keywords || [])) {
     const key = `${kw.keyword_text}::${kw.platform_campaign_id}::${kw.match_type || ""}`;
-    const existing = kwAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: kw.campaign_name || "", adset: kw.adset_name || "", match_type: kw.match_type || "", quality_score: null };
+    const existing = kwAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: kw.campaign_name || "", adset: kw.adset_name || "", match_type: kw.match_type || "", quality_score: null, status: null };
     existing.spend += Number(kw.spend || 0);
     existing.conversions += Number(kw.conversions || 0);
     existing.clicks += Number(kw.clicks || 0);
     existing.impressions += Number(kw.impressions || 0);
     if (kw.quality_score != null) existing.quality_score = Number(kw.quality_score);
+    if (kw.status) existing.status = kw.status;
     kwAgg.set(key, existing);
   }
 
-  const losingKeywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number }[] = [];
+  const losingKeywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number; status: string | null }[] = [];
   for (const [key, kw] of kwAgg.entries()) {
     const kwName = key.split("::")[0];
     const kwCpa = kw.conversions > 0 ? kw.spend / kw.conversions : (kw.spend > 0 ? Infinity : 0);
@@ -680,6 +683,7 @@ function computeCACTrend(daily: DailyData[], campaigns: any[], ads: any[], basel
         match_type: kw.match_type,
         quality_score: kw.quality_score,
         ctr: kwCtr,
+        status: kw.status,
       });
     }
   }
