@@ -109,6 +109,21 @@ export interface CACTrend {
   losing_keywords: { keyword: string; cpa: number; spend: number; clicks: number; conversions: number; campaign: string; ad_group: string; match_type: string; quality_score: number | null; ctr: number; status: string | null }[];
 }
 
+export interface AdToKill {
+  name: string;
+  platform: string;
+  campaign: string;
+  thumbnail_url: string | null;
+  status: string | null;
+  spend: number;
+  conversions: number;
+  cpa: number;
+  shopify_roas: number;
+  spend_share_pct: number;
+  wasted_spend: number;
+  recommendation: string;
+}
+
 export interface OptimizationResult {
   baseline: BaselineForecast;
   spend_adjusted: SpendScenario[];
@@ -118,6 +133,7 @@ export interface OptimizationResult {
   risk: RiskAssessment;
   ai_insight: string;
   cac_trend: CACTrend;
+  ads_to_kill: AdToKill[];
   data_quality: {
     days_with_data: number;
     total_days_analyzed: number;
