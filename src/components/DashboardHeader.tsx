@@ -39,9 +39,10 @@ const DashboardHeader = () => {
     try {
       const clientId = activeClient?.id || null;
 
-      // Run Meta and Subbly syncs in parallel
-      const [metaResult, subblyResult] = await Promise.allSettled([
+      // Run Meta, Google, and Subbly syncs in parallel
+      const [metaResult, googleResult, subblyResult] = await Promise.allSettled([
         supabase.functions.invoke("sync-meta-ads", { body: { client_id: clientId } }),
+        supabase.functions.invoke("sync-google-ads", { body: { client_id: clientId } }),
         supabase.functions.invoke("sync-subbly", { body: { client_id: clientId } }),
       ]);
 
@@ -52,6 +53,12 @@ const DashboardHeader = () => {
         totalSynced += metaResult.value.data?.results?.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0) || 0;
       } else {
         errors.push("Meta");
+      }
+
+      if (googleResult.status === "fulfilled" && !googleResult.value.error) {
+        totalSynced += googleResult.value.data?.records_synced || 0;
+      } else {
+        errors.push("Google");
       }
 
       if (subblyResult.status === "fulfilled" && !subblyResult.value.error) {
