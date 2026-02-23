@@ -87,15 +87,24 @@ Deno.serve(async (req) => {
     let totalRevenue30d = 0;
     let transactionCount30d = 0;
     const last30Str = fmt(last30);
+    let totalCOGS30d = 0;
+    let totalTax30d = 0;
+    let totalShipping30d = 0;
+    let totalDiscounts30d = 0;
+
     if (revenueSource === "shopify") {
       const { data: orders } = await supabase
         .from("shopify_orders")
-        .select("total_price")
+        .select("total_price, total_cost, total_tax, total_shipping, total_discounts")
         .eq("client_id", clientId)
         .in("financial_status", ["paid", "partially_refunded"])
         .gte("order_date", last30Str + "T00:00:00Z")
         .lte("order_date", todayStr + "T23:59:59Z");
       totalRevenue30d = (orders || []).reduce((s, o) => s + Number(o.total_price || 0), 0);
+      totalCOGS30d = (orders || []).reduce((s, o) => s + Number(o.total_cost || 0), 0);
+      totalTax30d = (orders || []).reduce((s, o) => s + Number(o.total_tax || 0), 0);
+      totalShipping30d = (orders || []).reduce((s, o) => s + Number(o.total_shipping || 0), 0);
+      totalDiscounts30d = (orders || []).reduce((s, o) => s + Number(o.total_discounts || 0), 0);
       transactionCount30d = (orders || []).length;
     } else {
       const { data: invoices } = await supabase
@@ -128,7 +137,9 @@ Deno.serve(async (req) => {
     }
 
     // === MODULE 1: Scenario Forecasting ===
-    const baseline = computeBaselineForecast(dailyAgg, totalRevenue30d, daysWithData, transactionCount30d, revenueSource);
+    const baseline = computeBaselineForecast(dailyAgg, totalRevenue30d, daysWithData, transactionCount30d, revenueSource, {
+      cogs: totalCOGS30d, tax: totalTax30d, shipping: totalShipping30d, discounts: totalDiscounts30d,
+    });
     const spendAdjusted = computeSpendAdjustedForecast(baseline, scenarioParams.spend_change_pct);
     const efficiencyAdjusted = computeEfficiencyForecast(baseline, scenarioParams);
 
@@ -272,7 +283,7 @@ function aggregateDaily(rows: any[]): DailyData[] {
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number, transactionCount: number, revenueSource: string) {
+function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number, transactionCount: number, revenueSource: string, costBreakdown?: { cogs: number; tax: number; shipping: number; discounts: number }) {
   const last30 = daily.slice(-30);
   const totalSpend = last30.reduce((s, d) => s + d.spend, 0);
   const totalConversions = last30.reduce((s, d) => s + d.conversions, 0);
@@ -329,6 +340,25 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
     });
   }
 
+  // Profit breakdown for Shopify clients
+  let profitBreakdown = undefined;
+  if (revenueSource === "shopify" && costBreakdown) {
+    const scaleFactor = activeDays > 0 ? forecastDays / activeDays : 1;
+    const projCOGS = Math.round(costBreakdown.cogs * scaleFactor);
+    const projTax = Math.round(costBreakdown.tax * scaleFactor);
+    const projShipping = Math.round(costBreakdown.shipping * scaleFactor);
+    const projDiscounts = Math.round(costBreakdown.discounts * scaleFactor);
+    const projProfit = Math.round(projectedRevenue) - Math.round(projectedSpend) - projCOGS - projTax - projShipping - projDiscounts;
+    profitBreakdown = {
+      projected_revenue: Math.round(projectedRevenue),
+      projected_ad_spend: Math.round(projectedSpend),
+      projected_cogs: projCOGS,
+      projected_tax_shipping: projTax + projShipping,
+      projected_discounts: projDiscounts,
+      projected_profit: projProfit,
+    };
+  }
+
   return {
     projected_revenue: Math.round(projectedRevenue),
     projected_spend: Math.round(projectedSpend),
@@ -349,6 +379,7 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
     days_in_month: daysInMonth,
     days_elapsed: daysElapsed,
     days_remaining: daysRemaining,
+    profit_breakdown: profitBreakdown,
   };
 }
 

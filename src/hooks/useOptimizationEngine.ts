@@ -9,6 +9,15 @@ export interface ScenarioParams {
   cvr_improvement_pct?: number;
 }
 
+export interface ProfitBreakdown {
+  projected_revenue: number;
+  projected_ad_spend: number;
+  projected_cogs: number;
+  projected_tax_shipping: number;
+  projected_discounts: number;
+  projected_profit: number;
+}
+
 export interface BaselineForecast {
   projected_revenue: number;
   projected_spend: number;
@@ -29,6 +38,7 @@ export interface BaselineForecast {
   days_in_month: number;
   days_elapsed: number;
   days_remaining: number;
+  profit_breakdown?: ProfitBreakdown;
 }
 
 export interface SpendScenario {
