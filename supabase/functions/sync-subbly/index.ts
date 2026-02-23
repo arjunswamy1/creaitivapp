@@ -128,9 +128,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Sync subscriptions
+    // Sync subscriptions — fetch more pages to cover all recent activity
+    // With 9500+ total subs, 5 pages (500) misses recent ones
     console.log("sync-subbly: fetching subscriptions");
-    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, {}, 5);
+    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, { "order_by": "created_at", "order_dir": "desc" }, 10);
     console.log("sync-subbly: got", subs.length, "subscriptions");
     let subsUpserted = 0;
 
