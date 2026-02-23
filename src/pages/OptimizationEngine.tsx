@@ -9,6 +9,7 @@ import BaselineForecastCard from "@/components/optimization/BaselineForecastCard
 import ScenarioSimulator from "@/components/optimization/ScenarioSimulator";
 import VarianceMonitor from "@/components/optimization/VarianceMonitor";
 import RecommendationFeed from "@/components/optimization/RecommendationFeed";
+import AdsToKillCard from "@/components/optimization/AdsToKillCard";
 import CACTrendCard from "@/components/optimization/CACTrendCard";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -119,6 +120,14 @@ const OptimizationEngine = () => {
             {/* Row 2: CAC Trend */}
             {data.cac_trend && (
               <CACTrendCard cacTrend={data.cac_trend} />
+            )}
+
+            {/* Row 2.5: Ads to Kill (Shopify only) */}
+            {data.ads_to_kill && data.ads_to_kill.length > 0 && (
+              <AdsToKillCard
+                adsToKill={data.ads_to_kill}
+                blendedROAS={data.baseline.projected_mer}
+              />
             )}
 
             {/* Row 3: Variance + Recommendations */}

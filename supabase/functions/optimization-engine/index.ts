@@ -160,6 +160,11 @@ Deno.serve(async (req) => {
     // === MODULE 2.5: CAC Trend Analysis ===
     const cacTrend = computeCACTrend(dailyAgg, campaigns || [], adData || [], baseline, keywordData || []);
 
+    // === MODULE 2.6: Ads to Kill (Shopify ROAS-based) ===
+    const adsToKill = revenueSource === "shopify"
+      ? computeAdsToKill(adData || [], totalRevenue30d, totalSpend30d(dailyAgg), baseline)
+      : [];
+
     // === MODULE 3: Recommendations ===
     const recommendations = generateRecommendations(
       dailyAgg, campaigns || [], adData || [], baseline, variances, riskAssessment
@@ -245,6 +250,7 @@ Deno.serve(async (req) => {
       risk: riskAssessment,
       ai_insight: aiInsight,
       cac_trend: cacTrend,
+      ads_to_kill: adsToKill,
       data_quality: {
         days_with_data: daysWithData,
         total_days_analyzed: dailyAgg.length,
@@ -836,6 +842,69 @@ ${recs.slice(0, 3).map(r => `- ${r.type}: ${r.action}`).join("\n")}
 RISK: ${risk.risk_level} (confidence: ${risk.confidence_score})
 
 Focus on: the single most impactful action, risk-adjusted, with projected outcome.`;
+}
+
+function totalSpend30d(daily: DailyData[]): number {
+  return daily.slice(-30).reduce((s, d) => s + d.spend, 0);
+}
+
+function computeAdsToKill(ads: any[], shopifyRevenue: number, totalAdSpend: number, baseline: any) {
+  // Compute blended Shopify ROAS
+  const blendedROAS = totalAdSpend > 0 ? shopifyRevenue / totalAdSpend : 0;
+
+  // Aggregate ads across dates
+  const adAgg = new Map<string, { spend: number; conversions: number; clicks: number; impressions: number; campaign: string; thumbnail_url: string | null; platform: string; status: string | null; revenue: number }>();
+  for (const ad of ads) {
+    const key = ad.ad_name;
+    const existing = adAgg.get(key) || { spend: 0, conversions: 0, clicks: 0, impressions: 0, campaign: ad.campaign_name || "", thumbnail_url: null, platform: ad.platform || "", status: null, revenue: 0 };
+    existing.spend += Number(ad.spend || 0);
+    existing.conversions += Number(ad.conversions || 0);
+    existing.clicks += Number(ad.clicks || 0);
+    existing.impressions += Number(ad.impressions || 0);
+    existing.revenue += Number(ad.spend || 0) * blendedROAS; // attribute revenue proportionally to spend share
+    if (ad.thumbnail_url && !existing.thumbnail_url) existing.thumbnail_url = ad.thumbnail_url;
+    if (ad.platform) existing.platform = ad.platform;
+    if (ad.status) existing.status = ad.status;
+    adAgg.set(key, existing);
+  }
+
+  // Filter to ads with significant spend but terrible unit economics
+  const results: any[] = [];
+  for (const [name, ad] of adAgg.entries()) {
+    if (ad.spend < baseline.avg_daily_spend * 0.3) continue; // skip low-spend noise
+    
+    const adCPA = ad.conversions > 0 ? ad.spend / ad.conversions : (ad.spend > 0 ? -1 : 0);
+    const spendShare = totalAdSpend > 0 ? (ad.spend / totalAdSpend) * 100 : 0;
+    // Shopify ROAS for this ad = proportional Shopify revenue / ad spend
+    const shopifyROAS = ad.spend > 0 ? (ad.spend / totalAdSpend) * shopifyRevenue / ad.spend : 0;
+    // That simplifies to blendedROAS for all — so instead use conversions as the differentiator
+    // Ads with 0 conversions or very high CPA are dragging ROAS down
+    const isLoser = adCPA === -1 || (adCPA > 0 && adCPA > baseline.projected_cpa * 1.5);
+    
+    if (!isLoser) continue;
+
+    // Calculate wasted spend (spend that generated no/insufficient return)
+    const efficientSpend = ad.conversions > 0 ? ad.conversions * baseline.projected_cpa : 0;
+    const wastedSpend = Math.max(0, Math.round(ad.spend - efficientSpend));
+
+    results.push({
+      name,
+      platform: ad.platform,
+      campaign: ad.campaign,
+      thumbnail_url: ad.thumbnail_url,
+      status: ad.status,
+      spend: Math.round(ad.spend),
+      conversions: ad.conversions,
+      cpa: adCPA === -1 ? -1 : Math.round(adCPA),
+      shopify_roas: Math.round(blendedROAS * 100) / 100,
+      spend_share_pct: Math.round(spendShare * 10) / 10,
+      wasted_spend: wastedSpend,
+      recommendation: adCPA === -1 ? "Kill — spending with zero conversions" : `Kill — CPA $${Math.round(adCPA)} is ${Math.round(((adCPA / baseline.projected_cpa) - 1) * 100)}% above target`,
+    });
+  }
+
+  results.sort((a, b) => b.wasted_spend - a.wasted_spend);
+  return results.slice(0, 10);
 }
 
 function jsonRes(body: any, status = 200) {
