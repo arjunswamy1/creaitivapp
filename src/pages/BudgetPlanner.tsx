@@ -17,26 +17,42 @@ import { DateRangeProvider } from "@/contexts/DateRangeContext";
 function BudgetPlannerContent() {
   const { activeClient, dashboardConfig } = useClient();
   const revenueSource = dashboardConfig?.revenue_source || "subbly";
-  const ordersLabel = revenueSource === "shopify" ? "Customer" : "Subscriber";
-  const ordersLabelPlural = revenueSource === "shopify" ? "Customers" : "Subscribers";
+  const isShopify = revenueSource === "shopify";
+  const ordersLabel = isShopify ? "Customer" : "Subscriber";
+  const ordersLabelPlural = isShopify ? "Customers" : "Subscribers";
   const [goalInput, setGoalInput] = useState("");
   const [submittedGoal, setSubmittedGoal] = useState<number | null>(null);
+  const [submittedProfitTarget, setSubmittedProfitTarget] = useState<number | null>(null);
   const [editedBudgets, setEditedBudgets] = useState<Record<string, number>>({});
 
   const { data: baseline, isLoading: baselineLoading } = useBudgetBaseline(activeClient?.id, revenueSource);
-  const { data: plan, isLoading, error } = useBudgetPlanner(submittedGoal, activeClient?.id, revenueSource);
+  const { data: plan, isLoading, error } = useBudgetPlanner(
+    isShopify ? null : submittedGoal,
+    activeClient?.id,
+    revenueSource,
+    isShopify ? submittedProfitTarget : null,
+  );
 
   useEffect(() => {
-    if (baseline?.last_year_baseline?.suggested_goal && !goalInput && !submittedGoal) {
+    if (!isShopify && baseline?.last_year_baseline?.suggested_goal && !goalInput && !submittedGoal) {
       setGoalInput(baseline.last_year_baseline.suggested_goal.toString());
     }
-  }, [baseline]);
+    if (isShopify && !goalInput) {
+      setGoalInput("2000"); // Default profit target
+    }
+  }, [baseline, isShopify]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseInt(goalInput);
     if (val > 0) {
-      setSubmittedGoal(val);
+      if (isShopify) {
+        setSubmittedProfitTarget(val);
+        setSubmittedGoal(null);
+      } else {
+        setSubmittedGoal(val);
+        setSubmittedProfitTarget(null);
+      }
       setEditedBudgets({});
     }
   };
@@ -89,13 +105,13 @@ function BudgetPlannerContent() {
               Budget Planner
             </h2>
             <p className="text-sm text-muted-foreground">
-              Plan {baseline?.target_month || "next month"} budgets based on your {revenueSource === "shopify" ? "customer acquisition" : "subscriber growth"} goals
+              Plan {baseline?.target_month || "next month"} budgets based on your {isShopify ? "profit target" : "subscriber growth goals"}
             </p>
           </div>
         </div>
 
-        {/* Last year baseline card */}
-        {(bl || baselineLoading) && (
+        {/* Last year baseline card - only for non-Shopify */}
+        {!isShopify && (bl || baselineLoading) && (
           <div className="glass-card p-5 mb-6">
             {baselineLoading && !bl ? (
               <Skeleton className="h-16 rounded-lg" />
@@ -124,16 +140,19 @@ function BudgetPlannerContent() {
           <form onSubmit={handleSubmit} className="flex items-end gap-4">
             <div className="flex-1 max-w-xs">
               <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                New {ordersLabel} Goal for {baseline?.target_month || "next month"}
+                {isShopify ? `Profit Target for ${baseline?.target_month || "next month"}` : `New ${ordersLabel} Goal for ${baseline?.target_month || "next month"}`}
               </label>
-              <Input
-                type="number"
-                min={1}
-                placeholder={bl ? `e.g. ${bl.suggested_goal}` : "e.g. 200"}
-                value={goalInput}
-                onChange={(e) => setGoalInput(e.target.value)}
-                className="font-mono text-lg"
-              />
+              <div className="relative">
+                {isShopify && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-mono">$</span>}
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder={isShopify ? "e.g. 2000" : (bl ? `e.g. ${bl.suggested_goal}` : "e.g. 200")}
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  className={`font-mono text-lg ${isShopify ? "pl-7" : ""}`}
+                />
+              </div>
             </div>
             <Button type="submit" disabled={!goalInput || parseInt(goalInput) <= 0}>
               <Target className="w-4 h-4 mr-2" />
@@ -161,32 +180,96 @@ function BudgetPlannerContent() {
           <div className="space-y-6">
             {/* Overview cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard
-                icon={<Users className="w-4 h-4" />}
-                label={`${ordersLabel} Goal`}
-                value={plan.target_subs.toLocaleString()}
-                sublabel={plan.target_month}
-              />
-              <StatCard
-                icon={<DollarSign className="w-4 h-4" />}
-                label="Recommended Budget"
-                value={`$${editedTotalBudget.toLocaleString()}`}
-                sublabel={`$${Math.round(editedTotalBudget / plan.days_in_month)}/day`}
-                highlight
-              />
-              <StatCard
-                icon={<TrendingUp className="w-4 h-4" />}
-                label="Weighted CAC"
-                value={`$${plan.projection_cac}`}
-                sublabel="50/30/20 weighted avg"
-              />
-              <StatCard
-                icon={<Settings className="w-4 h-4" />}
-                label="Active Campaigns"
-                value={plan.lookback_stats.active_campaigns.toString()}
-                sublabel={`${plan.days_in_month} days in month`}
-              />
+              {isShopify && plan.profit_economics ? (
+                <>
+                  <StatCard
+                    icon={<DollarSign className="w-4 h-4" />}
+                    label="Profit Target"
+                    value={`$${plan.profit_economics.target_profit.toLocaleString()}`}
+                    sublabel={plan.target_month}
+                    highlight
+                  />
+                  <StatCard
+                    icon={<Users className="w-4 h-4" />}
+                    label="Customers Needed"
+                    value={plan.target_subs.toLocaleString()}
+                    sublabel={`$${plan.profit_economics.profit_per_customer}/profit each`}
+                  />
+                  <StatCard
+                    icon={<DollarSign className="w-4 h-4" />}
+                    label="Recommended Budget"
+                    value={`$${editedTotalBudget.toLocaleString()}`}
+                    sublabel={`$${Math.round(editedTotalBudget / plan.days_in_month)}/day`}
+                  />
+                  <StatCard
+                    icon={<TrendingUp className="w-4 h-4" />}
+                    label="Weighted CAC"
+                    value={`$${plan.projection_cac}`}
+                    sublabel="50/30/20 weighted avg"
+                  />
+                </>
+              ) : (
+                <>
+                  <StatCard
+                    icon={<Users className="w-4 h-4" />}
+                    label={`${ordersLabel} Goal`}
+                    value={plan.target_subs.toLocaleString()}
+                    sublabel={plan.target_month}
+                  />
+                  <StatCard
+                    icon={<DollarSign className="w-4 h-4" />}
+                    label="Recommended Budget"
+                    value={`$${editedTotalBudget.toLocaleString()}`}
+                    sublabel={`$${Math.round(editedTotalBudget / plan.days_in_month)}/day`}
+                    highlight
+                  />
+                  <StatCard
+                    icon={<TrendingUp className="w-4 h-4" />}
+                    label="Weighted CAC"
+                    value={`$${plan.projection_cac}`}
+                    sublabel="50/30/20 weighted avg"
+                  />
+                  <StatCard
+                    icon={<Settings className="w-4 h-4" />}
+                    label="Active Campaigns"
+                    value={plan.lookback_stats.active_campaigns.toString()}
+                    sublabel={`${plan.days_in_month} days in month`}
+                  />
+                </>
+              )}
             </div>
+
+            {/* Profit economics breakdown for Shopify */}
+            {isShopify && plan.profit_economics && (
+              <div className="glass-card p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                  Profit Per Customer Breakdown
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {[
+                    { label: "Avg Revenue", value: plan.profit_economics.avg_order_revenue, positive: true },
+                    { label: "CAC (Ad Spend)", value: plan.profit_economics.cac, positive: false },
+                    { label: "Avg COGS", value: plan.profit_economics.avg_order_cogs, positive: false },
+                    { label: "Avg Tax + Ship", value: plan.profit_economics.avg_order_tax_shipping, positive: false },
+                    { label: "Avg Discounts", value: plan.profit_economics.avg_order_discounts, positive: false },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-secondary/40 rounded-lg p-4">
+                      <span className="text-xs text-muted-foreground">{item.label}</span>
+                      <p className={`text-lg font-bold font-mono mt-1 ${item.positive ? "text-emerald-400" : ""}`}>
+                        {item.positive ? "" : "−"}${Math.abs(item.value).toFixed(2)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 bg-primary/10 border border-primary/20 rounded-lg p-4 flex items-center justify-between">
+                  <span className="text-sm font-medium">Net Profit Per Customer</span>
+                  <span className={`text-2xl font-bold font-mono ${plan.profit_economics.profit_per_customer > 0 ? "text-emerald-400" : "text-destructive"}`}>
+                    ${plan.profit_economics.profit_per_customer.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Multi-period CAC breakdown */}
             <div className="glass-card p-6">
