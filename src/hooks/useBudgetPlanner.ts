@@ -23,6 +23,16 @@ export interface CampaignBudget {
   total_90d_conversions: number;
 }
 
+export interface ProfitEconomics {
+  avg_order_revenue: number;
+  avg_order_cogs: number;
+  avg_order_tax_shipping: number;
+  avg_order_discounts: number;
+  cac: number;
+  profit_per_customer: number;
+  target_profit: number;
+}
+
 export interface BudgetPlan {
   target_month: string;
   days_in_month: number;
@@ -50,6 +60,7 @@ export interface BudgetPlan {
     active_campaigns: number;
   };
   ai_insight: string;
+  profit_economics: ProfitEconomics | null;
 }
 
 // Fetch baseline (no target_subs needed)
@@ -69,14 +80,23 @@ export function useBudgetBaseline(clientId: string | undefined, revenueSource?: 
   });
 }
 
-export function useBudgetPlanner(targetSubs: number | null, clientId: string | undefined, revenueSource?: string) {
+export function useBudgetPlanner(
+  targetSubs: number | null,
+  clientId: string | undefined,
+  revenueSource?: string,
+  targetProfit?: number | null,
+) {
   return useQuery<BudgetPlan>({
-    queryKey: ["budget-planner", targetSubs, clientId, revenueSource],
-    enabled: !!targetSubs && targetSubs > 0 && !!clientId,
+    queryKey: ["budget-planner", targetSubs, clientId, revenueSource, targetProfit],
+    enabled: (!!targetSubs && targetSubs > 0 && !!clientId) || (!!targetProfit && targetProfit > 0 && !!clientId),
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("budget-planner", {
-        body: { target_subs: targetSubs, client_id: clientId, revenue_source: revenueSource || "subbly" },
-      });
+      const body: Record<string, unknown> = { client_id: clientId, revenue_source: revenueSource || "subbly" };
+      if (targetProfit && targetProfit > 0) {
+        body.target_profit = targetProfit;
+      } else if (targetSubs && targetSubs > 0) {
+        body.target_subs = targetSubs;
+      }
+      const { data, error } = await supabase.functions.invoke("budget-planner", { body });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

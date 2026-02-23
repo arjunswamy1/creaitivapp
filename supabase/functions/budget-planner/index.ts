@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  let body: { target_subs?: number; client_id: string; revenue_source?: string };
+  let body: { target_subs?: number; target_profit?: number; client_id: string; revenue_source?: string };
   try {
     body = await req.json();
   } catch {
@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
 
   const { client_id } = body;
   let { target_subs } = body;
+  const targetProfit = body.target_profit || 0;
   const revenueSource = body.revenue_source || "subbly";
   if (!client_id) {
     return errResponse("client_id is required", 400);
@@ -81,6 +82,43 @@ Deno.serve(async (req) => {
 
   const lastYearSubCount = lastYearCount;
   const suggestedGoal = Math.ceil(lastYearSubCount * 1.25);
+
+  // For Shopify profit-target mode: compute avg order economics then derive target_subs
+  let profitPerCustomer = 0;
+  let avgOrderRevenue = 0;
+  let avgOrderCOGS = 0;
+  let avgOrderTaxShipping = 0;
+  let avgOrderDiscounts = 0;
+
+  if (revenueSource === "shopify" && targetProfit > 0) {
+    // Fetch recent 90-day order economics
+    const orderEconStart = lookbackStart || formatDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90));
+    const { data: recentOrders, error: econErr } = await supabase
+      .from("shopify_orders")
+      .select("total_price, total_cost, total_tax, total_shipping, total_discounts")
+      .eq("client_id", client_id)
+      .in("financial_status", ["paid", "partially_refunded"])
+      .gte("order_date", orderEconStart + "T00:00:00.000Z")
+      .limit(2000);
+
+    if (econErr) return errResponse(econErr.message);
+
+    const orders = recentOrders || [];
+    if (orders.length > 0) {
+      const totals = orders.reduce((acc, o) => ({
+        revenue: acc.revenue + Number(o.total_price || 0),
+        cogs: acc.cogs + Number(o.total_cost || 0),
+        tax: acc.tax + Number(o.total_tax || 0),
+        shipping: acc.shipping + Number(o.total_shipping || 0),
+        discounts: acc.discounts + Number(o.total_discounts || 0),
+      }), { revenue: 0, cogs: 0, tax: 0, shipping: 0, discounts: 0 });
+
+      avgOrderRevenue = totals.revenue / orders.length;
+      avgOrderCOGS = totals.cogs / orders.length;
+      avgOrderTaxShipping = (totals.tax + totals.shipping) / orders.length;
+      avgOrderDiscounts = totals.discounts / orders.length;
+    }
+  }
 
   // If no target_subs provided, use the suggested goal
   if (!target_subs || target_subs <= 0) {
@@ -203,6 +241,15 @@ Deno.serve(async (req) => {
   if (cac60 > 0) { weightedCAC += cac60 * 0.30; totalWeight += 0.30; }
   if (cac90 > 0) { weightedCAC += cac90 * 0.20; totalWeight += 0.20; }
   const projectionCAC = totalWeight > 0 ? weightedCAC / totalWeight : 0;
+
+  // If profit-target mode (Shopify), derive target_subs from profit target
+  if (revenueSource === "shopify" && targetProfit > 0 && projectionCAC > 0) {
+    // Profit per customer = avgRevenue - CAC - avgCOGS - avgTaxShipping - avgDiscounts
+    profitPerCustomer = avgOrderRevenue - projectionCAC - avgOrderCOGS - avgOrderTaxShipping - avgOrderDiscounts;
+    if (profitPerCustomer > 0) {
+      target_subs = Math.ceil(targetProfit / profitPerCustomer);
+    }
+  }
 
   const totalBudgetNeeded = Math.round(target_subs * projectionCAC);
 
@@ -401,6 +448,15 @@ Focus on: whether the budget is achievable given the multi-period CAC trend, ris
       active_campaigns: activeCampaigns.length,
     },
     ai_insight: aiInsight,
+    profit_economics: revenueSource === "shopify" ? {
+      avg_order_revenue: r2(avgOrderRevenue),
+      avg_order_cogs: r2(avgOrderCOGS),
+      avg_order_tax_shipping: r2(avgOrderTaxShipping),
+      avg_order_discounts: r2(avgOrderDiscounts),
+      cac: r2(projectionCAC),
+      profit_per_customer: r2(profitPerCustomer),
+      target_profit: targetProfit,
+    } : null,
   };
 
   return new Response(JSON.stringify(result), {
