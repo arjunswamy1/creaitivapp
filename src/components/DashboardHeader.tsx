@@ -37,14 +37,37 @@ const DashboardHeader = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("sync-meta-ads", {
-        body: { client_id: activeClient?.id || null },
-      });
-      if (error) throw error;
+      const clientId = activeClient?.id || null;
+
+      // Run Meta and Subbly syncs in parallel
+      const [metaResult, subblyResult] = await Promise.allSettled([
+        supabase.functions.invoke("sync-meta-ads", { body: { client_id: clientId } }),
+        supabase.functions.invoke("sync-subbly", { body: { client_id: clientId } }),
+      ]);
+
+      const errors: string[] = [];
+      let totalSynced = 0;
+
+      if (metaResult.status === "fulfilled" && !metaResult.value.error) {
+        totalSynced += metaResult.value.data?.results?.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0) || 0;
+      } else {
+        errors.push("Meta");
+      }
+
+      if (subblyResult.status === "fulfilled" && !subblyResult.value.error) {
+        totalSynced += (subblyResult.value.data?.subscriptions_synced || 0) + (subblyResult.value.data?.invoices_synced || 0);
+      } else {
+        errors.push("Subbly");
+      }
+
       setLastSynced(new Date().toISOString());
       queryClient.invalidateQueries();
-      const totalSynced = data?.results?.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0) || 0;
-      toast.success(`Synced ${totalSynced} records`);
+
+      if (errors.length > 0) {
+        toast.warning(`Synced ${totalSynced} records (${errors.join(", ")} failed)`);
+      } else {
+        toast.success(`Synced ${totalSynced} records`);
+      }
     } catch (err: any) {
       toast.error("Sync failed: " + (err.message || "Unknown error"));
     } finally {
