@@ -39,11 +39,12 @@ const DashboardHeader = () => {
     try {
       const clientId = activeClient?.id || null;
 
-      // Run Meta, Google, and Subbly syncs in parallel
-      const [metaResult, googleResult, subblyResult] = await Promise.allSettled([
+      // Run Meta, Google, Subbly, and Shopify syncs in parallel
+      const [metaResult, googleResult, subblyResult, shopifyResult] = await Promise.allSettled([
         supabase.functions.invoke("sync-meta-ads", { body: { client_id: clientId } }),
         supabase.functions.invoke("sync-google-ads", { body: { client_id: clientId } }),
         supabase.functions.invoke("sync-subbly", { body: { client_id: clientId } }),
+        supabase.functions.invoke("sync-shopify-orders", { body: { client_id: clientId } }),
       ]);
 
       const errors: string[] = [];
@@ -65,6 +66,12 @@ const DashboardHeader = () => {
         totalSynced += (subblyResult.value.data?.subscriptions_synced || 0) + (subblyResult.value.data?.invoices_synced || 0);
       } else {
         errors.push("Subbly");
+      }
+
+      if (shopifyResult.status === "fulfilled" && !shopifyResult.value.error) {
+        totalSynced += shopifyResult.value.data?.records_synced || 0;
+      } else {
+        errors.push("Shopify");
       }
 
       setLastSynced(new Date().toISOString());
