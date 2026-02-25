@@ -208,7 +208,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   roas: spend > 0 ? revenue / spend : null,
                 };
               });
-              await supabase.from("ad_daily_metrics").upsert(batch, { onConflict: "user_id,platform,date" });
+              await supabase.from("ad_daily_metrics").upsert(batch, { onConflict: "user_id,platform,date,client_id" });
               totalRecords += batch.length;
             }
           } catch (err) {
