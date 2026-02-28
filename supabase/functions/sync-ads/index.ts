@@ -27,12 +27,22 @@ Deno.serve(async (req) => {
     headers["Authorization"] = `Bearer ${serviceRoleKey}`;
   }
 
+  // Parse client_id from request body and forward to sub-functions
+  let bodyClientId: string | null = null;
+  try {
+    const body = await req.json();
+    bodyClientId = body?.client_id || body?.clientId || null;
+  } catch { /* no body */ }
+
+  const bodyPayload = bodyClientId ? JSON.stringify({ client_id: bodyClientId }) : "{}";
+
   const results: Record<string, any> = {};
 
   try {
     const metaRes = await fetch(`${supabaseUrl}/functions/v1/sync-meta-ads`, {
       method: "POST",
       headers,
+      body: bodyPayload,
     });
     results.meta = await metaRes.json();
   } catch (err) {
@@ -43,6 +53,7 @@ Deno.serve(async (req) => {
     const googleRes = await fetch(`${supabaseUrl}/functions/v1/sync-google-ads`, {
       method: "POST",
       headers,
+      body: bodyPayload,
     });
     results.google = await googleRes.json();
   } catch (err) {
