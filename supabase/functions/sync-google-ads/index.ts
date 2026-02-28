@@ -50,8 +50,7 @@ Deno.serve(async (req) => {
     }
     const { data: conns } = await query;
     if (!conns || conns.length === 0) {
-      return new Response(JSON.stringify({ error: "No Google connection found" }), {
-        status: 404,
+      return new Response(JSON.stringify({ success: true, records_synced: 0, message: "No Google connection found for this client" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
