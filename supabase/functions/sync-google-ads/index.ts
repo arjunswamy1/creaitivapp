@@ -32,20 +32,30 @@ Deno.serve(async (req) => {
 
   let targetConnections: any[] = [];
 
+  // Parse optional client_id from request body
+  let bodyClientId: string | null = null;
+  try {
+    const body = await req.json();
+    bodyClientId = body?.client_id || body?.clientId || null;
+  } catch { /* no body */ }
+
   if (userId) {
-    const { data: conn } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("platform_connections")
       .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id")
       .eq("user_id", userId)
-      .eq("platform", "google")
-      .maybeSingle();
-    if (!conn) {
+      .eq("platform", "google");
+    if (bodyClientId) {
+      query = query.eq("client_id", bodyClientId);
+    }
+    const { data: conns } = await query;
+    if (!conns || conns.length === 0) {
       return new Response(JSON.stringify({ error: "No Google connection found" }), {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    targetConnections = [conn];
+    targetConnections = conns;
   } else {
     // Cron mode
     const { data: connections } = await supabaseAdmin
@@ -65,7 +75,7 @@ Deno.serve(async (req) => {
     // Refresh token if expired
     let accessToken = conn.access_token;
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
-      accessToken = await refreshGoogleToken(supabaseAdmin, conn.user_id, conn.refresh_token);
+      accessToken = await refreshGoogleToken(supabaseAdmin, conn.user_id, conn.refresh_token, conn.client_id);
       if (!accessToken) {
         results.push({ user_id: conn.user_id, error: "Token refresh failed" });
         continue;
@@ -76,12 +86,18 @@ Deno.serve(async (req) => {
     results.push(result);
   }
 
-  return new Response(JSON.stringify(userId ? results[0] : { results }), {
+  // Return consistent format: aggregate records_synced across all connections
+  const totalSynced = results.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0);
+  const errors = results.filter((r: any) => r.error);
+  const responseBody = errors.length === results.length
+    ? { error: errors[0]?.error || "All connections failed" }
+    : { success: true, records_synced: totalSynced, connections: results.length, results };
+  return new Response(JSON.stringify(responseBody), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
 
-async function refreshGoogleToken(supabase: any, userId: string, refreshToken: string): Promise<string | null> {
+async function refreshGoogleToken(supabase: any, userId: string, refreshToken: string, clientId: string | null = null): Promise<string | null> {
   if (!refreshToken) return null;
   try {
     const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -99,11 +115,16 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
       const tokenExpiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : null;
-      await supabase
+      // Update token scoped to the specific connection (user + platform + client)
+      let updateQuery = supabase
         .from("platform_connections")
         .update({ access_token: data.access_token, token_expires_at: tokenExpiresAt })
         .eq("user_id", userId)
         .eq("platform", "google");
+      if (clientId) {
+        updateQuery = updateQuery.eq("client_id", clientId);
+      }
+      await updateQuery;
       return data.access_token;
     }
     console.error("Token refresh failed:", data);
