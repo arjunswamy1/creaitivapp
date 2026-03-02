@@ -22,6 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 import ClientInviteManager from "@/components/ClientInviteManager";
+import AccountSelector from "@/components/AccountSelector";
 import {
   Select,
   SelectContent,
@@ -399,6 +400,11 @@ const Settings = () => {
           ) : (
             <div className="space-y-3">
               <PlatformCard name="Meta Ads" platformKey="meta" description="Connect your Facebook & Instagram ad accounts" connection={getConnection("meta")} gradientClass="platform-meta" glowClass="glow-meta" onConnect={handleConnectMeta} onDisconnect={() => handleDisconnect("meta")} connecting={connecting === "meta"} disconnecting={disconnecting === "meta"} />
+              {getConnection("meta") && (
+                <div className="ml-14 -mt-1">
+                  <AccountSelector />
+                </div>
+              )}
               {dashboardConfig?.enabled_platforms?.includes("google") && (
                 <PlatformCard name="Google Ads" platformKey="google" description="Connect your Google Ads manager account" connection={getConnection("google")} gradientClass="platform-google" glowClass="glow-google" onConnect={handleConnectGoogle} onDisconnect={() => handleDisconnect("google")} connecting={connecting === "google"} disconnecting={disconnecting === "google"} />
               )}
