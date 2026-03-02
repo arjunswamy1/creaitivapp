@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2 } from "lucide-react";
+import { useClient } from "@/contexts/ClientContext";
 
 interface AdAccount {
   id: string;
@@ -18,14 +19,25 @@ const AccountSelector = () => {
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   useEffect(() => {
     const fetchAccounts = async () => {
-      const { data } = await supabase
+      setLoading(true);
+      setAccounts([]);
+      setSelected(null);
+
+      let query = supabase
         .from("platform_connections")
-        .select("metadata, selected_ad_account")
-        .eq("platform", "meta")
-        .single();
+        .select("metadata, selected_ad_account, id")
+        .eq("platform", "meta");
+
+      if (clientId) {
+        query = query.eq("client_id", clientId);
+      }
+
+      const { data } = await query.maybeSingle();
 
       if (data) {
         const adAccounts: AdAccount[] = (data.metadata as any)?.ad_accounts || [];
@@ -33,23 +45,24 @@ const AccountSelector = () => {
         const sel = data.selected_ad_account as unknown as SelectedAccount | null;
         if (sel?.id) {
           setSelected(sel.id);
-        } else if (adAccounts.length > 0) {
-          // Auto-select first account
-          const first = adAccounts[0];
-          setSelected(first.id);
-          await saveSelection(first);
         }
       }
       setLoading(false);
     };
     fetchAccounts();
-  }, []);
+  }, [clientId]);
 
   const saveSelection = async (account: AdAccount) => {
-    await supabase
+    let query = supabase
       .from("platform_connections")
       .update({ selected_ad_account: { id: account.id, name: account.name } })
       .eq("platform", "meta");
+
+    if (clientId) {
+      query = query.eq("client_id", clientId);
+    }
+
+    await query;
   };
 
   const handleChange = async (accountId: string) => {
@@ -66,7 +79,7 @@ const AccountSelector = () => {
     <Select value={selected || undefined} onValueChange={handleChange}>
       <SelectTrigger className="w-[220px] h-8 text-xs bg-card border-border">
         <Building2 className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-        <SelectValue placeholder="Select account" />
+        <SelectValue placeholder="Select ad account" />
       </SelectTrigger>
       <SelectContent className="bg-popover border-border z-50">
         {accounts.map((a) => (
