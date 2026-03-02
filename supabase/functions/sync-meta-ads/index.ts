@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
     }
     const { data: conns } = await query;
     if (!conns || conns.length === 0) {
-      return new Response(JSON.stringify({ error: "No Meta connection found" }), {
-        status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ success: true, records_synced: 0, message: "No Meta connection found for this client" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     targetConnections = conns;
@@ -60,15 +60,36 @@ Deno.serve(async (req) => {
       .select("user_id, access_token, metadata, selected_ad_account, client_id")
       .eq("platform", "meta");
     if (!connections || connections.length === 0) {
-      return new Response(JSON.stringify({ message: "No meta connections found" }), {
+      return new Response(JSON.stringify({ success: true, records_synced: 0, message: "No meta connections found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
     targetConnections = connections;
   }
 
+  // Filter out connections that don't have a selected_ad_account — syncing
+  // without one pulls data from ALL ad accounts and produces wildly wrong totals.
+  const validConnections = targetConnections.filter(conn => {
+    const sel = conn.selected_ad_account as any;
+    if (!sel?.id) {
+      console.warn(`Skipping Meta sync for client ${conn.client_id}: no ad account selected`);
+      return false;
+    }
+    return true;
+  });
+
+  if (validConnections.length === 0) {
+    return new Response(JSON.stringify({ 
+      success: false, 
+      records_synced: 0, 
+      message: "No Meta connections have a selected ad account. Please select an ad account in Settings before syncing." 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const results = [];
-  for (const conn of targetConnections) {
+  for (const conn of validConnections) {
     const selectedAccount = conn.selected_ad_account as any;
     const metadata = selectedAccount?.id
       ? { ...conn.metadata, ad_accounts: [selectedAccount] }
