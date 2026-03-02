@@ -114,6 +114,7 @@ const DashboardHeader = () => {
       </div>
       <div className="flex items-center gap-3">
         {isAgencyAdmin && <ClientSwitcher />}
+        <AccountSelector />
         {isAgencyAdmin && (
           <TooltipProvider>
             <Tooltip>
