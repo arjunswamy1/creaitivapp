@@ -33,11 +33,13 @@ const MetaDashboard = () => {
       </div>
 
       {/* Secondary KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
+            <KPICard title="Add to Cart" value={(kpis?.addToCart ?? 0).toLocaleString()} change={kpis?.changes.addToCart} />
+            <KPICard title="ATC Rate" value={`${kpis?.atcRate ?? 0}%`} change={kpis?.changes.atcRate} subtitle="Clicks → ATC" />
             <KPICard title="Purchases" value={(kpis?.totalConversions ?? 0).toLocaleString()} change={kpis?.changes.conversions} />
             <KPICard title="CPC" value={`$${kpis?.cpc ?? 0}`} change={kpis?.changes.cpc} invertColor />
             <KPICard title="CTR" value={`${kpis?.ctr ?? 0}%`} change={kpis?.changes.ctr} />

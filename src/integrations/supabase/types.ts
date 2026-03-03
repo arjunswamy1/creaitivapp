@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ad_campaigns: {
         Row: {
+          add_to_cart: number
           campaign_name: string
           clicks: number
           client_id: string | null
@@ -37,6 +38,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          add_to_cart?: number
           campaign_name: string
           clicks?: number
           client_id?: string | null
@@ -58,6 +60,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          add_to_cart?: number
           campaign_name?: string
           clicks?: number
           client_id?: string | null
@@ -90,6 +93,7 @@ export type Database = {
       }
       ad_daily_metrics: {
         Row: {
+          add_to_cart: number
           clicks: number
           client_id: string | null
           conversions: number
@@ -108,6 +112,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          add_to_cart?: number
           clicks?: number
           client_id?: string | null
           conversions?: number
@@ -126,6 +131,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          add_to_cart?: number
           clicks?: number
           client_id?: string | null
           conversions?: number
@@ -155,6 +161,7 @@ export type Database = {
       }
       ad_sets: {
         Row: {
+          add_to_cart: number
           adset_name: string
           campaign_name: string | null
           clicks: number
@@ -175,6 +182,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          add_to_cart?: number
           adset_name: string
           campaign_name?: string | null
           clicks?: number
@@ -195,6 +203,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          add_to_cart?: number
           adset_name?: string
           campaign_name?: string | null
           clicks?: number
@@ -260,6 +269,7 @@ export type Database = {
       ads: {
         Row: {
           ad_name: string
+          add_to_cart: number
           adset_name: string | null
           campaign_name: string | null
           clicks: number
@@ -290,6 +300,7 @@ export type Database = {
         }
         Insert: {
           ad_name: string
+          add_to_cart?: number
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
@@ -320,6 +331,7 @@ export type Database = {
         }
         Update: {
           ad_name?: string
+          add_to_cart?: number
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number

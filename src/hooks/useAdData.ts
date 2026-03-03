@@ -14,6 +14,8 @@ export interface KPIData {
   ctr: number;
   cpm: number;
   impressions: number;
+  addToCart: number;
+  atcRate: number;
 }
 
 export interface KPIWithChange extends KPIData {
@@ -26,6 +28,8 @@ export interface KPIWithChange extends KPIData {
     ctr: number | null;
     cpm: number | null;
     impressions: number | null;
+    addToCart: number | null;
+    atcRate: number | null;
   };
 }
 
@@ -62,13 +66,14 @@ export interface CampaignRow {
 
 function calcKPIs(data: any[]): KPIData {
   if (!data || data.length === 0) {
-    return { totalSpend: 0, totalRevenue: 0, blendedROAS: 0, totalConversions: 0, cpc: 0, ctr: 0, cpm: 0, impressions: 0 };
+    return { totalSpend: 0, totalRevenue: 0, blendedROAS: 0, totalConversions: 0, cpc: 0, ctr: 0, cpm: 0, impressions: 0, addToCart: 0, atcRate: 0 };
   }
   const totalSpend = data.reduce((s, r) => s + Number(r.spend), 0);
   const totalRevenue = data.reduce((s, r) => s + Number(r.revenue), 0);
   const totalClicks = data.reduce((s, r) => s + Number(r.clicks), 0);
   const totalImpressions = data.reduce((s, r) => s + Number(r.impressions), 0);
   const totalConversions = data.reduce((s, r) => s + Number(r.conversions), 0);
+  const addToCart = data.reduce((s, r) => s + Number(r.add_to_cart || 0), 0);
 
   return {
     totalSpend: Math.round(totalSpend),
@@ -79,6 +84,8 @@ function calcKPIs(data: any[]): KPIData {
     ctr: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0,
     cpm: totalImpressions > 0 ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0,
     impressions: totalImpressions,
+    addToCart,
+    atcRate: totalClicks > 0 ? Math.round((addToCart / totalClicks) * 10000) / 100 : 0,
   };
 }
 
@@ -106,10 +113,10 @@ export function useKPIs(platform?: string) {
     queryKey: ["kpis", fromStr, toStr, clientId, platform],
     queryFn: async (): Promise<KPIWithChange> => {
       let currentQuery = supabase.from("ad_daily_metrics")
-        .select("spend, revenue, impressions, clicks, conversions")
+        .select("spend, revenue, impressions, clicks, conversions, add_to_cart")
         .gte("date", fromStr).lte("date", toStr);
       let previousQuery = supabase.from("ad_daily_metrics")
-        .select("spend, revenue, impressions, clicks, conversions")
+        .select("spend, revenue, impressions, clicks, conversions, add_to_cart")
         .gte("date", prevFrom).lte("date", prevTo);
 
       if (clientId) {
@@ -141,6 +148,8 @@ export function useKPIs(platform?: string) {
           ctr: pctChange(cur.ctr, prev.ctr),
           cpm: pctChange(cur.cpm, prev.cpm),
           impressions: pctChange(cur.impressions, prev.impressions),
+          addToCart: pctChange(cur.addToCart, prev.addToCart),
+          atcRate: pctChange(cur.atcRate, prev.atcRate),
         },
       };
     },
@@ -454,11 +463,11 @@ export function useGoogleKPIsWithSubblyRevenue() {
     queryFn: async (): Promise<KPIWithChange> => {
       // Fetch Google ad metrics
       let currentAdQuery = supabase.from("ad_daily_metrics")
-        .select("spend, impressions, clicks, conversions")
+        .select("spend, impressions, clicks, conversions, add_to_cart")
         .eq("platform", "google")
         .gte("date", fromStr).lte("date", toStr);
       let previousAdQuery = supabase.from("ad_daily_metrics")
-        .select("spend, impressions, clicks, conversions")
+        .select("spend, impressions, clicks, conversions, add_to_cart")
         .eq("platform", "google")
         .gte("date", prevFrom).lte("date", prevTo);
 
@@ -488,11 +497,13 @@ export function useGoogleKPIsWithSubblyRevenue() {
       const curClicks = sumField(currentAd, "clicks");
       const curImpressions = sumField(currentAd, "impressions");
       const curConversions = sumField(currentAd, "conversions");
+      const curATC = sumField(currentAd, "add_to_cart");
 
       const prevSpend = sumField(previousAd, "spend");
       const prevClicks = sumField(previousAd, "clicks");
       const prevImpressions = sumField(previousAd, "impressions");
       const prevConversions = sumField(previousAd, "conversions");
+      const prevATC = sumField(previousAd, "add_to_cart");
 
       const cur = {
         totalSpend: Math.round(curSpend),
@@ -503,6 +514,8 @@ export function useGoogleKPIsWithSubblyRevenue() {
         ctr: curImpressions > 0 ? Math.round((curClicks / curImpressions) * 10000) / 100 : 0,
         cpm: curImpressions > 0 ? Math.round((curSpend / curImpressions) * 1000 * 100) / 100 : 0,
         impressions: curImpressions,
+        addToCart: curATC,
+        atcRate: curClicks > 0 ? Math.round((curATC / curClicks) * 10000) / 100 : 0,
       };
 
       const prev = {
@@ -514,6 +527,8 @@ export function useGoogleKPIsWithSubblyRevenue() {
         ctr: prevImpressions > 0 ? Math.round((prevClicks / prevImpressions) * 10000) / 100 : 0,
         cpm: prevImpressions > 0 ? Math.round((prevSpend / prevImpressions) * 1000 * 100) / 100 : 0,
         impressions: prevImpressions,
+        addToCart: prevATC,
+        atcRate: prevClicks > 0 ? Math.round((prevATC / prevClicks) * 10000) / 100 : 0,
       };
 
       return {
@@ -527,6 +542,8 @@ export function useGoogleKPIsWithSubblyRevenue() {
           ctr: pctChange(cur.ctr, prev.ctr),
           cpm: pctChange(cur.cpm, prev.cpm),
           impressions: pctChange(cur.impressions, prev.impressions),
+          addToCart: pctChange(cur.addToCart, prev.addToCart),
+          atcRate: pctChange(cur.atcRate, prev.atcRate),
         },
       };
     },

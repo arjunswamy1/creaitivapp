@@ -152,6 +152,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           return {
             user_id: userId, client_id: clientId, platform: "meta", date: day.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            add_to_cart: m.addToCart,
             cpc: m.clicks > 0 ? m.spend / m.clicks : null,
             ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : null,
             cpm: m.impressions > 0 ? (m.spend / m.impressions) * 1000 : null,
@@ -169,6 +170,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: c.campaign_id,
             campaign_name: c.campaign_name, status: "active", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
           };
         });
@@ -184,6 +186,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
             status: "active", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
           };
         });
@@ -205,6 +208,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
             status: "active", date: ad.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
+            add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
             format,
             frequency: ad.frequency ? parseFloat(ad.frequency) : null,
@@ -354,15 +358,21 @@ const PURCHASE_ACTIONS = [
   "offsite_conversion.fb_pixel_purchase", "offsite_conversion.custom.purchase",
 ];
 
+const ADD_TO_CART_ACTIONS = [
+  "add_to_cart", "omni_add_to_cart",
+  "offsite_conversion.fb_pixel_add_to_cart",
+];
+
 function extractMetrics(row: any) {
   const spend = parseFloat(row.spend || "0");
   const impressions = parseInt(row.impressions || "0");
   const clicks = parseInt(row.clicks || "0");
-  let conversions = 0, revenue = 0;
+  let conversions = 0, revenue = 0, addToCart = 0;
 
   if (row.actions) {
     for (const a of row.actions) {
-      if (PURCHASE_ACTIONS.includes(a.action_type)) { conversions += parseInt(a.value || "0"); break; }
+      if (PURCHASE_ACTIONS.includes(a.action_type)) { conversions += parseInt(a.value || "0"); }
+      if (ADD_TO_CART_ACTIONS.includes(a.action_type)) { addToCart += parseInt(a.value || "0"); }
     }
   }
   if (row.action_values) {
@@ -370,5 +380,5 @@ function extractMetrics(row: any) {
       if (PURCHASE_ACTIONS.includes(a.action_type)) { revenue += parseFloat(a.value || "0"); break; }
     }
   }
-  return { spend, impressions, clicks, conversions, revenue };
+  return { spend, impressions, clicks, conversions, revenue, addToCart };
 }
