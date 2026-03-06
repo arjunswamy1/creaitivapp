@@ -308,18 +308,24 @@ export function useTopCampaigns(platform?: string) {
 
 export function useCampaignAdSets(campaignName: string | null, platform: string | null) {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["campaign-adsets", campaignName, fromStr, toStr],
+    queryKey: ["campaign-adsets", campaignName, fromStr, toStr, clientId],
     enabled: !!campaignName,
     queryFn: async () => {
       if (!campaignName) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("ad_sets")
         .select("adset_name, platform_adset_id, spend, revenue, impressions, clicks, conversions, roas, status, date")
         .eq("campaign_name", campaignName)
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
@@ -355,18 +361,24 @@ export function useCampaignAdSets(campaignName: string | null, platform: string 
 
 export function useAdSetAds(adsetId: string | null) {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["adset-ads", adsetId, fromStr, toStr],
+    queryKey: ["adset-ads", adsetId, fromStr, toStr, clientId],
     enabled: !!adsetId,
     queryFn: async () => {
       if (!adsetId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("ads")
         .select("ad_name, spend, revenue, impressions, clicks, conversions, roas, status, date")
         .eq("platform_adset_id", adsetId)
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
@@ -401,18 +413,24 @@ export function useAdSetAds(adsetId: string | null) {
 
 export function useAdGroupKeywords(adsetId: string | null) {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["adgroup-keywords", adsetId, fromStr, toStr],
+    queryKey: ["adgroup-keywords", adsetId, fromStr, toStr, clientId],
     enabled: !!adsetId,
     queryFn: async () => {
       if (!adsetId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("keywords" as any)
         .select("keyword_text, match_type, spend, revenue, impressions, clicks, conversions, roas, status, quality_score, date")
         .eq("platform_adset_id", adsetId)
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
