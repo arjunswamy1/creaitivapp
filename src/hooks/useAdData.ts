@@ -361,18 +361,24 @@ export function useCampaignAdSets(campaignName: string | null, platform: string 
 
 export function useAdSetAds(adsetId: string | null) {
   const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["adset-ads", adsetId, fromStr, toStr],
+    queryKey: ["adset-ads", adsetId, fromStr, toStr, clientId],
     enabled: !!adsetId,
     queryFn: async () => {
       if (!adsetId) return [];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("ads")
         .select("ad_name, spend, revenue, impressions, clicks, conversions, roas, status, date")
         .eq("platform_adset_id", adsetId)
         .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data) return [];
