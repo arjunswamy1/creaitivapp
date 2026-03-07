@@ -355,6 +355,30 @@ async function updateSyncLog(supabase: any, syncId: string, status: string, reco
   }).eq("id", syncId);
 }
 
+function formatMetaObjective(objective: string): string {
+  const map: Record<string, string> = {
+    OUTCOME_SALES: "Sales",
+    OUTCOME_LEADS: "Leads",
+    OUTCOME_ENGAGEMENT: "Engagement",
+    OUTCOME_AWARENESS: "Awareness",
+    OUTCOME_TRAFFIC: "Traffic",
+    OUTCOME_APP_PROMOTION: "App Promotion",
+    CONVERSIONS: "Conversions",
+    LINK_CLICKS: "Traffic",
+    POST_ENGAGEMENT: "Engagement",
+    VIDEO_VIEWS: "Video Views",
+    REACH: "Reach",
+    BRAND_AWARENESS: "Brand Awareness",
+    LEAD_GENERATION: "Lead Gen",
+    MESSAGES: "Messages",
+    PAGE_LIKES: "Page Likes",
+    APP_INSTALLS: "App Installs",
+    PRODUCT_CATALOG_SALES: "Catalog Sales",
+    STORE_VISITS: "Store Visits",
+  };
+  return map[objective] || objective.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
 const PURCHASE_ACTIONS = [
   "purchase", "omni_purchase", "web_in_store_purchase",
   "offsite_conversion.fb_pixel_purchase", "offsite_conversion.custom.purchase",
