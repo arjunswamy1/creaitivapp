@@ -257,7 +257,7 @@ export function useTopCampaigns(platform?: string) {
     queryFn: async (): Promise<CampaignRow[]> => {
       let query = supabase
         .from("ad_campaigns")
-        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share")
+        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type")
         .gte("date", fromStr).lte("date", toStr);
 
       if (clientId) query = query.eq("client_id", clientId);
