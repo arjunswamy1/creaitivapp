@@ -301,6 +301,8 @@ export function useTopCampaigns(platform?: string) {
           clicks: vals.clicks,
           conversions: vals.conversions,
           impressionShare: vals.impressionShareCount > 0 ? vals.impressionShareSum / vals.impressionShareCount : null,
+          biddingStrategy: vals.biddingStrategy,
+          campaignType: vals.campaignType,
         }))
         .sort((a, b) => b.spend - a.spend)
         .slice(0, 15);
