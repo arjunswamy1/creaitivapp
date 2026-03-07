@@ -272,7 +272,7 @@ export function useTopCampaigns(platform?: string) {
 
       const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number; biddingStrategy: string | null; campaignType: string | null }>();
       for (const row of data) {
-        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0 };
+        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0, biddingStrategy: (row as any).bidding_strategy_type || null, campaignType: (row as any).campaign_type || null };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);
         existing.impressions += Number(row.impressions);
