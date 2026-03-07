@@ -318,9 +318,10 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
 
   const projectedSpend = avgDailySpend * forecastDays;
   const projectedRevenue = avgDailyRevenue * forecastDays;
-  const projectedCPA = avgDailyConversions > 0 ? avgDailySpend / avgDailyConversions : 0;
-  const projectedMER = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
   const projectedTransactions = Math.round(avgDailyTransactions * forecastDays);
+  // CPA based on actual transactions (subscribers/orders), not platform-reported conversions
+  const projectedCPA = avgDailyTransactions > 0 ? avgDailySpend / avgDailyTransactions : 0;
+  const projectedMER = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
 
   // Confidence based on data volume and variance
   const spendValues = last30.map(d => d.spend).filter(v => v > 0);
