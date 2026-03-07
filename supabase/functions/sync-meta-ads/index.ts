@@ -135,8 +135,8 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
       const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
         fetchInsights(accountId, accessToken, since, until, "account"),
-        fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,"),
-        fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,"),
+        fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,objective,buying_type,"),
+        fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,optimization_goal,"),
       ]);
 
       // Fetch ad-level data with creative fields in monthly chunks
