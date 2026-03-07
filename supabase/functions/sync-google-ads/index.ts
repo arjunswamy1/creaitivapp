@@ -552,3 +552,40 @@ async function updateSyncLog(supabase: any, syncId: string, status: string, reco
     })
     .eq("id", syncId);
 }
+
+function formatBiddingStrategy(type: string): string {
+  const map: Record<string, string> = {
+    TARGET_CPA: "Target CPA",
+    TARGET_ROAS: "Target ROAS",
+    MAXIMIZE_CONVERSIONS: "Max Conversions",
+    MAXIMIZE_CONVERSION_VALUE: "Max Conv. Value",
+    MANUAL_CPC: "Manual CPC",
+    ENHANCED_CPC: "Enhanced CPC",
+    TARGET_SPEND: "Max Clicks",
+    MANUAL_CPM: "Manual CPM",
+    TARGET_CPM: "Target CPM",
+    MAXIMIZE_CLICKS: "Max Clicks",
+    PERCENT_CPC: "Percent CPC",
+    TARGET_IMPRESSION_SHARE: "Target Imp. Share",
+    COMMISSION: "Commission",
+  };
+  return map[type] || type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatChannelType(type: string): string {
+  const map: Record<string, string> = {
+    SEARCH: "Search",
+    DISPLAY: "Display",
+    SHOPPING: "Shopping",
+    VIDEO: "Video",
+    MULTI_CHANNEL: "Performance Max",
+    PERFORMANCE_MAX: "Performance Max",
+    SMART: "Smart",
+    DISCOVERY: "Demand Gen",
+    DEMAND_GEN: "Demand Gen",
+    LOCAL: "Local",
+    HOTEL: "Hotel",
+    LOCAL_SERVICES: "Local Services",
+  };
+  return map[type] || type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
