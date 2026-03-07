@@ -235,13 +235,15 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
             console.error(`Daily metrics error for ${cid} ${since}-${until}:`, err);
           }
 
-          // Campaign metrics with impression share
+          // Campaign metrics with impression share and bid strategy
           try {
             const campaignRows = await queryGoogleAds(cid, accessToken, developerToken, `
               SELECT
                 campaign.id,
                 campaign.name,
                 campaign.status,
+                campaign.bidding_strategy_type,
+                campaign.advertising_channel_type,
                 segments.date,
                 metrics.cost_micros,
                 metrics.impressions,
