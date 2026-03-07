@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords } from "@/hooks/useAdData";
+import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms } from "@/hooks/useAdData";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -192,6 +192,7 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
 
 function KeywordDetail({ adsetId }: { adsetId: string }) {
   const { data: keywords, isLoading } = useAdGroupKeywords(adsetId);
+  const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
 
   if (isLoading) {
     return <div className="p-4 pl-16"><Skeleton className="h-16 rounded-lg" /></div>;
@@ -221,24 +222,95 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
           </tr>
         </thead>
         <tbody>
-          {keywords.map((kw) => (
-            <tr key={`${kw.keyword}-${kw.matchType}`} className="border-b border-border/10 hover:bg-secondary/40 transition-colors">
+          {keywords.map((kw) => {
+            const kwKey = `${kw.keyword}__${kw.matchType}`;
+            return (
+              <>
+                <tr
+                  key={kwKey}
+                  className="border-b border-border/10 hover:bg-secondary/40 transition-colors cursor-pointer"
+                  onClick={() => setExpandedKeyword(expandedKeyword === kwKey ? null : kwKey)}
+                >
+                  <td className="w-8 pl-6">
+                    {expandedKeyword === kwKey ? (
+                      <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3 text-muted-foreground" />
+                    )}
+                  </td>
+                  <td className="py-1.5 pl-16 font-medium max-w-[240px] truncate">{kw.keyword}</td>
+                  <td className="py-1.5">
+                    <Badge variant="outline" className="text-[10px] capitalize">{kw.matchType}</Badge>
+                  </td>
+                  <td className="py-1.5 text-right font-mono">${kw.spend.toLocaleString()}</td>
+                  <td className="py-1.5 text-right font-mono">{kw.conversions.toLocaleString()}</td>
+                  <td className="py-1.5 text-right font-mono">{kw.ctr}%</td>
+                  <td className="py-1.5 text-right font-mono">{kw.cpa != null ? `$${kw.cpa}` : "—"}</td>
+                  <td className="py-1.5 text-right font-mono">
+                    {kw.qualityScore != null ? (
+                      <span className={kw.qualityScore < 5 ? "text-destructive" : kw.qualityScore >= 7 ? "text-accent" : ""}>
+                        {kw.qualityScore}/10
+                      </span>
+                    ) : "—"}
+                  </td>
+                </tr>
+                {expandedKeyword === kwKey && (
+                  <tr key={`${kwKey}-st`}>
+                    <td colSpan={8} className="p-0">
+                      <SearchTermDetail adsetId={adsetId} keywordText={kw.keyword} />
+                    </td>
+                  </tr>
+                )}
+              </>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SearchTermDetail({ adsetId, keywordText }: { adsetId: string; keywordText: string }) {
+  const { data: searchTerms, isLoading } = useKeywordSearchTerms(adsetId, keywordText);
+
+  if (isLoading) {
+    return <div className="p-4 pl-24"><Skeleton className="h-12 rounded-lg" /></div>;
+  }
+
+  if (!searchTerms || searchTerms.length === 0) {
+    return (
+      <div className="px-24 py-3 bg-secondary/40 text-xs text-muted-foreground">
+        No search term data available for this keyword.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-secondary/40 border-t border-border/10">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/10">
+            <th className="w-8"></th>
+            <th className="text-left py-1 pl-24 text-muted-foreground font-medium text-[10px]">Search Term</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Spend</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Clicks</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Impr.</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">CTR</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Conv.</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">CPA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {searchTerms.map((st) => (
+            <tr key={st.searchTerm} className="border-b border-border/5 hover:bg-secondary/50 transition-colors">
               <td className="w-8"></td>
-              <td className="py-1.5 pl-16 font-medium max-w-[240px] truncate">{kw.keyword}</td>
-              <td className="py-1.5">
-                <Badge variant="outline" className="text-[10px] capitalize">{kw.matchType}</Badge>
-              </td>
-              <td className="py-1.5 text-right font-mono">${kw.spend.toLocaleString()}</td>
-              <td className="py-1.5 text-right font-mono">{kw.conversions.toLocaleString()}</td>
-              <td className="py-1.5 text-right font-mono">{kw.ctr}%</td>
-              <td className="py-1.5 text-right font-mono">{kw.cpa != null ? `$${kw.cpa}` : "—"}</td>
-              <td className="py-1.5 text-right font-mono">
-                {kw.qualityScore != null ? (
-                  <span className={kw.qualityScore < 5 ? "text-destructive" : kw.qualityScore >= 7 ? "text-accent" : ""}>
-                    {kw.qualityScore}/10
-                  </span>
-                ) : "—"}
-              </td>
+              <td className="py-1 pl-24 font-medium max-w-[220px] truncate">{st.searchTerm}</td>
+              <td className="py-1 text-right font-mono">${st.spend.toLocaleString()}</td>
+              <td className="py-1 text-right font-mono">{st.clicks.toLocaleString()}</td>
+              <td className="py-1 text-right font-mono">{st.impressions.toLocaleString()}</td>
+              <td className="py-1 text-right font-mono">{st.ctr}%</td>
+              <td className="py-1 text-right font-mono">{st.conversions.toLocaleString()}</td>
+              <td className="py-1 text-right font-mono">{st.cpa != null ? `$${st.cpa}` : "—"}</td>
             </tr>
           ))}
         </tbody>

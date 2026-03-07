@@ -473,6 +473,58 @@ export function useAdGroupKeywords(adsetId: string | null) {
   });
 }
 
+export function useKeywordSearchTerms(adsetId: string | null, keywordText: string | null) {
+  const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
+
+  return useQuery({
+    queryKey: ["keyword-search-terms", adsetId, keywordText, fromStr, toStr, clientId],
+    enabled: !!adsetId && !!keywordText,
+    queryFn: async () => {
+      if (!adsetId || !keywordText) return [];
+
+      let query = supabase
+        .from("search_terms" as any)
+        .select("search_term, spend, revenue, impressions, clicks, conversions, roas, date")
+        .eq("platform_adset_id", adsetId)
+        .eq("keyword_text", keywordText)
+        .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      if (!data) return [];
+
+      const byST = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
+      for (const row of data as any[]) {
+        const existing = byST.get(row.search_term) || { spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
+        existing.spend += Number(row.spend);
+        existing.revenue += Number(row.revenue);
+        existing.impressions += Number(row.impressions);
+        existing.clicks += Number(row.clicks);
+        existing.conversions += Number(row.conversions);
+        byST.set(row.search_term, existing);
+      }
+
+      return Array.from(byST.entries())
+        .map(([term, vals]) => ({
+          searchTerm: term,
+          spend: Math.round(vals.spend),
+          revenue: Math.round(vals.revenue),
+          impressions: vals.impressions,
+          clicks: vals.clicks,
+          conversions: vals.conversions,
+          ctr: vals.impressions > 0 ? Math.round((vals.clicks / vals.impressions) * 10000) / 100 : 0,
+          cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+    },
+  });
+}
+
 export function useGoogleKPIsWithSubblyRevenue() {
   const { fromStr, toStr, prevFrom, prevTo } = useDateStrings();
   const { dateRange } = useDateRange();

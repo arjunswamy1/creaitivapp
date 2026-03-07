@@ -457,6 +457,65 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
           } catch (err) {
             console.error(`Keyword metrics error for ${cid} ${since}-${until}:`, err?.message || err);
           }
+
+          // Search term report (Google Search only)
+          try {
+            console.log(`Fetching search terms for customer ${cid}, ${since} to ${until}`);
+            const stRows = await queryGoogleAds(cid, accessToken, developerToken, `
+              SELECT
+                campaign.id,
+                campaign.name,
+                ad_group.id,
+                ad_group.name,
+                search_term_view.search_term,
+                segments.keyword.info.text,
+                segments.keyword.info.match_type,
+                segments.date,
+                metrics.cost_micros,
+                metrics.impressions,
+                metrics.clicks,
+                metrics.conversions,
+                metrics.conversions_value
+              FROM search_term_view
+              WHERE segments.date BETWEEN '${since}' AND '${until}'
+            `);
+
+            console.log(`Search term rows returned for ${cid}: ${stRows.length}`);
+
+            if (stRows.length > 0) {
+              const batch = stRows.map((row: any) => {
+                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                const revenue = row.metrics?.conversionsValue || 0;
+                return {
+                  user_id: userId,
+                  client_id: clientId,
+                  platform: "google",
+                  platform_campaign_id: String(row.campaign?.id),
+                  platform_adset_id: String(row.adGroup?.id),
+                  search_term: row.searchTermView?.searchTerm || "Unknown",
+                  keyword_text: row.segments?.keyword?.info?.text || "Unknown",
+                  match_type: (row.segments?.keyword?.info?.matchType || "UNSPECIFIED").toLowerCase(),
+                  campaign_name: row.campaign?.name || "Unknown",
+                  adset_name: row.adGroup?.name || "Unknown",
+                  date: row.segments?.date,
+                  spend, revenue,
+                  impressions: parseInt(row.metrics?.impressions || "0"),
+                  clicks: parseInt(row.metrics?.clicks || "0"),
+                  conversions: Math.round(row.metrics?.conversions || 0),
+                  roas: spend > 0 ? revenue / spend : null,
+                };
+              });
+              const { error: upsertErr } = await supabase.from("search_terms").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,keyword_text,search_term,date" });
+              if (upsertErr) {
+                console.error(`Search term upsert error for ${cid}:`, upsertErr);
+              } else {
+                totalRecords += batch.length;
+                console.log(`Upserted ${batch.length} search terms for ${cid}`);
+              }
+            }
+          } catch (err) {
+            console.error(`Search term error for ${cid} ${since}-${until}:`, err?.message || err);
+          }
         }
       }
     }
