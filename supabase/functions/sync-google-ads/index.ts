@@ -458,63 +458,99 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
             console.error(`Keyword metrics error for ${cid} ${since}-${until}:`, err?.message || err);
           }
 
-          // Search term report (Google Search only)
+          // Search term report (Google Search only) — use smaller date windows to avoid CPU limits
           try {
-            console.log(`Fetching search terms for customer ${cid}, ${since} to ${until}`);
-            const stRows = await queryGoogleAds(cid, accessToken, developerToken, `
-              SELECT
-                campaign.id,
-                campaign.name,
-                ad_group.id,
-                ad_group.name,
-                search_term_view.search_term,
-                segments.keyword.info.text,
-                segments.keyword.info.match_type,
-                segments.date,
-                metrics.cost_micros,
-                metrics.impressions,
-                metrics.clicks,
-                metrics.conversions,
-                metrics.conversions_value
-              FROM search_term_view
-              WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            // Break the chunk into 7-day sub-chunks to keep volume manageable
+            const stSubChunks = buildDateChunks(new Date(since), new Date(until), 7);
+            for (const sub of stSubChunks) {
+              try {
+                console.log(`Fetching search terms for customer ${cid}, ${sub.since} to ${sub.until}`);
+                const stRows = await queryGoogleAds(cid, accessToken, developerToken, `
+                  SELECT
+                    campaign.id,
+                    campaign.name,
+                    ad_group.id,
+                    ad_group.name,
+                    search_term_view.search_term,
+                    segments.keyword.info.text,
+                    segments.keyword.info.match_type,
+                    segments.date,
+                    metrics.cost_micros,
+                    metrics.impressions,
+                    metrics.clicks,
+                    metrics.conversions,
+                    metrics.conversions_value
+                  FROM search_term_view
+                  WHERE segments.date BETWEEN '${sub.since}' AND '${sub.until}'
+                `);
 
-            console.log(`Search term rows returned for ${cid}: ${stRows.length}`);
+                console.log(`Search term rows returned for ${cid}: ${stRows.length}`);
 
-            if (stRows.length > 0) {
-              const batch = stRows.map((row: any) => {
-                const spend = (row.metrics?.costMicros || 0) / 1_000_000;
-                const revenue = row.metrics?.conversionsValue || 0;
-                return {
-                  user_id: userId,
-                  client_id: clientId,
-                  platform: "google",
-                  platform_campaign_id: String(row.campaign?.id),
-                  platform_adset_id: String(row.adGroup?.id),
-                  search_term: row.searchTermView?.searchTerm || "Unknown",
-                  keyword_text: row.segments?.keyword?.info?.text || "Unknown",
-                  match_type: (row.segments?.keyword?.info?.matchType || "UNSPECIFIED").toLowerCase(),
-                  campaign_name: row.campaign?.name || "Unknown",
-                  adset_name: row.adGroup?.name || "Unknown",
-                  date: row.segments?.date,
-                  spend, revenue,
-                  impressions: parseInt(row.metrics?.impressions || "0"),
-                  clicks: parseInt(row.metrics?.clicks || "0"),
-                  conversions: Math.round(row.metrics?.conversions || 0),
-                  roas: spend > 0 ? revenue / spend : null,
-                };
-              });
-              const { error: upsertErr } = await supabase.from("search_terms").upsert(batch, { onConflict: "user_id,platform,platform_adset_id,keyword_text,search_term,date" });
-              if (upsertErr) {
-                console.error(`Search term upsert error for ${cid}:`, upsertErr);
-              } else {
-                totalRecords += batch.length;
-                console.log(`Upserted ${batch.length} search terms for ${cid}`);
+                if (stRows.length > 0) {
+                  // Deduplicate: the API can return multiple rows for the same key within a batch
+                  const deduped = new Map<string, any>();
+                  for (const row of stRows) {
+                    const searchTerm = row.searchTermView?.searchTerm || "Unknown";
+                    const keywordText = row.segments?.keyword?.info?.text || "Unknown";
+                    const date = row.segments?.date;
+                    const adsetId = String(row.adGroup?.id);
+                    const dedupeKey = `${adsetId}|${keywordText}|${searchTerm}|${date}`;
+
+                    const spend = (row.metrics?.costMicros || 0) / 1_000_000;
+                    const revenue = row.metrics?.conversionsValue || 0;
+
+                    if (deduped.has(dedupeKey)) {
+                      const existing = deduped.get(dedupeKey);
+                      existing.spend += spend;
+                      existing.revenue += revenue;
+                      existing.impressions += parseInt(row.metrics?.impressions || "0");
+                      existing.clicks += parseInt(row.metrics?.clicks || "0");
+                      existing.conversions += Math.round(row.metrics?.conversions || 0);
+                    } else {
+                      deduped.set(dedupeKey, {
+                        user_id: userId,
+                        client_id: clientId,
+                        platform: "google",
+                        platform_campaign_id: String(row.campaign?.id),
+                        platform_adset_id: adsetId,
+                        search_term: searchTerm,
+                        keyword_text: keywordText,
+                        match_type: (row.segments?.keyword?.info?.matchType || "UNSPECIFIED").toLowerCase(),
+                        campaign_name: row.campaign?.name || "Unknown",
+                        adset_name: row.adGroup?.name || "Unknown",
+                        date,
+                        spend, revenue,
+                        impressions: parseInt(row.metrics?.impressions || "0"),
+                        clicks: parseInt(row.metrics?.clicks || "0"),
+                        conversions: Math.round(row.metrics?.conversions || 0),
+                        roas: 0, // recalculated below
+                      });
+                    }
+                  }
+
+                  const batch = Array.from(deduped.values()).map(r => ({
+                    ...r,
+                    roas: r.spend > 0 ? r.revenue / r.spend : null,
+                  }));
+
+                  // Upsert in sub-batches of 500 to stay within limits
+                  for (let i = 0; i < batch.length; i += 500) {
+                    const slice = batch.slice(i, i + 500);
+                    const { error: upsertErr } = await supabase.from("search_terms").upsert(slice, { onConflict: "user_id,platform,platform_adset_id,keyword_text,search_term,date" });
+                    if (upsertErr) {
+                      console.error(`Search term upsert error for ${cid}:`, upsertErr);
+                    } else {
+                      totalRecords += slice.length;
+                    }
+                  }
+                  console.log(`Upserted ${batch.length} search terms for ${cid} (${sub.since} to ${sub.until})`);
+                }
+              } catch (err) {
+                console.error(`Search term error for ${cid} ${sub.since}-${sub.until}:`, err?.message || err);
               }
             }
           } catch (err) {
-            console.error(`Search term error for ${cid} ${since}-${until}:`, err?.message || err);
+            console.error(`Search term outer error for ${cid} ${since}-${until}:`, err?.message || err);
           }
         }
       }
