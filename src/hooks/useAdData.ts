@@ -270,7 +270,7 @@ export function useTopCampaigns(platform?: string) {
       if (error) throw error;
       if (!data) return [];
 
-      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number }>();
+      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number; biddingStrategy: string | null; campaignType: string | null }>();
       for (const row of data) {
         const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0 };
         existing.spend += Number(row.spend);
