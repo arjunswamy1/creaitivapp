@@ -17,7 +17,9 @@ export type Database = {
       ad_campaigns: {
         Row: {
           add_to_cart: number
+          bidding_strategy_type: string | null
           campaign_name: string
+          campaign_type: string | null
           clicks: number
           client_id: string | null
           conversions: number
@@ -39,7 +41,9 @@ export type Database = {
         }
         Insert: {
           add_to_cart?: number
+          bidding_strategy_type?: string | null
           campaign_name: string
+          campaign_type?: string | null
           clicks?: number
           client_id?: string | null
           conversions?: number
@@ -61,7 +65,9 @@ export type Database = {
         }
         Update: {
           add_to_cart?: number
+          bidding_strategy_type?: string | null
           campaign_name?: string
+          campaign_type?: string | null
           clicks?: number
           client_id?: string | null
           conversions?: number

@@ -135,8 +135,8 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
 
       const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
         fetchInsights(accountId, accessToken, since, until, "account"),
-        fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,"),
-        fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,"),
+        fetchInsights(accountId, accessToken, since, until, "campaign", "campaign_id,campaign_name,objective,buying_type,"),
+        fetchInsights(accountId, accessToken, since, until, "adset", "campaign_id,campaign_name,adset_id,adset_name,optimization_goal,"),
       ]);
 
       // Fetch ad-level data with creative fields in monthly chunks
@@ -172,6 +172,8 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
+            bidding_strategy_type: c.objective ? formatMetaObjective(c.objective) : null,
+            campaign_type: c.buying_type || null,
           };
         });
         await batchUpsert(supabase, "ad_campaigns", batch, "user_id,platform,platform_campaign_id,date");
@@ -351,6 +353,30 @@ async function updateSyncLog(supabase: any, syncId: string, status: string, reco
   await supabase.from("ad_sync_log").update({
     status, records_synced: records, error_message: error || null, completed_at: new Date().toISOString(),
   }).eq("id", syncId);
+}
+
+function formatMetaObjective(objective: string): string {
+  const map: Record<string, string> = {
+    OUTCOME_SALES: "Sales",
+    OUTCOME_LEADS: "Leads",
+    OUTCOME_ENGAGEMENT: "Engagement",
+    OUTCOME_AWARENESS: "Awareness",
+    OUTCOME_TRAFFIC: "Traffic",
+    OUTCOME_APP_PROMOTION: "App Promotion",
+    CONVERSIONS: "Conversions",
+    LINK_CLICKS: "Traffic",
+    POST_ENGAGEMENT: "Engagement",
+    VIDEO_VIEWS: "Video Views",
+    REACH: "Reach",
+    BRAND_AWARENESS: "Brand Awareness",
+    LEAD_GENERATION: "Lead Gen",
+    MESSAGES: "Messages",
+    PAGE_LIKES: "Page Likes",
+    APP_INSTALLS: "App Installs",
+    PRODUCT_CATALOG_SALES: "Catalog Sales",
+    STORE_VISITS: "Store Visits",
+  };
+  return map[objective] || objective.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
 }
 
 const PURCHASE_ACTIONS = [

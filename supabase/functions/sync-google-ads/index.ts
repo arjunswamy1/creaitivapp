@@ -235,13 +235,15 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
             console.error(`Daily metrics error for ${cid} ${since}-${until}:`, err);
           }
 
-          // Campaign metrics with impression share
+          // Campaign metrics with impression share and bid strategy
           try {
             const campaignRows = await queryGoogleAds(cid, accessToken, developerToken, `
               SELECT
                 campaign.id,
                 campaign.name,
                 campaign.status,
+                campaign.bidding_strategy_type,
+                campaign.advertising_channel_type,
                 segments.date,
                 metrics.cost_micros,
                 metrics.impressions,
@@ -259,6 +261,8 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               const batch = campaignRows.map((row: any) => {
                 const spend = (row.metrics?.costMicros || 0) / 1_000_000;
                 const revenue = row.metrics?.conversionsValue || 0;
+                const biddingType = row.campaign?.biddingStrategyType || null;
+                const channelType = row.campaign?.advertisingChannelType || null;
                 return {
                   user_id: userId,
                   client_id: clientId,
@@ -275,6 +279,8 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   impression_share: row.metrics?.searchImpressionShare ?? null,
                   lost_is_budget: row.metrics?.searchBudgetLostImpressionShare ?? null,
                   lost_is_rank: row.metrics?.searchRankLostImpressionShare ?? null,
+                  bidding_strategy_type: biddingType ? formatBiddingStrategy(biddingType) : null,
+                  campaign_type: channelType ? formatChannelType(channelType) : null,
                 };
               });
               await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
@@ -545,4 +551,41 @@ async function updateSyncLog(supabase: any, syncId: string, status: string, reco
       completed_at: new Date().toISOString(),
     })
     .eq("id", syncId);
+}
+
+function formatBiddingStrategy(type: string): string {
+  const map: Record<string, string> = {
+    TARGET_CPA: "Target CPA",
+    TARGET_ROAS: "Target ROAS",
+    MAXIMIZE_CONVERSIONS: "Max Conversions",
+    MAXIMIZE_CONVERSION_VALUE: "Max Conv. Value",
+    MANUAL_CPC: "Manual CPC",
+    ENHANCED_CPC: "Enhanced CPC",
+    TARGET_SPEND: "Max Clicks",
+    MANUAL_CPM: "Manual CPM",
+    TARGET_CPM: "Target CPM",
+    MAXIMIZE_CLICKS: "Max Clicks",
+    PERCENT_CPC: "Percent CPC",
+    TARGET_IMPRESSION_SHARE: "Target Imp. Share",
+    COMMISSION: "Commission",
+  };
+  return map[type] || type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatChannelType(type: string): string {
+  const map: Record<string, string> = {
+    SEARCH: "Search",
+    DISPLAY: "Display",
+    SHOPPING: "Shopping",
+    VIDEO: "Video",
+    MULTI_CHANNEL: "Performance Max",
+    PERFORMANCE_MAX: "Performance Max",
+    SMART: "Smart",
+    DISCOVERY: "Demand Gen",
+    DEMAND_GEN: "Demand Gen",
+    LOCAL: "Local",
+    HOTEL: "Hotel",
+    LOCAL_SERVICES: "Local Services",
+  };
+  return map[type] || type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
 }
