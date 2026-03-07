@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords } from "@/hooks/useAdData";
+import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms } from "@/hooks/useAdData";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
