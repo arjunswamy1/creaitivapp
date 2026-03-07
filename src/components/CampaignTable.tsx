@@ -37,6 +37,8 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                 <th className="text-left py-3 text-muted-foreground font-medium w-8"></th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Campaign</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Channel</th>
+                <th className="text-left py-3 text-muted-foreground font-medium">Type</th>
+                <th className="text-left py-3 text-muted-foreground font-medium">Bid Strategy</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>}
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
@@ -67,6 +69,12 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                         {c.channel}
                       </Badge>
                     </td>
+                    <td className="py-3 text-xs text-muted-foreground">{c.campaignType || "—"}</td>
+                    <td className="py-3">
+                      {c.biddingStrategy ? (
+                        <Badge variant="secondary" className="text-xs font-normal">{c.biddingStrategy}</Badge>
+                      ) : "—"}
+                    </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
                     {!isGoogle && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
                     {!isGoogle && <td className="py-3 text-right font-mono">{c.roas}x</td>}
@@ -87,7 +95,7 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                   </tr>
                   {expandedCampaign === c.name && (
                     <tr key={`${c.name}-detail`}>
-                       <td colSpan={isGoogle ? 8 : 9} className="p-0">
+                       <td colSpan={isGoogle ? 10 : 11} className="p-0">
                         <AdSetDetail campaignName={c.name} platform={c.platform} />
                       </td>
                     </tr>
@@ -127,6 +135,8 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
             <th className="w-8"></th>
             <th className="text-left py-2 pl-10 text-muted-foreground font-medium text-xs">Ad Set</th>
             <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
+            <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
+            <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Spend</th>
             {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">Revenue</th>}
             {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">ROAS</th>}
@@ -151,6 +161,8 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
                 </td>
                 <td className="py-2 pl-10 font-medium text-xs max-w-[260px] truncate">{as.name}</td>
                 <td></td>
+                <td></td>
+                <td></td>
                 <td className="py-2 text-right font-mono text-xs">${as.spend.toLocaleString()}</td>
                 {!isGoogle && <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>}
                 {!isGoogle && <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>}
@@ -161,7 +173,7 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
               </tr>
               {expandedAdSet?.name === as.name && (
                 <tr key={`${as.name}-detail`}>
-                  <td colSpan={isGoogle ? 6 : 8} className="p-0">
+                  <td colSpan={isGoogle ? 8 : 10} className="p-0">
                     {platform === "google" ? (
                       <KeywordDetail adsetId={expandedAdSet.id} />
                     ) : (

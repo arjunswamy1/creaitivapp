@@ -3,6 +3,12 @@ import CampaignTable from "@/components/CampaignTable";
 import { useGoogleKPIsWithSubblyRevenue } from "@/hooks/useAdData";
 import { Skeleton } from "@/components/ui/skeleton";
 
+function formatImpressions(val: number): string {
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
+  return val.toLocaleString();
+}
+
 const GoogleDashboard = () => {
   const { data: kpis, isLoading } = useGoogleKPIsWithSubblyRevenue();
 
@@ -23,17 +29,15 @@ const GoogleDashboard = () => {
       </div>
 
       {/* Secondary KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {isLoading ? (
-          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
-            <KPICard title="Add to Cart" value={(kpis?.addToCart ?? 0).toLocaleString()} change={kpis?.changes.addToCart} />
-            <KPICard title="ATC Rate" value={`${kpis?.atcRate ?? 0}%`} change={kpis?.changes.atcRate} subtitle="Clicks → ATC" />
             <KPICard title="Avg CPC" value={`$${kpis?.cpc ?? 0}`} change={kpis?.changes.cpc} invertColor />
             <KPICard title="CTR" value={`${kpis?.ctr ?? 0}%`} change={kpis?.changes.ctr} />
             <KPICard title="CPM" value={`$${kpis?.cpm ?? 0}`} change={kpis?.changes.cpm} invertColor />
-            <KPICard title="Impressions" value={`${((kpis?.impressions ?? 0) / 1000000).toFixed(1)}M`} change={kpis?.changes.impressions} />
+            <KPICard title="Impressions" value={formatImpressions(kpis?.impressions ?? 0)} change={kpis?.changes.impressions} />
           </>
         )}
       </div>
