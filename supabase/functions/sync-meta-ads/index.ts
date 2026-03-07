@@ -172,6 +172,8 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
+            bidding_strategy_type: c.objective ? formatMetaObjective(c.objective) : null,
+            campaign_type: c.buying_type || null,
           };
         });
         await batchUpsert(supabase, "ad_campaigns", batch, "user_id,platform,platform_campaign_id,date");
