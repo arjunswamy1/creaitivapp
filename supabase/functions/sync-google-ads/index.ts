@@ -261,6 +261,8 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               const batch = campaignRows.map((row: any) => {
                 const spend = (row.metrics?.costMicros || 0) / 1_000_000;
                 const revenue = row.metrics?.conversionsValue || 0;
+                const biddingType = row.campaign?.biddingStrategyType || null;
+                const channelType = row.campaign?.advertisingChannelType || null;
                 return {
                   user_id: userId,
                   client_id: clientId,
@@ -277,6 +279,8 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   impression_share: row.metrics?.searchImpressionShare ?? null,
                   lost_is_budget: row.metrics?.searchBudgetLostImpressionShare ?? null,
                   lost_is_rank: row.metrics?.searchRankLostImpressionShare ?? null,
+                  bidding_strategy_type: biddingType ? formatBiddingStrategy(biddingType) : null,
+                  campaign_type: channelType ? formatChannelType(channelType) : null,
                 };
               });
               await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
