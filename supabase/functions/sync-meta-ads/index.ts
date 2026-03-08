@@ -163,12 +163,18 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         records += batch.length;
       }
 
+      // Fetch real statuses for campaigns, adsets, and ads
+      const [campaignStatusMap, adsetStatusMap] = await Promise.all([
+        fetchEntityStatuses(accountId, accessToken, "campaigns"),
+        fetchEntityStatuses(accountId, accessToken, "adsets"),
+      ]);
+
       if (campaignInsights) {
         const batch = campaignInsights.map((c: any) => {
           const m = extractMetrics(c);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: c.campaign_id,
-            campaign_name: c.campaign_name, status: "active", date: c.date_start,
+            campaign_name: c.campaign_name, status: campaignStatusMap.get(c.campaign_id) || "unknown", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
@@ -186,7 +192,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: a.campaign_id,
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
-            status: "active", date: a.date_start,
+            status: adsetStatusMap.get(a.adset_id) || "unknown", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
@@ -208,7 +214,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
-            status: "active", date: ad.date_start,
+            status: creative?.effective_status || "unknown", date: ad.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
@@ -289,7 +295,7 @@ async function fetchInsightsChunked(accountId: string, accessToken: string, sinc
 
 async function fetchAdCreatives(accountId: string, accessToken: string): Promise<Map<string, any>> {
   const map = new Map<string, any>();
-  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,creative{object_type,thumbnail_url,effective_object_story_id}&limit=500&access_token=${accessToken}`;
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,effective_status,creative{object_type,thumbnail_url,effective_object_story_id}&limit=500&access_token=${accessToken}`;
   
   try {
     while (url) {
@@ -304,6 +310,7 @@ async function fetchAdCreatives(accountId: string, accessToken: string): Promise
           map.set(ad.id, {
             object_type: ad.creative?.object_type || null,
             thumbnail_url: ad.creative?.thumbnail_url || null,
+            effective_status: ad.effective_status?.toLowerCase() || "unknown",
           });
         }
       }
@@ -313,6 +320,32 @@ async function fetchAdCreatives(accountId: string, accessToken: string): Promise
     console.error("Failed to fetch ad creatives:", err);
   }
   console.log(`Fetched creatives for ${map.size} ads`);
+  return map;
+}
+
+async function fetchEntityStatuses(accountId: string, accessToken: string, entityType: "campaigns" | "adsets"): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/${entityType}?fields=id,effective_status&limit=500&access_token=${accessToken}`;
+  
+  try {
+    while (url) {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        console.error(`${entityType} status error:`, data.error.message);
+        break;
+      }
+      if (data.data) {
+        for (const entity of data.data) {
+          map.set(entity.id, entity.effective_status?.toLowerCase() || "unknown");
+        }
+      }
+      url = data.paging?.next || null;
+    }
+  } catch (err) {
+    console.error(`Failed to fetch ${entityType} statuses:`, err);
+  }
+  console.log(`Fetched statuses for ${map.size} ${entityType}`);
   return map;
 }
 
