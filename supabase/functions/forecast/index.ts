@@ -261,7 +261,10 @@ Deno.serve(async (req) => {
     month_cac: monthCAC,
     avg_daily_subs: avgDailySubs,
     avg_daily_spend: avgDailySpend,
+    avg_daily_revenue: avgDailyRevenue,
+    avg_daily_conversions: avgDailyConversions,
     daily_forecast: dailyForecast,
+    completed_days: completedDays,
     trend_direction: trendMultiplier > 1.05 ? "accelerating" : trendMultiplier < 0.95 ? "decelerating" : "steady",
     // Profit fields (populated for Shopify clients)
     actual_revenue: Math.round(mtdRevenue * 100) / 100,
