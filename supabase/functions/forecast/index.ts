@@ -49,8 +49,9 @@ Deno.serve(async (req) => {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const totalDaysInMonth = monthEnd.getDate();
   const today = now.getDate();
-  const remainingDays = totalDaysInMonth - today;
-  const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+  // Today is incomplete, so count it as a remaining day for projections
+  const remainingDays = totalDaysInMonth - today + 1;
+  const completedDays = today - 1;
 
   const monthStartStr = formatDate(monthStart);
   const todayStr = formatDate(now);
