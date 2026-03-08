@@ -310,6 +310,7 @@ async function fetchAdCreatives(accountId: string, accessToken: string): Promise
           map.set(ad.id, {
             object_type: ad.creative?.object_type || null,
             thumbnail_url: ad.creative?.thumbnail_url || null,
+            effective_status: ad.effective_status?.toLowerCase() || "unknown",
           });
         }
       }
