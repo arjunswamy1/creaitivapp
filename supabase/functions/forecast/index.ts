@@ -231,6 +231,10 @@ Deno.serve(async (req) => {
 
   const avgDailySubs = daysWithData > 0 ? Math.round((actualOrders / daysWithData) * 10) / 10 : 0;
   const avgDailySpend = daysWithData > 0 ? Math.round(actualSpend / daysWithData) : 0;
+  const avgDailyRevenue = daysWithData > 0 ? Math.round(mtdRevenue / daysWithData) : 0;
+  const avgDailyConversions = daysWithData > 0 
+    ? Math.round(((monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0) > 0 ? actualOrders / daysWithData : 0) * 10) / 10 
+    : 0;
 
   // Profit calculations
   const actualProfit = Math.round((mtdRevenue - actualSpend - mtdCOGS - mtdTaxesShipping - mtdDiscounts) * 100) / 100;
