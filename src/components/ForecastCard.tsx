@@ -130,19 +130,23 @@ const ForecastCard = () => {
         />
       </div>
 
-      {/* Spend summary */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="bg-secondary/40 rounded-lg p-3">
-          <p className="text-xs text-muted-foreground mb-1">MTD Spend</p>
-          <p className="text-base font-bold font-mono">${forecast.actual_spend?.toLocaleString()}</p>
-        </div>
+      {/* Daily averages */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <div className="bg-secondary/40 rounded-lg p-3">
           <p className="text-xs text-muted-foreground mb-1">Avg Daily Spend</p>
           <p className="text-base font-bold font-mono">${forecast.avg_daily_spend?.toLocaleString()}</p>
         </div>
-        <div className="bg-primary/10 rounded-lg p-3 border border-primary/20">
-          <p className="text-xs text-muted-foreground mb-1">Projected Month Spend</p>
-          <p className="text-base font-bold font-mono text-primary">${forecast.month_total_spend?.toLocaleString()}</p>
+        <div className="bg-secondary/40 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Avg Daily Revenue</p>
+          <p className="text-base font-bold font-mono">${(forecast.avg_daily_revenue || 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Avg Daily Conversions</p>
+          <p className="text-base font-bold font-mono">{(forecast.avg_daily_conversions || forecast.avg_daily_subs || 0).toLocaleString()}</p>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Avg Daily {subsLabel}</p>
+          <p className="text-base font-bold font-mono">{forecast.avg_daily_subs}</p>
         </div>
       </div>
 
