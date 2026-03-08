@@ -214,7 +214,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
             user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
-            status: "active", date: ad.date_start,
+            status: creative?.effective_status || "unknown", date: ad.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
