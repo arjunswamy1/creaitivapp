@@ -163,12 +163,18 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
         records += batch.length;
       }
 
+      // Fetch real statuses for campaigns, adsets, and ads
+      const [campaignStatusMap, adsetStatusMap] = await Promise.all([
+        fetchEntityStatuses(accountId, accessToken, "campaigns"),
+        fetchEntityStatuses(accountId, accessToken, "adsets"),
+      ]);
+
       if (campaignInsights) {
         const batch = campaignInsights.map((c: any) => {
           const m = extractMetrics(c);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: c.campaign_id,
-            campaign_name: c.campaign_name, status: "active", date: c.date_start,
+            campaign_name: c.campaign_name, status: campaignStatusMap.get(c.campaign_id) || "unknown", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             roas: m.spend > 0 ? m.revenue / m.spend : null,
