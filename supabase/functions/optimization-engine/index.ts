@@ -309,7 +309,8 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const currentDay = now.getDate();
   const daysElapsed = currentDay;
-  const daysRemaining = daysInMonth - currentDay;
+  // Today is incomplete, so include it in remaining days for projections
+  const daysRemaining = daysInMonth - currentDay + 1;
   const forecastDays = daysInMonth;
 
   // Month-to-date actuals (use weighted avg from lookback data)

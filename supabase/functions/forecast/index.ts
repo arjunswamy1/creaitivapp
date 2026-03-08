@@ -49,8 +49,9 @@ Deno.serve(async (req) => {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const totalDaysInMonth = monthEnd.getDate();
   const today = now.getDate();
-  const remainingDays = totalDaysInMonth - today;
-  const monthName = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+  // Today is incomplete, so count it as a remaining day for projections
+  const remainingDays = totalDaysInMonth - today + 1;
+  const completedDays = today - 1;
 
   const monthStartStr = formatDate(monthStart);
   const todayStr = formatDate(now);
@@ -147,6 +148,8 @@ Deno.serve(async (req) => {
     mtdDailySpend.set(row.date, (mtdDailySpend.get(row.date) || 0) + Number(row.spend));
   }
 
+  // Build MTD series — include today for actuals but use yesterday as the
+  // last "complete" day for projection averages (today's data is partial).
   const mtdDates: string[] = [];
   for (let i = 1; i <= today; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), i);
@@ -163,13 +166,16 @@ Deno.serve(async (req) => {
     discounts: mtdDailyCosts.get(d)?.discounts || 0,
   }));
 
-  const daysWithData = mtdSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
+  // Use only completed days (exclude today) for projection averages.
+  // Today's partial data would otherwise drag down all daily rate estimates.
+  const completedSeries = mtdSeries.slice(0, -1);
+  const daysWithData = completedSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
 
   const recentWindow = 7;
-  const recentDays = mtdSeries.slice(-recentWindow);
-  const olderDays = mtdSeries.slice(0, -recentWindow);
+  const recentDays = completedSeries.slice(-recentWindow);
+  const olderDays = completedSeries.slice(0, -recentWindow);
 
-  const weightedAvg = (arr: typeof mtdSeries, older: typeof mtdSeries, field: string) => {
+  const weightedAvg = (arr: typeof completedSeries, older: typeof completedSeries, field: string) => {
     const recentAvg = arr.length > 0 ? arr.reduce((s, d) => s + Number((d as any)[field]), 0) / arr.length : 0;
     const olderAvg = older.length > 0 ? older.reduce((s, d) => s + Number((d as any)[field]), 0) / older.length : recentAvg;
     if (older.length > 0) return (recentAvg * 2 + olderAvg * 1) / 3;
@@ -183,7 +189,7 @@ Deno.serve(async (req) => {
   const projDailyTaxes = weightedAvg(recentDays, olderDays, "taxes");
   const projDailyDiscounts = weightedAvg(recentDays, olderDays, "discounts");
 
-  const last3 = mtdSeries.slice(-3);
+  const last3 = completedSeries.slice(-3);
   const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
   const overallAvgSubs = actualOrders / daysWithData;
   const rawTrend = overallAvgSubs > 0 ? last3AvgSubs / overallAvgSubs : 1;
@@ -225,6 +231,10 @@ Deno.serve(async (req) => {
 
   const avgDailySubs = daysWithData > 0 ? Math.round((actualOrders / daysWithData) * 10) / 10 : 0;
   const avgDailySpend = daysWithData > 0 ? Math.round(actualSpend / daysWithData) : 0;
+  const avgDailyRevenue = daysWithData > 0 ? Math.round(mtdRevenue / daysWithData) : 0;
+  const avgDailyConversions = daysWithData > 0 
+    ? Math.round(((monthAdMetrics || []).reduce((s, r) => s + Number(r.spend), 0) > 0 ? actualOrders / daysWithData : 0) * 10) / 10 
+    : 0;
 
   // Profit calculations
   const actualProfit = Math.round((mtdRevenue - actualSpend - mtdCOGS - mtdTaxesShipping - mtdDiscounts) * 100) / 100;
@@ -251,7 +261,10 @@ Deno.serve(async (req) => {
     month_cac: monthCAC,
     avg_daily_subs: avgDailySubs,
     avg_daily_spend: avgDailySpend,
+    avg_daily_revenue: avgDailyRevenue,
+    avg_daily_conversions: avgDailyConversions,
     daily_forecast: dailyForecast,
+    completed_days: completedDays,
     trend_direction: trendMultiplier > 1.05 ? "accelerating" : trendMultiplier < 0.95 ? "decelerating" : "steady",
     // Profit fields (populated for Shopify clients)
     actual_revenue: Math.round(mtdRevenue * 100) / 100,
