@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
 
     const revenueSource = configData?.revenue_source || "subbly";
 
-    // Fetch actual revenue + transaction counts (Shopify or Subbly)
+    // Fetch actual revenue + transaction counts (last 30 days for daily averages)
     let totalRevenue30d = 0;
     let transactionCount30d = 0;
     const last30Str = fmt(last30);
@@ -92,38 +92,65 @@ Deno.serve(async (req) => {
     let totalShipping30d = 0;
     let totalDiscounts30d = 0;
 
+    // Also fetch MTD actuals for accurate month projection
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartStr = fmt(monthStart);
+    let mtdRevenue = 0;
+    let mtdTransactions = 0;
+    let mtdCOGS = 0;
+    let mtdTax = 0;
+    let mtdShipping = 0;
+    let mtdDiscounts = 0;
+
     if (revenueSource === "shopify") {
-      const { data: orders } = await supabase
+      const { data: orders30d } = await supabase
         .from("shopify_orders")
-        .select("total_price, total_cost, total_tax, total_shipping, total_discounts")
+        .select("total_price, total_cost, total_tax, total_shipping, total_discounts, order_date")
         .eq("client_id", clientId)
         .in("financial_status", ["paid", "partially_refunded"])
         .gte("order_date", last30Str + "T00:00:00Z")
         .lte("order_date", todayStr + "T23:59:59Z");
-      totalRevenue30d = (orders || []).reduce((s, o) => s + Number(o.total_price || 0), 0);
-      totalCOGS30d = (orders || []).reduce((s, o) => s + Number(o.total_cost || 0), 0);
-      totalTax30d = (orders || []).reduce((s, o) => s + Number(o.total_tax || 0), 0);
-      totalShipping30d = (orders || []).reduce((s, o) => s + Number(o.total_shipping || 0), 0);
-      totalDiscounts30d = (orders || []).reduce((s, o) => s + Number(o.total_discounts || 0), 0);
-      transactionCount30d = (orders || []).length;
+      totalRevenue30d = (orders30d || []).reduce((s, o) => s + Number(o.total_price || 0), 0);
+      totalCOGS30d = (orders30d || []).reduce((s, o) => s + Number(o.total_cost || 0), 0);
+      totalTax30d = (orders30d || []).reduce((s, o) => s + Number(o.total_tax || 0), 0);
+      totalShipping30d = (orders30d || []).reduce((s, o) => s + Number(o.total_shipping || 0), 0);
+      totalDiscounts30d = (orders30d || []).reduce((s, o) => s + Number(o.total_discounts || 0), 0);
+      transactionCount30d = (orders30d || []).length;
+
+      // MTD actuals
+      const mtdOrders = (orders30d || []).filter((o: any) => o.order_date && o.order_date >= monthStartStr + "T00:00:00Z");
+      mtdRevenue = mtdOrders.reduce((s: number, o: any) => s + Number(o.total_price || 0), 0);
+      mtdTransactions = mtdOrders.length;
+      mtdCOGS = mtdOrders.reduce((s: number, o: any) => s + Number(o.total_cost || 0), 0);
+      mtdTax = mtdOrders.reduce((s: number, o: any) => s + Number(o.total_tax || 0), 0);
+      mtdShipping = mtdOrders.reduce((s: number, o: any) => s + Number(o.total_shipping || 0), 0);
+      mtdDiscounts = mtdOrders.reduce((s: number, o: any) => s + Number(o.total_discounts || 0), 0);
     } else {
       const { data: invoices } = await supabase
         .from("subbly_invoices")
-        .select("amount")
+        .select("amount, invoice_date")
         .eq("client_id", clientId)
         .eq("status", "paid")
         .gte("invoice_date", last30Str + "T00:00:00Z")
         .lte("invoice_date", todayStr + "T23:59:59Z");
       totalRevenue30d = (invoices || []).reduce((s, i) => s + Number(i.amount || 0) / 100, 0);
-      // For Subbly, count subscriptions instead of invoices
       const { data: subs } = await supabase
         .from("subbly_subscriptions")
-        .select("id")
+        .select("id, subbly_created_at")
         .eq("client_id", clientId)
         .gte("subbly_created_at", last30Str + "T05:00:00Z")
         .lte("subbly_created_at", todayStr + "T23:59:59Z");
       transactionCount30d = (subs || []).length;
+
+      // MTD actuals
+      mtdRevenue = (invoices || []).filter((i: any) => i.invoice_date && i.invoice_date >= monthStartStr + "T00:00:00Z")
+        .reduce((s: number, i: any) => s + Number(i.amount || 0) / 100, 0);
+      mtdTransactions = (subs || []).filter((s: any) => s.subbly_created_at && s.subbly_created_at >= monthStartStr + "T05:00:00Z").length;
     }
+
+    // MTD ad spend from daily metrics
+    const mtdAdMetrics = (dailyMetrics || []).filter((r: any) => r.date >= monthStartStr);
+    const mtdSpend = mtdAdMetrics.reduce((s: number, r: any) => s + Number(r.spend || 0), 0);
 
     // Aggregate daily data
     const dailyAgg = aggregateDaily(dailyMetrics || []);
@@ -136,10 +163,15 @@ Deno.serve(async (req) => {
       }, 200);
     }
 
+    const mtdActuals = {
+      spend: mtdSpend, revenue: mtdRevenue, transactions: mtdTransactions,
+      cogs: mtdCOGS, tax: mtdTax, shipping: mtdShipping, discounts: mtdDiscounts,
+    };
+
     // === MODULE 1: Scenario Forecasting ===
     const baseline = computeBaselineForecast(dailyAgg, totalRevenue30d, daysWithData, transactionCount30d, revenueSource, {
       cogs: totalCOGS30d, tax: totalTax30d, shipping: totalShipping30d, discounts: totalDiscounts30d,
-    });
+    }, mtdActuals);
     const spendAdjusted = computeSpendAdjustedForecast(baseline, scenarioParams.spend_change_pct);
     const efficiencyAdjusted = computeEfficiencyForecast(baseline, scenarioParams);
 
