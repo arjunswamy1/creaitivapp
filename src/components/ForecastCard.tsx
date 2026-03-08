@@ -51,7 +51,7 @@ const ForecastCard = () => {
       {/* Month progress */}
       <div className="mb-5">
         <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-          <span>Month Progress</span>
+          <span>Day {forecast.days_elapsed} of {forecast.total_days} ({forecast.days_remaining} remaining)</span>
           <span>{monthProgress}%</span>
         </div>
         <Progress value={monthProgress} className="h-2" />
