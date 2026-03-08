@@ -323,6 +323,32 @@ async function fetchAdCreatives(accountId: string, accessToken: string): Promise
   return map;
 }
 
+async function fetchEntityStatuses(accountId: string, accessToken: string, entityType: "campaigns" | "adsets"): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/${entityType}?fields=id,effective_status&limit=500&access_token=${accessToken}`;
+  
+  try {
+    while (url) {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.error) {
+        console.error(`${entityType} status error:`, data.error.message);
+        break;
+      }
+      if (data.data) {
+        for (const entity of data.data) {
+          map.set(entity.id, entity.effective_status?.toLowerCase() || "unknown");
+        }
+      }
+      url = data.paging?.next || null;
+    }
+  } catch (err) {
+    console.error(`Failed to fetch ${entityType} statuses:`, err);
+  }
+  console.log(`Fetched statuses for ${map.size} ${entityType}`);
+  return map;
+}
+
 function detectFormat(adName: string, creative: any): string {
   const objectType = creative?.object_type?.toLowerCase() || "";
   if (objectType.includes("video")) return "video";
