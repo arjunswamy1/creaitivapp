@@ -321,7 +321,7 @@ function aggregateDaily(rows: any[]): DailyData[] {
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number, transactionCount: number, revenueSource: string, costBreakdown?: { cogs: number; tax: number; shipping: number; discounts: number }) {
+function computeBaselineForecast(daily: DailyData[], actualRevenue: number, daysWithData: number, transactionCount: number, revenueSource: string, costBreakdown?: { cogs: number; tax: number; shipping: number; discounts: number }, mtdActuals?: { spend: number; revenue: number; transactions: number; cogs: number; tax: number; shipping: number; discounts: number }) {
   const last30 = daily.slice(-30);
   const totalSpend = last30.reduce((s, d) => s + d.spend, 0);
   const totalConversions = last30.reduce((s, d) => s + d.conversions, 0);
@@ -337,23 +337,26 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
   // Calculate remaining days in current month
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-indexed
+  const currentMonth = now.getMonth();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const currentDay = now.getDate();
   const daysElapsed = currentDay;
   // Today is incomplete, so include it in remaining days for projections
   const daysRemaining = daysInMonth - currentDay + 1;
-  const forecastDays = daysInMonth;
+  const completedDays = currentDay - 1;
 
-  // Month-to-date actuals (use weighted avg from lookback data)
-  const mtdSpend = avgDailySpend * daysElapsed;
-  const mtdRevenue = avgDailyRevenue * daysElapsed;
+  // Use MTD actuals + projected remaining (instead of pure trailing avg * full month)
+  // This ensures the forecast reflects what actually happened this month
+  const mtdSpendActual = mtdActuals?.spend ?? (avgDailySpend * completedDays);
+  const mtdRevenueActual = mtdActuals?.revenue ?? (avgDailyRevenue * completedDays);
+  const mtdTransactionsActual = mtdActuals?.transactions ?? Math.round(avgDailyTransactions * completedDays);
 
-  const projectedSpend = avgDailySpend * forecastDays;
-  const projectedRevenue = avgDailyRevenue * forecastDays;
-  const projectedTransactions = Math.round(avgDailyTransactions * forecastDays);
-  // CPA based on actual transactions (subscribers/orders), not platform-reported conversions
-  const projectedCPA = avgDailyTransactions > 0 ? avgDailySpend / avgDailyTransactions : 0;
+  const projectedSpend = mtdSpendActual + (avgDailySpend * daysRemaining);
+  const projectedRevenue = mtdRevenueActual + (avgDailyRevenue * daysRemaining);
+  const projectedTransactions = mtdTransactionsActual + Math.round(avgDailyTransactions * daysRemaining);
+
+  // CPA based on actual transactions, not platform-reported conversions
+  const projectedCPA = projectedTransactions > 0 ? projectedSpend / projectedTransactions : 0;
   const projectedMER = projectedSpend > 0 ? projectedRevenue / projectedSpend : 0;
 
   // Confidence based on data volume and variance
@@ -380,20 +383,30 @@ function computeBaselineForecast(daily: DailyData[], actualRevenue: number, days
     });
   }
 
-  // Profit breakdown for Shopify clients
+  // Profit breakdown for Shopify clients — use MTD actuals + projected remaining
   let profitBreakdown = undefined;
   if (revenueSource === "shopify" && costBreakdown) {
-    const scaleFactor = activeDays > 0 ? forecastDays / activeDays : 1;
-    const projCOGS = Math.round(costBreakdown.cogs * scaleFactor);
-    const projTax = Math.round(costBreakdown.tax * scaleFactor);
-    const projShipping = Math.round(costBreakdown.shipping * scaleFactor);
-    const projDiscounts = Math.round(costBreakdown.discounts * scaleFactor);
-    const projProfit = Math.round(projectedRevenue) - Math.round(projectedSpend) - projCOGS - projTax - projShipping - projDiscounts;
+    const mtdCOGSActual = mtdActuals?.cogs ?? 0;
+    const mtdTaxActual = mtdActuals?.tax ?? 0;
+    const mtdShippingActual = mtdActuals?.shipping ?? 0;
+    const mtdDiscountsActual = mtdActuals?.discounts ?? 0;
+
+    // Per-day cost rates from 30-day lookback for projecting remaining days
+    const dailyCOGSRate = activeDays > 0 ? costBreakdown.cogs / activeDays : 0;
+    const dailyTaxRate = activeDays > 0 ? costBreakdown.tax / activeDays : 0;
+    const dailyShippingRate = activeDays > 0 ? costBreakdown.shipping / activeDays : 0;
+    const dailyDiscountsRate = activeDays > 0 ? costBreakdown.discounts / activeDays : 0;
+
+    const projCOGS = Math.round(mtdCOGSActual + dailyCOGSRate * daysRemaining);
+    const projTaxShipping = Math.round((mtdTaxActual + mtdShippingActual) + (dailyTaxRate + dailyShippingRate) * daysRemaining);
+    const projDiscounts = Math.round(mtdDiscountsActual + dailyDiscountsRate * daysRemaining);
+    const projProfit = Math.round(projectedRevenue) - Math.round(projectedSpend) - projCOGS - projTaxShipping - projDiscounts;
+
     profitBreakdown = {
       projected_revenue: Math.round(projectedRevenue),
       projected_ad_spend: Math.round(projectedSpend),
       projected_cogs: projCOGS,
-      projected_tax_shipping: projTax + projShipping,
+      projected_tax_shipping: projTaxShipping,
       projected_discounts: projDiscounts,
       projected_profit: projProfit,
     };
