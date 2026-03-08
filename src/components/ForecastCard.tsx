@@ -30,7 +30,7 @@ const ForecastCard = () => {
   if (!forecast) return null;
 
   const monthProgress = forecast.total_days > 0
-    ? Math.round((forecast.days_elapsed / forecast.total_days) * 100)
+    ? Math.round(((forecast.completed_days || forecast.days_elapsed - 1) / forecast.total_days) * 100)
     : 0;
 
   const profitIsPositive = (forecast.month_total_profit || 0) >= 0;
