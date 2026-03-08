@@ -171,10 +171,10 @@ Deno.serve(async (req) => {
   const daysWithData = completedSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
 
   const recentWindow = 7;
-  const recentDays = mtdSeries.slice(-recentWindow);
-  const olderDays = mtdSeries.slice(0, -recentWindow);
+  const recentDays = completedSeries.slice(-recentWindow);
+  const olderDays = completedSeries.slice(0, -recentWindow);
 
-  const weightedAvg = (arr: typeof mtdSeries, older: typeof mtdSeries, field: string) => {
+  const weightedAvg = (arr: typeof completedSeries, older: typeof completedSeries, field: string) => {
     const recentAvg = arr.length > 0 ? arr.reduce((s, d) => s + Number((d as any)[field]), 0) / arr.length : 0;
     const olderAvg = older.length > 0 ? older.reduce((s, d) => s + Number((d as any)[field]), 0) / older.length : recentAvg;
     if (older.length > 0) return (recentAvg * 2 + olderAvg * 1) / 3;
@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
   const projDailyTaxes = weightedAvg(recentDays, olderDays, "taxes");
   const projDailyDiscounts = weightedAvg(recentDays, olderDays, "discounts");
 
-  const last3 = mtdSeries.slice(-3);
+  const last3 = completedSeries.slice(-3);
   const last3AvgSubs = last3.length > 0 ? last3.reduce((s, d) => s + d.subs, 0) / last3.length : 0;
   const overallAvgSubs = actualOrders / daysWithData;
   const rawTrend = overallAvgSubs > 0 ? last3AvgSubs / overallAvgSubs : 1;
