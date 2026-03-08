@@ -147,6 +147,8 @@ Deno.serve(async (req) => {
     mtdDailySpend.set(row.date, (mtdDailySpend.get(row.date) || 0) + Number(row.spend));
   }
 
+  // Build MTD series — include today for actuals but use yesterday as the
+  // last "complete" day for projection averages (today's data is partial).
   const mtdDates: string[] = [];
   for (let i = 1; i <= today; i++) {
     const d = new Date(now.getFullYear(), now.getMonth(), i);
@@ -163,7 +165,10 @@ Deno.serve(async (req) => {
     discounts: mtdDailyCosts.get(d)?.discounts || 0,
   }));
 
-  const daysWithData = mtdSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
+  // Use only completed days (exclude today) for projection averages.
+  // Today's partial data would otherwise drag down all daily rate estimates.
+  const completedSeries = mtdSeries.slice(0, -1);
+  const daysWithData = completedSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
 
   const recentWindow = 7;
   const recentDays = mtdSeries.slice(-recentWindow);
