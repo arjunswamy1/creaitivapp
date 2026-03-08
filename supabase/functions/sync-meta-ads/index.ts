@@ -295,7 +295,7 @@ async function fetchInsightsChunked(accountId: string, accessToken: string, sinc
 
 async function fetchAdCreatives(accountId: string, accessToken: string): Promise<Map<string, any>> {
   const map = new Map<string, any>();
-  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,creative{object_type,thumbnail_url,effective_object_story_id}&limit=500&access_token=${accessToken}`;
+  let url: string | null = `https://graph.facebook.com/v21.0/${accountId}/ads?fields=id,effective_status,creative{object_type,thumbnail_url,effective_object_story_id}&limit=500&access_token=${accessToken}`;
   
   try {
     while (url) {
