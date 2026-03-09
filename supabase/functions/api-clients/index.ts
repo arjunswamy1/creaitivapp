@@ -120,6 +120,9 @@ Deno.serve(async (req) => {
           logoUrl: c.logo_url,
           platforms,
           revenueSource: config?.revenue_source || "subbly",
+          kpi: config?.kpi || "ROAS",
+          target: config?.target ?? 0,
+          ...(config?.break_even_roas != null && { breakEvenROAS: config.break_even_roas }),
           accountIds,
         };
       }),
