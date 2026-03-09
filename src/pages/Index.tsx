@@ -2,10 +2,11 @@ import DashboardHeader from "@/components/DashboardHeader";
 import CrossChannelView from "@/components/CrossChannelView";
 import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
+import BillyDashboard from "@/components/BillyDashboard";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap } from "lucide-react";
 
 const DashboardContent = () => {
   const { dashboardConfig } = useClient();
