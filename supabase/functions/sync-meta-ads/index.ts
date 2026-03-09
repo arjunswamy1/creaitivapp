@@ -413,8 +413,8 @@ function formatMetaObjective(objective: string): string {
 }
 
 const PURCHASE_ACTIONS = [
-  "purchase", "omni_purchase", "web_in_store_purchase",
-  "offsite_conversion.fb_pixel_purchase", "offsite_conversion.custom.purchase",
+  "purchase",
+  "offsite_conversion.fb_pixel_purchase",
 ];
 
 const ADD_TO_CART_ACTIONS = [
