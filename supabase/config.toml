@@ -47,3 +47,12 @@ verify_jwt = false
 
 [functions.notion-check-token]
 verify_jwt = false
+
+[functions.api-campaigns]
+verify_jwt = false
+
+[functions.api-ads]
+verify_jwt = false
+
+[functions.api-clients]
+verify_jwt = false
