@@ -2,9 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @layer base {
+  #lovable-badge {
+    display: none !important;
+  }
+
   :root {
     --background: 230 40% 16%;
     --foreground: 0 0% 98%;
@@ -36,8 +40,8 @@
 
     --radius: 0.75rem;
 
-    --font-heading: 'Inter', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    --font-heading: "Inter", sans-serif;
+    --font-body: "Inter", sans-serif;
 
     /* Platform colors */
     --meta: 214 89% 52%;
@@ -79,12 +83,14 @@
     font-family: var(--font-body);
   }
 
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     font-family: var(--font-heading);
   }
 
   .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
   }
 }
 
