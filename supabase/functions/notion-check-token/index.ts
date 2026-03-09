@@ -1,27 +1,10 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-// Note: In edge functions, each invocation is isolated. 
-// We'll use a shared KV approach via the redirect function's store.
-// Since Deno Deploy isolates don't share memory, we use a simple workaround:
-// The redirect function stores tokens, and this function checks them.
-// For production, use a database. For now, we'll check by re-importing.
-
-// Since edge functions are isolated, we need a shared store.
-// We'll use a simple in-memory Map that's populated by the redirect function.
-// In practice on Deno Deploy, we'd need a DB. Let's use a global Map.
-
-const tokenStore = new Map<string, { token: string; workspace: string; expiresAt: number }>();
-
-// Make tokenStore accessible globally so both functions can share it
-// @ts-ignore - globalThis extension
-if (!globalThis.__notionTokenStore) {
-  // @ts-ignore
-  globalThis.__notionTokenStore = tokenStore;
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -30,8 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const pathParts = url.pathname.split("/");
-    const state = pathParts[pathParts.length - 1] || url.searchParams.get("state");
+    const state = url.searchParams.get("state");
 
     if (!state) {
       return new Response(
@@ -40,19 +22,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // @ts-ignore
-    const store = globalThis.__notionTokenStore as Map<string, { token: string; workspace: string; expiresAt: number }>;
-    const entry = store?.get(state);
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    if (!entry) {
+    const { data: entry, error } = await supabase
+      .from("notion_oauth_tokens")
+      .select("access_token, workspace_name, expires_at")
+      .eq("state", state)
+      .single();
+
+    if (error || !entry) {
       return new Response(
         JSON.stringify({ status: "pending" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (Date.now() > entry.expiresAt) {
-      store.delete(state);
+    // Check expiry
+    if (new Date(entry.expires_at) < new Date()) {
+      await supabase.from("notion_oauth_tokens").delete().eq("state", state);
       return new Response(
         JSON.stringify({ status: "expired" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -60,8 +50,8 @@ Deno.serve(async (req) => {
     }
 
     // Return token and clean up
-    const result = { status: "ready", token: entry.token, workspace: entry.workspace };
-    store.delete(state);
+    const result = { status: "ready", token: entry.access_token, workspace: entry.workspace_name };
+    await supabase.from("notion_oauth_tokens").delete().eq("state", state);
 
     return new Response(
       JSON.stringify(result),
