@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         .in("client_id", allClientIds),
       supabaseAdmin
         .from("client_dashboard_config")
-        .select("client_id, enabled_platforms, revenue_source")
+        .select("client_id, enabled_platforms, revenue_source, kpi, target, break_even_roas")
         .in("client_id", allClientIds),
     ]);
 
