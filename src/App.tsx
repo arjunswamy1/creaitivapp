@@ -69,6 +69,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/notion/redirect" element={<NotionRedirect />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrandingProvider>
