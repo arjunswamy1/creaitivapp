@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         grant_type: "authorization_code",
         code,
-        redirect_uri: "https://creaitivapp.lovable.app/notion/redirect",
+        redirect_uri: "https://creaitivapp.com/notion/redirect",
       }),
     });
 
