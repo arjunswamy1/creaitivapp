@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import BudgetPlanner from "./pages/BudgetPlanner";
 import OptimizationEngine from "./pages/OptimizationEngine";
 import ClientManagementHub from "./pages/ClientManagementHub";
+import NotionRedirect from "./pages/NotionRedirect";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -68,6 +69,7 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/notion/redirect" element={<NotionRedirect />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrandingProvider>

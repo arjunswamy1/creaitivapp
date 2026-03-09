@@ -6,7 +6,7 @@ import { toast } from "@/hooks/use-toast";
 
 const NOTION_CLIENT_ID = "31bd872b-594c-8179-93eb-0037c224e8a6";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/notion-oauth-redirect`;
+const REDIRECT_URI = "https://creaitivapp.com/notion/redirect";
 
 function generateState() {
   return crypto.randomUUID();
