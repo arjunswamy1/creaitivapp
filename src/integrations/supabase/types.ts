@@ -709,6 +709,33 @@ export type Database = {
           },
         ]
       }
+      notion_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          state: string
+          workspace_name: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          state: string
+          workspace_name?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          state?: string
+          workspace_name?: string | null
+        }
+        Relationships: []
+      }
       optimization_recommendations: {
         Row: {
           action: string
