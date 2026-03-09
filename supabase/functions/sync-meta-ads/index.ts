@@ -413,8 +413,8 @@ function formatMetaObjective(objective: string): string {
 }
 
 const PURCHASE_ACTIONS = [
-  "purchase", "omni_purchase", "web_in_store_purchase",
-  "offsite_conversion.fb_pixel_purchase", "offsite_conversion.custom.purchase",
+  "purchase",
+  "offsite_conversion.fb_pixel_purchase",
 ];
 
 const ADD_TO_CART_ACTIONS = [
@@ -430,8 +430,8 @@ function extractMetrics(row: any) {
 
   if (row.actions) {
     for (const a of row.actions) {
-      if (PURCHASE_ACTIONS.includes(a.action_type)) { conversions += parseInt(a.value || "0"); }
-      if (ADD_TO_CART_ACTIONS.includes(a.action_type)) { addToCart += parseInt(a.value || "0"); }
+      if (conversions === 0 && PURCHASE_ACTIONS.includes(a.action_type)) { conversions = parseInt(a.value || "0"); }
+      if (addToCart === 0 && ADD_TO_CART_ACTIONS.includes(a.action_type)) { addToCart = parseInt(a.value || "0"); }
     }
   }
   if (row.action_values) {
