@@ -1,18 +1,10 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-// In-memory token store with 5-min expiry
-const tokenStore = new Map<string, { token: string; workspace: string; expiresAt: number }>();
-
-function cleanupExpired() {
-  const now = Date.now();
-  for (const [key, val] of tokenStore) {
-    if (now > val.expiresAt) tokenStore.delete(key);
-  }
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Accept POST with JSON body { code, state }
     const { code, state } = await req.json();
 
     if (!code || !state) {
@@ -60,13 +51,23 @@ Deno.serve(async (req) => {
     const accessToken = tokenData.access_token;
     const workspaceName = tokenData.workspace_name || "Unknown Workspace";
 
-    // Store token in memory with 5-min expiry
-    cleanupExpired();
-    tokenStore.set(state, {
-      token: accessToken,
-      workspace: workspaceName,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
+    // Store token in database
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { error: dbError } = await supabase
+      .from("notion_oauth_tokens")
+      .upsert({
+        state,
+        access_token: accessToken,
+        workspace_name: workspaceName,
+      }, { onConflict: "state" });
+
+    if (dbError) {
+      console.error("Failed to store token:", dbError.message);
+    }
 
     return new Response(JSON.stringify({ success: true, workspace: workspaceName }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -79,5 +80,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-
-export { tokenStore };
