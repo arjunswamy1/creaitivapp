@@ -60,6 +60,14 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/client-management"
+                  element={
+                    <ProtectedRoute>
+                      <ClientManagementHub />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrandingProvider>

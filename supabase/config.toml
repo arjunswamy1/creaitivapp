@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.forecast]
 verify_jwt = false
+
+[functions.notion-oauth-redirect]
+verify_jwt = false
+
+[functions.notion-check-token]
+verify_jwt = false
