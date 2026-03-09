@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
         .in("client_id", allClientIds),
       supabaseAdmin
         .from("client_dashboard_config")
-        .select("client_id, enabled_platforms, revenue_source")
+        .select("client_id, enabled_platforms, revenue_source, kpi, target, break_even_roas")
         .in("client_id", allClientIds),
     ]);
 
@@ -120,6 +120,9 @@ Deno.serve(async (req) => {
           logoUrl: c.logo_url,
           platforms,
           revenueSource: config?.revenue_source || "subbly",
+          kpi: config?.kpi || "ROAS",
+          target: config?.target ?? 0,
+          ...(config?.break_even_roas != null && { breakEvenROAS: config.break_even_roas }),
           accountIds,
         };
       }),

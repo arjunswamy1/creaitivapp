@@ -422,33 +422,42 @@ export type Database = {
       }
       client_dashboard_config: {
         Row: {
+          break_even_roas: number | null
           client_id: string
           created_at: string
           custom_metrics: Json | null
           enabled_kpis: string[] | null
           enabled_platforms: string[] | null
           id: string
+          kpi: string
           revenue_source: string
+          target: number
           updated_at: string
         }
         Insert: {
+          break_even_roas?: number | null
           client_id: string
           created_at?: string
           custom_metrics?: Json | null
           enabled_kpis?: string[] | null
           enabled_platforms?: string[] | null
           id?: string
+          kpi?: string
           revenue_source?: string
+          target?: number
           updated_at?: string
         }
         Update: {
+          break_even_roas?: number | null
           client_id?: string
           created_at?: string
           custom_metrics?: Json | null
           enabled_kpis?: string[] | null
           enabled_platforms?: string[] | null
           id?: string
+          kpi?: string
           revenue_source?: string
+          target?: number
           updated_at?: string
         }
         Relationships: [
