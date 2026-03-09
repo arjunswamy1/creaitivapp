@@ -430,8 +430,8 @@ function extractMetrics(row: any) {
 
   if (row.actions) {
     for (const a of row.actions) {
-      if (PURCHASE_ACTIONS.includes(a.action_type)) { conversions += parseInt(a.value || "0"); }
-      if (ADD_TO_CART_ACTIONS.includes(a.action_type)) { addToCart += parseInt(a.value || "0"); }
+      if (conversions === 0 && PURCHASE_ACTIONS.includes(a.action_type)) { conversions = parseInt(a.value || "0"); }
+      if (addToCart === 0 && ADD_TO_CART_ACTIONS.includes(a.action_type)) { addToCart = parseInt(a.value || "0"); }
     }
   }
   if (row.action_values) {
