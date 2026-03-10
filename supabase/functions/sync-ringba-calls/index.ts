@@ -139,6 +139,27 @@ Deno.serve(async (req) => {
 
     console.log(`Total fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
 
+    // Collect diagnostic info from first few calls
+    const diagnostics: any[] = [];
+    for (const s of uniqueCalls.slice(0, 5)) {
+      diagnostics.push({
+        id: s.inboundCallId,
+        conversionAmount: s.conversionAmount,
+        profitGross: s.profitGross,
+        totalCost: s.totalCost,
+        payoutAmount: s.payoutAmount,
+        revenue: s.revenue,
+        buyerCallPrice: s.buyerCallPrice,
+        forceBilled: s.forceBilled,
+        adjustedPayoutAmount: s.adjustedPayoutAmount,
+        adjustedRevenue: s.adjustedRevenue,
+        hasPayout: s.hasPayout,
+        hasConverted: s.hasConverted,
+        endCallSource: s.endCallSource,
+        allKeys: Object.keys(s),
+      });
+    }
+
     // Upsert in batches
     let upserted = 0;
     const batchSize = 100;
@@ -185,7 +206,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, total_fetched: allCalls.length, unique: uniqueCalls.length, upserted }),
+      JSON.stringify({ success: true, total_fetched: allCalls.length, unique: uniqueCalls.length, upserted, diagnostics }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
