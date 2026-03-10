@@ -13,7 +13,7 @@ export interface VerticalRingbaMetrics {
 }
 
 function emptyVertical(): VerticalRingbaMetrics {
-  return { totalCalls: 0, connectedCalls: 0, convertedCalls: 0, totalRevenue: 0 };
+  return { totalCalls: 0, connectedCalls: 0, convertedCalls: 0, totalRevenue: 0, avgDuration: 0 };
 }
 
 function calcVertical(calls: any[]): VerticalRingbaMetrics {
