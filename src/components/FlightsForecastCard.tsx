@@ -162,8 +162,9 @@ const FlightsForecastCard = () => {
                   <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" tickFormatter={(v) => `$${v}`} />
                   <Tooltip
                     contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, ""]}
+                    formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
                   />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
                   <Area type="monotone" dataKey="profit" stroke="hsl(var(--accent))" fill="hsl(var(--accent) / 0.15)" name="Profit" />
                   <Area type="monotone" dataKey="callRevenue" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.1)" name="Revenue" />
                   <Area type="monotone" dataKey="spend" stroke="hsl(var(--destructive))" fill="hsl(var(--destructive) / 0.08)" name="Spend" />
