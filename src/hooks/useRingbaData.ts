@@ -45,7 +45,7 @@ export function useRingbaData() {
       const calls = (data || []) as any[];
       const totalCalls = calls.length;
       const connectedCalls = calls.filter((c) => c.connected).length;
-      const convertedCalls = calls.filter((c) => c.converted).length;
+      const convertedCalls = calls.filter((c) => c.converted && c.connected && Number(c.duration_seconds || 0) > 0).length;
       const totalRevenue = calls.reduce((s, c) => s + Number(c.revenue || 0), 0);
       const totalPayout = calls.reduce((s, c) => s + Number(c.payout || 0), 0);
       const avgDuration = totalCalls > 0
