@@ -134,16 +134,17 @@ const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
   
   const { data: ringbaByVertical, isLoading: ringbaLoading } = useRingbaByVertical();
-  const ringba = ringbaByVertical ? {
-    totalCalls: ringbaByVertical.allFlights.totalCalls,
-    connectedCalls: ringbaByVertical.allFlights.connectedCalls,
-    convertedCalls: ringbaByVertical.allFlights.convertedCalls,
-    totalRevenue: ringbaByVertical.allFlights.totalRevenue,
-    connectRate: ringbaByVertical.allFlights.totalCalls > 0 ? (ringbaByVertical.allFlights.connectedCalls / ringbaByVertical.allFlights.totalCalls) * 100 : 0,
-    conversionRate: ringbaByVertical.allFlights.totalCalls > 0 ? (ringbaByVertical.allFlights.convertedCalls / ringbaByVertical.allFlights.totalCalls) * 100 : 0,
-    revenuePerCall: ringbaByVertical.allFlights.connectedCalls > 0 ? ringbaByVertical.allFlights.totalRevenue / ringbaByVertical.allFlights.connectedCalls : 0,
-    avgDuration: 0,
-  const ringbaAvgDuration = ringbaByVertical?.allFlights.avgDuration ?? 0;
+  const flightsRingba = ringbaByVertical?.allFlights;
+  const ringba = flightsRingba ? {
+    totalCalls: flightsRingba.totalCalls,
+    connectedCalls: flightsRingba.connectedCalls,
+    convertedCalls: flightsRingba.convertedCalls,
+    totalRevenue: flightsRingba.totalRevenue,
+    connectRate: flightsRingba.totalCalls > 0 ? (flightsRingba.connectedCalls / flightsRingba.totalCalls) * 100 : 0,
+    conversionRate: flightsRingba.totalCalls > 0 ? (flightsRingba.convertedCalls / flightsRingba.totalCalls) * 100 : 0,
+    revenuePerCall: flightsRingba.connectedCalls > 0 ? flightsRingba.totalRevenue / flightsRingba.connectedCalls : 0,
+    avgDuration: flightsRingba.avgDuration,
+  } : null;
   const [syncing, setSyncing] = useState(false);
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
