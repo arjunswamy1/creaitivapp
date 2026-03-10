@@ -40,10 +40,10 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                 <th className="text-left py-3 text-muted-foreground font-medium">Type</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Bid Strategy</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
-                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>}
-                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
-                <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
-                <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>
+                {!isGoogle && platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>}
+                {!isGoogle && platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
+                {platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>}
+                {platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>}
                 {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Status</th>
               </tr>
@@ -76,10 +76,10 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
-                    {!isGoogle && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
-                    {!isGoogle && <td className="py-3 text-right font-mono">{c.roas}x</td>}
-                    <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>
-                    <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>
+                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
+                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">{c.roas}x</td>}
+                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>}
+                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>}
                     {isGoogle && (
                       <td className="py-3 text-right font-mono">
                         {c.impressionShare != null ? (
