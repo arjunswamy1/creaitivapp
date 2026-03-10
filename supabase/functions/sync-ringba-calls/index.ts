@@ -46,13 +46,6 @@ Deno.serve(async (req) => {
     const requestBody: any = {
       reportStart: formatDate(startDate),
       reportEnd: formatDate(endDate),
-      filters: [
-        {
-          column: "CampaignName",
-          operand: "Is",
-          value: "Premium Flights Call Flow",
-        },
-      ],
       pageSize: 500,
       pageNumber: 1,
     };
