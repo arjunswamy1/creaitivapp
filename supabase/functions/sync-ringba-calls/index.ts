@@ -56,9 +56,13 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter for all Flights campaigns (Premium + Mixed + any future variants)
+    // Client-side filter for Billy verticals: Flights + Bath campaigns
     const matching = records.filter(
-      (c: any) => c.campaignName && c.campaignName.toLowerCase().includes("flights")
+      (c: any) => {
+        if (!c.campaignName) return false;
+        const name = c.campaignName.toLowerCase();
+        return name.includes("flights") || name.includes("bath");
+      }
     );
 
     // Log revenue-related fields from first few matching calls for diagnostics

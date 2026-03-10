@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
-import { useRingbaData } from "@/hooks/useRingbaData";
+import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { format, differenceInDays, subDays } from "date-fns";
 import KPICard from "@/components/KPICard";
 import CampaignTable from "@/components/CampaignTable";
@@ -117,21 +117,35 @@ function useBillyVerticalKPIs() {
 
 const BillyMetaDashboard = () => {
   const { data, isLoading } = useBillyVerticalKPIs();
-  const { data: ringba } = useRingbaData();
+  const { data: ringba, isLoading: ringbaLoading } = useRingbaByVertical();
 
   const flights = data?.flights;
   const bath = data?.bath;
   const total = data?.total;
 
-  // Ringba-based metrics for Flights
-  const ringbaRevenue = ringba?.totalRevenue ?? 0;
-  const ringbaConversions = ringba?.convertedCalls ?? 0;
+  // Per-vertical Ringba metrics
+  const flightsRingba = ringba?.allFlights;
+  const bathRingba = ringba?.bath;
+  const allRingba = ringba?.all;
+
   const flightsSpend = flights?.spend ?? 0;
-  const flightsRoas = flightsSpend > 0 ? Math.round((ringbaRevenue / flightsSpend) * 100) / 100 : 0;
-  const flightsCpa = ringbaConversions > 0 ? Math.round((flightsSpend / ringbaConversions) * 100) / 100 : 0;
-  // Blended ROAS for total account using Ringba revenue
+  const flightsRevenue = flightsRingba?.totalRevenue ?? 0;
+  const flightsConversions = flightsRingba?.convertedCalls ?? 0;
+  const flightsRoas = flightsSpend > 0 ? Math.round((flightsRevenue / flightsSpend) * 100) / 100 : 0;
+  const flightsCpa = flightsConversions > 0 ? Math.round((flightsSpend / flightsConversions) * 100) / 100 : 0;
+
+  const bathSpend = bath?.spend ?? 0;
+  const bathRevenue = bathRingba?.totalRevenue ?? 0;
+  const bathConversions = bathRingba?.convertedCalls ?? 0;
+  const bathRoas = bathSpend > 0 ? Math.round((bathRevenue / bathSpend) * 100) / 100 : 0;
+  const bathCpa = bathConversions > 0 ? Math.round((bathSpend / bathConversions) * 100) / 100 : 0;
+
   const totalSpend = total?.spend ?? 0;
-  const blendedRoas = totalSpend > 0 ? Math.round((ringbaRevenue / totalSpend) * 100) / 100 : 0;
+  const totalRevenue = allRingba?.totalRevenue ?? 0;
+  const totalConversions = allRingba?.convertedCalls ?? 0;
+  const blendedRoas = totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : 0;
+
+  const loading = isLoading || ringbaLoading;
 
   return (
     <>
@@ -142,19 +156,19 @@ const BillyMetaDashboard = () => {
             <DollarSign className="w-4 h-4 text-primary" />
             <CardTitle className="text-base">Meta Account Totals</CardTitle>
           </div>
-          <p className="text-xs text-muted-foreground">All campaigns combined (Flights + Bath + Other)</p>
+          <p className="text-xs text-muted-foreground">All campaigns combined — revenue from Ringba</p>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <KPICard title="Total Meta Spend" value={`$${totalSpend.toLocaleString()}`} />
-              <KPICard title="Ringba Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle="Flights calls" />
+              <KPICard title="Ringba Revenue" value={`$${totalRevenue.toLocaleString()}`} subtitle="All verticals" />
               <KPICard title="Blended ROAS" value={`${blendedRoas}x`} subtitle="Ringba rev ÷ all spend" />
-              <KPICard title="Conversions" value={ringbaConversions.toLocaleString()} subtitle="Ringba converted" />
+              <KPICard title="Conversions" value={totalConversions.toLocaleString()} subtitle="Ringba converted" />
             </div>
           )}
         </CardContent>
@@ -167,19 +181,21 @@ const BillyMetaDashboard = () => {
             <Plane className="w-4 h-4 text-primary" />
             <CardTitle className="text-base">✈️ Flights Campaigns</CardTitle>
           </div>
-          <p className="text-xs text-muted-foreground">Campaigns matching "Flight" — lead-gen / call monetization</p>
+          <p className="text-xs text-muted-foreground">
+            Premium + Mixed Flights — revenue from Ringba Flights campaigns
+          </p>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {loading ? (
             <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
               {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
               <KPICard title="Spend" value={`$${flightsSpend.toLocaleString()}`} change={flights?.changes.spend} invertColor />
-              <KPICard title="Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle="Ringba" />
+              <KPICard title="Revenue" value={`$${flightsRevenue.toLocaleString()}`} subtitle="Ringba" />
               <KPICard title="ROAS" value={`${flightsRoas}x`} subtitle="Ringba rev ÷ spend" />
-              <KPICard title="CPA" value={`$${flightsCpa}`} subtitle="Spend ÷ conversions" invertColor />
+              <KPICard title="CPA" value={`$${flightsCpa}`} subtitle={`${flightsConversions} conv.`} invertColor />
               <KPICard title="CPC" value={`$${flights?.cpc ?? 0}`} change={flights?.changes.cpc} invertColor />
               <KPICard title="CTR" value={`${flights?.ctr ?? 0}%`} change={flights?.changes.ctr} />
               <KPICard title="CPM" value={`$${flights?.cpm ?? 0}`} change={flights?.changes.cpm} invertColor />
@@ -195,21 +211,24 @@ const BillyMetaDashboard = () => {
             <Bath className="w-4 h-4 text-primary" />
             <CardTitle className="text-base">🛁 Bath / Home Services Campaigns</CardTitle>
           </div>
-          <p className="text-xs text-muted-foreground">Campaigns matching "Bath" — lead generation</p>
+          <p className="text-xs text-muted-foreground">
+            Campaigns matching "Bath" — revenue from Ringba Bath campaigns
+          </p>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          {loading ? (
+            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+              {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-              <KPICard title="Spend" value={`$${(bath?.spend ?? 0).toLocaleString()}`} change={bath?.changes.spend} invertColor />
-              <KPICard title="Meta Revenue" value={`$${(bath?.revenue ?? 0).toLocaleString()}`} change={bath?.changes.revenue} subtitle="Meta-reported" />
+            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+              <KPICard title="Spend" value={`$${bathSpend.toLocaleString()}`} change={bath?.changes.spend} invertColor />
+              <KPICard title="Revenue" value={`$${bathRevenue.toLocaleString()}`} subtitle="Ringba" />
+              <KPICard title="ROAS" value={`${bathRoas}x`} subtitle="Ringba rev ÷ spend" />
+              <KPICard title="CPA" value={bathConversions > 0 ? `$${bathCpa}` : "–"} subtitle={`${bathConversions} conv.`} invertColor />
               <KPICard title="CPC" value={`$${bath?.cpc ?? 0}`} change={bath?.changes.cpc} invertColor />
               <KPICard title="CTR" value={`${bath?.ctr ?? 0}%`} change={bath?.changes.ctr} />
               <KPICard title="CPM" value={`$${bath?.cpm ?? 0}`} change={bath?.changes.cpm} invertColor />
-              <KPICard title="ROAS" value={`${bath?.roas ?? 0}x`} change={bath?.changes.roas} subtitle="Meta-reported" />
             </div>
           )}
         </CardContent>
