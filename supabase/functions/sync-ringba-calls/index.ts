@@ -87,11 +87,11 @@ Deno.serve(async (req) => {
 
       allCalls = allCalls.concat(calls);
       
-      if (records.length < 500) {
+      if (records.length < 1000) {
         hasMore = false;
       } else {
-        offset += 500;
-        if (offset > 10000) hasMore = false; // Safety limit
+        offset += 1000;
+        if (offset > 20000) hasMore = false;
       }
     }
 
