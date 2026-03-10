@@ -40,7 +40,7 @@ const DashboardContent = () => {
             </TabsContent>
             {showMeta && (
               <TabsContent value="meta">
-                <MetaDashboard />
+                <BillyMetaDashboard />
               </TabsContent>
             )}
           </Tabs>
