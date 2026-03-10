@@ -81,6 +81,20 @@ Deno.serve(async (req) => {
       
       const records = data.report?.records || [];
       
+      // On first page, log all campaign names containing "flight" or "premium" (case-insensitive)
+      if (offset === 0) {
+        const allNames = [...new Set(records.map((r: any) => r.campaignName))];
+        const flightNames = allNames.filter((n: string) => /flight|premium/i.test(n));
+        console.log("Flight/Premium campaigns found:", JSON.stringify(flightNames));
+        console.log("All campaign names:", JSON.stringify(allNames));
+        
+        // Log date range of records
+        const dates = records.map((r: any) => r.callDt).filter(Boolean).sort();
+        if (dates.length) {
+          console.log("Date range in response:", dates[0], "to", dates[dates.length - 1]);
+        }
+      }
+      
       // Filter to only "Premium Flights Call Flow"
       const calls = records.filter((c: any) => 
         c.campaignName === "Premium Flights Call Flow"
