@@ -82,7 +82,11 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const calls = data.calls || data.records || data.data || [];
+      console.log("Ringba response keys:", JSON.stringify(Object.keys(data)));
+      console.log("Ringba response sample:", JSON.stringify(data).substring(0, 1000));
+      
+      // Try multiple possible response structures
+      const calls = data.callLog?.data || data.calls || data.records || data.data || data.callLogs || [];
 
       console.log(`Page ${page}: got ${calls.length} calls`);
 
