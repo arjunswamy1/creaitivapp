@@ -166,6 +166,15 @@ const BillyDashboard = () => {
 
   return (
     <>
+      {/* Flights Revenue Engine Header */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="h-8 w-1 rounded-full bg-primary" />
+        <div>
+          <h2 className="text-lg font-bold tracking-tight">✈️ Premium Flights — Revenue Engine</h2>
+          <p className="text-xs text-muted-foreground">4-step lead-gen funnel: Traffic → Landing Page → Call Processing → Monetization</p>
+        </div>
+      </div>
+
       {/* Aggregate KPI Row — Step 1: Traffic */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
