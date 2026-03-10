@@ -9,6 +9,7 @@ export interface VerticalRingbaMetrics {
   connectedCalls: number;
   convertedCalls: number;
   totalRevenue: number;
+  avgDuration: number;
 }
 
 function emptyVertical(): VerticalRingbaMetrics {
