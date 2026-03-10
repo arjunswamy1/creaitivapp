@@ -1,6 +1,7 @@
-import { useBillyKPIs, useBillyTopCampaigns } from "@/hooks/useBillyKPIs";
+import { useBillyKPIs } from "@/hooks/useBillyKPIs";
 import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useClient } from "@/contexts/ClientContext";
+import FlightsForecastCard from "@/components/FlightsForecastCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
