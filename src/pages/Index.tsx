@@ -21,7 +21,7 @@ const DashboardContent = () => {
       <div className="min-h-screen bg-background px-6 pb-12">
         <div className="max-w-7xl mx-auto">
           <DashboardHeader />
-          <Tabs defaultValue="revenue-engine" className="w-full">
+          <Tabs key={activeClient?.id} defaultValue="revenue-engine" className="w-full">
             <TabsList className="bg-secondary/50 mb-6">
               <TabsTrigger value="revenue-engine" className="gap-1.5">
                 <Zap className="w-3.5 h-3.5" />
