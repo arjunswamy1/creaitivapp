@@ -10,7 +10,7 @@ type MetaVertical = "flights" | "bath" | "other";
 function categorizeMetaCampaign(name: string): MetaVertical {
   const lower = (name || "").toLowerCase();
   if (lower.includes("flight")) return "flights";
-  if (lower.includes("bath")) return "bath";
+  if (lower.includes("bath") || lower.includes("bathroom")) return "bath";
   return "other";
 }
 

@@ -61,7 +61,7 @@ async function fetchChunk(
       (c: any) => {
         if (!c.campaignName) return false;
         const name = c.campaignName.toLowerCase();
-        return name.includes("flights") || name.includes("bath");
+        return name.includes("flights") || name.includes("bath") || name.includes("bathroom");
       }
     );
 
