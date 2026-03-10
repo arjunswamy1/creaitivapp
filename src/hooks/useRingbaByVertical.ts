@@ -59,7 +59,7 @@ export function useRingbaByVertical() {
       if (!clientId) return { premiumFlights: emptyVertical(), mixedFlights: emptyVertical(), allFlights: emptyVertical(), bath: emptyVertical(), all: emptyVertical() };
 
       const { data, error } = await supabase
-        .from("ringba_calls" as any)
+        .from("ringba_calls")
         .select("duration_seconds, revenue, payout, connected, converted, campaign_name")
         .eq("client_id", clientId)
         .gte("call_date", fromStr + "T00:00:00.000Z")
