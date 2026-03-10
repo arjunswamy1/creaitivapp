@@ -85,17 +85,22 @@ Deno.serve(async (req) => {
       console.log("Ringba response keys:", JSON.stringify(Object.keys(data)));
       console.log("Ringba response sample:", JSON.stringify(data).substring(0, 1000));
       
-      // Try multiple possible response structures
-      const calls = data.callLog?.data || data.calls || data.records || data.data || data.callLogs || [];
+      // Response structure: { report: { records: [...], partialResult: bool } }
+      const records = data.report?.records || data.callLog?.data || data.calls || [];
+      
+      // Filter to only "Premium Flights Call Flow" if the API filter didn't work
+      const calls = records.filter((c: any) => 
+        (c.campaignName || "").includes("Premium Flights Call Flow")
+      );
 
-      console.log(`Page ${page}: got ${calls.length} calls`);
+      console.log(`Page ${page}: got ${records.length} total records, ${calls.length} matching "Premium Flights Call Flow"`);
 
-      if (calls.length === 0) {
+      if (records.length === 0 || data.report?.partialResult === false) {
+        allCalls = allCalls.concat(calls);
         hasMore = false;
       } else {
         allCalls = allCalls.concat(calls);
         page++;
-        // Safety limit
         if (page > 20) hasMore = false;
       }
     }
