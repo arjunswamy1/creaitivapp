@@ -56,9 +56,9 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter for Premium Flights
+    // Client-side filter for all Flights campaigns (Premium + Mixed + any future variants)
     const matching = records.filter(
-      (c: any) => c.campaignName === "Premium Flights Call Flow"
+      (c: any) => c.campaignName && c.campaignName.toLowerCase().includes("flights")
     );
 
     // Log revenue-related fields from first few matching calls for diagnostics
