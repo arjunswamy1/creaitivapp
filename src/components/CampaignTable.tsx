@@ -76,10 +76,10 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
-                    {!isGoogle && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
-                    {!isGoogle && <td className="py-3 text-right font-mono">{c.roas}x</td>}
-                    <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>
-                    <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>
+                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
+                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">{c.roas}x</td>}
+                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>}
+                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>}
                     {isGoogle && (
                       <td className="py-3 text-right font-mono">
                         {c.impressionShare != null ? (
