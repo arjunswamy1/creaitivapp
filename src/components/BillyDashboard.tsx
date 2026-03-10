@@ -137,7 +137,7 @@ const BillyDashboard = () => {
   const visitors = totalClicks;
   const ctaClicks = kpis?.totalConversions ?? 0;
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
-  const rpv = visitors > 0 ? (kpis?.totalRevenue ?? 0) / visitors : 0;
+  const rpv = visitors > 0 ? (ringba?.totalRevenue ?? 0) / visitors : 0;
 
   // Ringba-derived metrics
   const totalCalls = ringba?.totalCalls ?? 0;
