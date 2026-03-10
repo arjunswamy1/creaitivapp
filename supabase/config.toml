@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.api-clients]
 verify_jwt = false
+
+[functions.sync-ringba-calls]
+verify_jwt = false
