@@ -1,5 +1,6 @@
 import { useBillyKPIs } from "@/hooks/useBillyKPIs";
-import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
+import { syncRingbaCalls } from "@/hooks/useRingbaData";
+import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useClient } from "@/contexts/ClientContext";
 import FlightsForecastCard from "@/components/FlightsForecastCard";
 import FlightsRecommendations from "@/components/FlightsRecommendations";
