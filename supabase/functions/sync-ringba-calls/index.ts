@@ -44,9 +44,9 @@ Deno.serve(async (req) => {
     // The Ringba API v2 calllogs endpoint
     const url = `https://api.ringba.com/v2/${RINGBA_ACCOUNT_ID}/calllogs`;
 
-    const requestBody = {
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
+    const requestBody: any = {
+      ReportStart: formatDate(startDate),
+      ReportEnd: formatDate(endDate),
       filters: [
         {
           column: "CallFlowName",
@@ -54,8 +54,8 @@ Deno.serve(async (req) => {
           value: "Premium Flights Call Flow",
         },
       ],
-      pageSize: 500,
-      page: 1,
+      PageSize: 500,
+      PageNumber: 1,
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
