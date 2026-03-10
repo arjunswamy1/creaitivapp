@@ -53,11 +53,11 @@ Deno.serve(async (req) => {
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
 
     let allCalls: any[] = [];
-    let page = 1;
+    let offset = 0;
     let hasMore = true;
 
     while (hasMore) {
-      requestBody.pageNumber = page;
+      requestBody.offset = offset;
 
       const response = await fetch(url, {
         method: "POST",
@@ -75,30 +75,29 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log("Ringba response keys:", JSON.stringify(Object.keys(data)));
-      console.log("Ringba response sample:", JSON.stringify(data).substring(0, 1000));
       
-      // Response structure: { report: { records: [...], partialResult: bool } }
       const records = data.report?.records || [];
       
-      // Log unique campaign names for debugging
-      const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
-      console.log("Campaigns in response:", JSON.stringify(uniqueNames));
+      // Log unique campaign names on first page for debugging
+      if (offset === 0) {
+        const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
+        console.log("Campaigns in response:", JSON.stringify(uniqueNames));
+      }
       
       // Filter to only "Premium Flights Call Flow"
       const calls = records.filter((c: any) => 
         c.campaignName === "Premium Flights Call Flow"
       );
 
-      console.log(`Page ${page}: got ${records.length} total records, ${calls.length} matching`);
+      console.log(`Offset ${offset}: got ${records.length} total records, ${calls.length} matching`);
 
       allCalls = allCalls.concat(calls);
       
-      if (records.length < 500 || data.report?.partialResult === false) {
+      if (records.length < 500) {
         hasMore = false;
       } else {
-        page++;
-        if (page > 20) hasMore = false;
+        offset += 500;
+        if (offset > 10000) hasMore = false; // Safety limit
       }
     }
 
