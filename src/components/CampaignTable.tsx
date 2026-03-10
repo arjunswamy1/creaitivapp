@@ -1,14 +1,64 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms } from "@/hooks/useAdData";
+import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+type MetaVertical = "flights" | "bath" | "other";
+
+function categorizeMetaCampaign(name: string): MetaVertical {
+  const lower = (name || "").toLowerCase();
+  if (lower.includes("flight")) return "flights";
+  if (lower.includes("bath")) return "bath";
+  return "other";
+}
+
+interface RingbaEnriched {
+  ringbaRevenue: number;
+  ringbaConversions: number;
+  ringbaRoas: number;
+}
+
 const CampaignTable = ({ platform }: { platform?: string }) => {
   const { data: campaigns, isLoading } = useTopCampaigns(platform);
+  const { data: ringba } = useRingbaByVertical();
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
   const isGoogle = platform === "google";
+  const isMeta = platform === "meta";
+
+  // For Meta campaigns, distribute Ringba revenue proportionally by spend share within each vertical
+  const ringbaEnrichment = useMemo(() => {
+    if (!isMeta || !campaigns || !ringba) return new Map<string, RingbaEnriched>();
+
+    const verticalSpend: Record<MetaVertical, number> = { flights: 0, bath: 0, other: 0 };
+    const campaignVerticals = new Map<string, MetaVertical>();
+
+    for (const c of campaigns) {
+      const vertical = categorizeMetaCampaign(c.name);
+      campaignVerticals.set(c.name, vertical);
+      verticalSpend[vertical] += c.spend;
+    }
+
+    const verticalRingba: Record<MetaVertical, { revenue: number; conversions: number }> = {
+      flights: { revenue: ringba.allFlights?.totalRevenue ?? 0, conversions: ringba.allFlights?.convertedCalls ?? 0 },
+      bath: { revenue: ringba.bath?.totalRevenue ?? 0, conversions: ringba.bath?.convertedCalls ?? 0 },
+      other: { revenue: 0, conversions: 0 },
+    };
+
+    const result = new Map<string, RingbaEnriched>();
+    for (const c of campaigns) {
+      const vertical = campaignVerticals.get(c.name) || "other";
+      const totalVerticalSpend = verticalSpend[vertical];
+      const spendShare = totalVerticalSpend > 0 ? c.spend / totalVerticalSpend : 0;
+      const rev = Math.round(verticalRingba[vertical].revenue * spendShare);
+      const conv = Math.round(verticalRingba[vertical].conversions * spendShare);
+      const roas = c.spend > 0 ? Math.round((rev / c.spend) * 100) / 100 : 0;
+      result.set(c.name, { ringbaRevenue: rev, ringbaConversions: conv, ringbaRoas: roas });
+    }
+    return result;
+  }, [isMeta, campaigns, ringba]);
 
   const toggleExpand = (name: string, plat: string) => {
     if (expandedCampaign === name) {
@@ -40,16 +90,23 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                 <th className="text-left py-3 text-muted-foreground font-medium">Type</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Bid Strategy</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
-                {!isGoogle && platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">Revenue</th>}
-                {!isGoogle && platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
-                {platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>}
-                {platform !== "meta" && <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>}
+                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue{isMeta ? " (Ringba)" : ""}</th>}
+                {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
+                <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
+                <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>
                 {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c) => (
+              {campaigns.map((c) => {
+                const enriched = ringbaEnrichment.get(c.name);
+                const displayRevenue = isMeta && enriched ? enriched.ringbaRevenue : c.revenue;
+                const displayRoas = isMeta && enriched ? enriched.ringbaRoas : c.roas;
+                const displayConversions = isMeta && enriched ? enriched.ringbaConversions : c.conversions;
+                const displayCpa = displayConversions > 0 ? Math.round(c.spend / displayConversions) : null;
+
+                return (
                 <>
                   <tr
                     key={c.name}
@@ -76,10 +133,10 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
-                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">${c.revenue.toLocaleString()}</td>}
-                    {!isGoogle && platform !== "meta" && <td className="py-3 text-right font-mono">{c.roas}x</td>}
-                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions.toLocaleString()}</td>}
-                    {platform !== "meta" && <td className="py-3 text-right font-mono">{c.conversions > 0 ? `$${Math.round(c.spend / c.conversions)}` : "—"}</td>}
+                    {!isGoogle && <td className="py-3 text-right font-mono">${displayRevenue.toLocaleString()}</td>}
+                    {!isGoogle && <td className="py-3 text-right font-mono">{displayRoas}x</td>}
+                    <td className="py-3 text-right font-mono">{displayConversions.toLocaleString()}</td>
+                    <td className="py-3 text-right font-mono">{displayCpa != null ? `$${displayCpa}` : "—"}</td>
                     {isGoogle && (
                       <td className="py-3 text-right font-mono">
                         {c.impressionShare != null ? (
@@ -101,7 +158,8 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
                     </tr>
                   )}
                 </>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
