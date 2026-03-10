@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     let hasMore = true;
 
     while (hasMore) {
-      requestBody.page = page;
+      requestBody.PageNumber = page;
 
       const response = await fetch(url, {
         method: "POST",
