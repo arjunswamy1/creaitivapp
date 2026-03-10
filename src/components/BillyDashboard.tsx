@@ -1,7 +1,12 @@
 import { useKPIs, useTopCampaigns } from "@/hooks/useAdData";
+import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
+import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight, ArrowDownRight, MousePointerClick, Eye, DollarSign, BarChart3, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight, ArrowDownRight, MousePointerClick, Eye, DollarSign, BarChart3, Target, Phone, PhoneCall, RefreshCw, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface FunnelMetricProps {
   label: string;
