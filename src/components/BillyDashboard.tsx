@@ -63,6 +63,7 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
 
   // Derived metrics
+  // RPV: revenue from calls / landing page visitors
   const rpv = visitors > 0 ? revenue / visitors : 0;
   const maxCpc = rpv; // If RPV > CPC, we can scale
 
