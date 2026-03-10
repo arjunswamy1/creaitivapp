@@ -1,6 +1,7 @@
-import { useBillyKPIs, useBillyTopCampaigns } from "@/hooks/useBillyKPIs";
+import { useBillyKPIs } from "@/hooks/useBillyKPIs";
 import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useClient } from "@/contexts/ClientContext";
+import FlightsForecastCard from "@/components/FlightsForecastCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,7 +130,7 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
-  const { data: campaigns, isLoading: campaignsLoading } = useBillyTopCampaigns();
+  
   const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
@@ -338,36 +339,8 @@ const BillyDashboard = () => {
         </Card>
       )}
 
-      {/* Per-Campaign Funnel Breakdown */}
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Per Campaign Breakdown</h3>
-        {campaignsLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 rounded-xl" />)}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(campaigns || []).map((c) => (
-              <CampaignFunnelRow
-                key={c.name}
-                name={c.name}
-                spend={c.spend}
-                clicks={c.clicks}
-                impressions={c.impressions}
-                conversions={c.conversions}
-                revenue={c.revenue}
-              />
-            ))}
-            {(!campaigns || campaigns.length === 0) && (
-              <Card className="col-span-2 border-dashed">
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  No campaign data yet. Connect the Billy.com Meta ad account in Settings to begin syncing.
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-      </div>
+      {/* Monthly Profit Forecast */}
+      <FlightsForecastCard />
     </>
   );
 };
