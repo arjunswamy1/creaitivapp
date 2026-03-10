@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       reportEnd: formatDate(endDate),
       filters: [
         {
-          column: "CallFlowName",
+          column: "CampaignName",
           operand: "Is",
           value: "Premium Flights Call Flow",
         },
