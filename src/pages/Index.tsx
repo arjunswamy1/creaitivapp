@@ -3,6 +3,7 @@ import CrossChannelView from "@/components/CrossChannelView";
 import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
+import BillyMetaDashboard from "@/components/BillyMetaDashboard";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,7 +40,7 @@ const DashboardContent = () => {
             </TabsContent>
             {showMeta && (
               <TabsContent value="meta">
-                <MetaDashboard />
+                <BillyMetaDashboard />
               </TabsContent>
             )}
           </Tabs>
