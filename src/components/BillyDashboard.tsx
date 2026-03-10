@@ -342,6 +342,9 @@ const BillyDashboard = () => {
 
       {/* Monthly Profit Forecast */}
       <FlightsForecastCard />
+
+      {/* AI Recommendations */}
+      <FlightsRecommendations />
     </>
   );
 };
