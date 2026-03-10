@@ -136,7 +136,8 @@ const BillyDashboard = () => {
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
   const visitors = totalClicks;
-  const ctaClicks = kpis?.totalConversions ?? 0;
+  // CTA Clicks = Ringba total calls (people who clicked the phone CTA on the LP)
+  const ctaClicks = ringba?.totalCalls ?? 0;
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
   const rpv = visitors > 0 ? (ringba?.totalRevenue ?? 0) / visitors : 0;
 
