@@ -123,6 +123,16 @@ const BillyMetaDashboard = () => {
   const bath = data?.bath;
   const total = data?.total;
 
+  // Ringba-based metrics for Flights
+  const ringbaRevenue = ringba?.totalRevenue ?? 0;
+  const ringbaConversions = ringba?.convertedCalls ?? 0;
+  const flightsSpend = flights?.spend ?? 0;
+  const flightsRoas = flightsSpend > 0 ? Math.round((ringbaRevenue / flightsSpend) * 100) / 100 : 0;
+  const flightsCpa = ringbaConversions > 0 ? Math.round((flightsSpend / ringbaConversions) * 100) / 100 : 0;
+  // Blended ROAS for total account using Ringba revenue
+  const totalSpend = total?.spend ?? 0;
+  const blendedRoas = totalSpend > 0 ? Math.round((ringbaRevenue / totalSpend) * 100) / 100 : 0;
+
   return (
     <>
       {/* Total Account Spend/Revenue Summary */}
@@ -141,10 +151,10 @@ const BillyMetaDashboard = () => {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KPICard title="Total Meta Spend" value={`$${(total?.spend ?? 0).toLocaleString()}`} />
-              <KPICard title="Meta Revenue" value={`$${(total?.revenue ?? 0).toLocaleString()}`} subtitle="Meta-reported" />
-              <KPICard title="Ringba Revenue" value={`$${(ringba?.totalRevenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} subtitle="Flights calls" />
-              <KPICard title="Meta ROAS" value={`${total?.roas ?? 0}x`} subtitle="Meta-reported" />
+              <KPICard title="Total Meta Spend" value={`$${totalSpend.toLocaleString()}`} />
+              <KPICard title="Ringba Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle="Flights calls" />
+              <KPICard title="Blended ROAS" value={`${blendedRoas}x`} subtitle="Ringba rev ÷ all spend" />
+              <KPICard title="Conversions" value={ringbaConversions.toLocaleString()} subtitle="Ringba converted" />
             </div>
           )}
         </CardContent>
@@ -161,17 +171,18 @@ const BillyMetaDashboard = () => {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+              {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-              <KPICard title="Spend" value={`$${(flights?.spend ?? 0).toLocaleString()}`} change={flights?.changes.spend} invertColor />
-              <KPICard title="Meta Revenue" value={`$${(flights?.revenue ?? 0).toLocaleString()}`} change={flights?.changes.revenue} subtitle="Meta-reported" />
+            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
+              <KPICard title="Spend" value={`$${flightsSpend.toLocaleString()}`} change={flights?.changes.spend} invertColor />
+              <KPICard title="Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle="Ringba" />
+              <KPICard title="ROAS" value={`${flightsRoas}x`} subtitle="Ringba rev ÷ spend" />
+              <KPICard title="CPA" value={`$${flightsCpa}`} subtitle="Spend ÷ conversions" invertColor />
               <KPICard title="CPC" value={`$${flights?.cpc ?? 0}`} change={flights?.changes.cpc} invertColor />
               <KPICard title="CTR" value={`${flights?.ctr ?? 0}%`} change={flights?.changes.ctr} />
               <KPICard title="CPM" value={`$${flights?.cpm ?? 0}`} change={flights?.changes.cpm} invertColor />
-              <KPICard title="ROAS" value={`${flights?.roas ?? 0}x`} change={flights?.changes.roas} subtitle="Meta-reported" />
             </div>
           )}
         </CardContent>
