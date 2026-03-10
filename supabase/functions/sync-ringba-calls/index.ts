@@ -37,16 +37,15 @@ Deno.serve(async (req) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const formatDate = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const formatDate = (d: Date) => d.toISOString();
 
     // Fetch call logs from Ringba API
     // The Ringba API v2 calllogs endpoint
     const url = `https://api.ringba.com/v2/${RINGBA_ACCOUNT_ID}/calllogs`;
 
-    const requestBody = {
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate),
+    const requestBody: any = {
+      reportStart: formatDate(startDate),
+      reportEnd: formatDate(endDate),
       filters: [
         {
           column: "CallFlowName",
@@ -55,7 +54,7 @@ Deno.serve(async (req) => {
         },
       ],
       pageSize: 500,
-      page: 1,
+      pageNumber: 1,
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
@@ -65,7 +64,7 @@ Deno.serve(async (req) => {
     let hasMore = true;
 
     while (hasMore) {
-      requestBody.page = page;
+      requestBody.pageNumber = page;
 
       const response = await fetch(url, {
         method: "POST",
