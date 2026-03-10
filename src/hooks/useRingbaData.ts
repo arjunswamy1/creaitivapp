@@ -60,8 +60,8 @@ export function useRingbaData() {
         totalPayout,
         avgDuration,
         connectRate: totalCalls > 0 ? (connectedCalls / totalCalls) * 100 : 0,
-        conversionRate: connectedCalls > 0 ? (convertedCalls / connectedCalls) * 100 : 0,
-        revenuePerCall: connectedCalls > 0 ? totalRevenue / connectedCalls : 0,
+        conversionRate: totalCalls > 0 ? (convertedCalls / totalCalls) * 100 : 0,
+        revenuePerCall: totalCalls > 0 ? totalRevenue / totalCalls : 0,
       };
     },
   });

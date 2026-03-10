@@ -146,15 +146,22 @@ Deno.serve(async (req) => {
     for (let i = 0; i < uniqueCalls.length; i += batchSize) {
       const batch = uniqueCalls.slice(i, i + batchSize);
 
-      const rows = batch.map((call: any) => ({
+      const rows = batch.map((call: any) => {
+        const isConnected = call.hasConnected ?? false;
+        // Only count as converted if the call was actually connected
+        const isConverted = isConnected && (call.hasConverted ?? false);
+        // Only use conversionAmount for revenue — profitGross/totalCost are cost metrics, not conversion revenue
+        const conversionRevenue = parseFloat(String(call.conversionAmount || 0));
+
+        return {
         client_id: clientId,
         ringba_call_id: call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`,
         call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
         duration_seconds: call.callLengthInSeconds || 0,
-        revenue: parseFloat(String(call.conversionAmount || call.profitGross || call.totalCost || 0)),
+        revenue: conversionRevenue,
         payout: parseFloat(String(call.payoutAmount || 0)),
-        connected: call.hasConnected ?? false,
-        converted: call.hasConverted ?? false,
+        connected: isConnected,
+        converted: isConverted,
         caller_number: call.inboundPhoneNumber || null,
         target_name: call.targetName || null,
         campaign_name: call.campaignName || "Premium Flights Call Flow",
@@ -171,7 +178,8 @@ Deno.serve(async (req) => {
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }));
+      };
+      });
 
       const { error } = await supabase
         .from("ringba_calls")
