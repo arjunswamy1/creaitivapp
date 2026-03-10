@@ -63,6 +63,7 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
 
   // Derived metrics
+  // RPV: revenue from calls / landing page visitors
   const rpv = visitors > 0 ? revenue / visitors : 0;
   const maxCpc = rpv; // If RPV > CPC, we can scale
 
@@ -137,7 +138,7 @@ const BillyDashboard = () => {
   const visitors = totalClicks;
   const ctaClicks = kpis?.totalConversions ?? 0;
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
-  const rpv = visitors > 0 ? (kpis?.totalRevenue ?? 0) / visitors : 0;
+  const rpv = visitors > 0 ? (ringba?.totalRevenue ?? 0) / visitors : 0;
 
   // Ringba-derived metrics
   const totalCalls = ringba?.totalCalls ?? 0;
@@ -166,6 +167,15 @@ const BillyDashboard = () => {
 
   return (
     <>
+      {/* Flights Revenue Engine Header */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="h-8 w-1 rounded-full bg-primary" />
+        <div>
+          <h2 className="text-lg font-bold tracking-tight">✈️ Premium Flights — Revenue Engine</h2>
+          <p className="text-xs text-muted-foreground">4-step lead-gen funnel: Traffic → Landing Page → Call Processing → Monetization</p>
+        </div>
+      </div>
+
       {/* Aggregate KPI Row — Step 1: Traffic */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
