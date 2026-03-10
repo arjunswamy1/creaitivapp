@@ -53,7 +53,7 @@ const DashboardContent = () => {
       <div className="max-w-7xl mx-auto">
         <DashboardHeader />
 
-        <Tabs defaultValue="cross-channel" className="w-full">
+        <Tabs key={activeClient?.id} defaultValue="cross-channel" className="w-full">
           <TabsList className="bg-secondary/50 mb-6">
             <TabsTrigger value="cross-channel" className="gap-1.5">
               <BarChart3 className="w-3.5 h-3.5" />
