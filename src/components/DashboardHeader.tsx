@@ -1,4 +1,4 @@
-import { RefreshCw, Settings, Target, Cpu } from "lucide-react";
+import { RefreshCw, Settings, Target, Cpu, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -11,13 +11,44 @@ import { useClient } from "@/contexts/ClientContext";
 import { useBranding } from "@/contexts/BrandingContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+
+interface ExpiredConnection {
+  platform: string;
+  token_expires_at: string | null;
+}
 
 const DashboardHeader = () => {
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [expiredPlatforms, setExpiredPlatforms] = useState<string[]>([]);
   const { activeClient, isAgencyAdmin } = useClient();
   const { logoUrl, clientName } = useBranding();
   const queryClient = useQueryClient();
+
+  // Check for expired tokens
+  useEffect(() => {
+    const checkTokenExpiry = async () => {
+      const clientId = activeClient?.id;
+      let query = supabase
+        .from("platform_connections")
+        .select("platform, token_expires_at");
+
+      if (clientId) {
+        query = query.eq("client_id", clientId);
+      }
+
+      const { data } = await query;
+      if (data) {
+        const now = new Date();
+        const expired = (data as ExpiredConnection[])
+          .filter((c) => c.token_expires_at && new Date(c.token_expires_at) < now)
+          .map((c) => c.platform.charAt(0).toUpperCase() + c.platform.slice(1));
+        setExpiredPlatforms(expired);
+      }
+    };
+    checkTokenExpiry();
+  }, [activeClient?.id]);
 
   useEffect(() => {
     const fetchLastSync = async () => {
@@ -113,6 +144,25 @@ const DashboardHeader = () => {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap justify-end">
+        {expiredPlatforms.length > 0 && isAgencyAdmin && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link to="/settings">
+                  <Badge variant="destructive" className="gap-1 cursor-pointer text-xs animate-pulse">
+                    <AlertTriangle className="w-3 h-3" />
+                    {expiredPlatforms.length === 1
+                      ? `${expiredPlatforms[0]} expired`
+                      : `${expiredPlatforms.length} tokens expired`}
+                  </Badge>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{expiredPlatforms.join(", ")} — click to re-authenticate in Settings</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
         {isAgencyAdmin && <ClientSwitcher />}
         <AccountSelector />
         {isAgencyAdmin && (
