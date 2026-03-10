@@ -2,6 +2,7 @@ import { useBillyKPIs } from "@/hooks/useBillyKPIs";
 import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useClient } from "@/contexts/ClientContext";
 import FlightsForecastCard from "@/components/FlightsForecastCard";
+import FlightsRecommendations from "@/components/FlightsRecommendations";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
