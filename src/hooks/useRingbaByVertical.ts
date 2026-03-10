@@ -9,19 +9,22 @@ export interface VerticalRingbaMetrics {
   connectedCalls: number;
   convertedCalls: number;
   totalRevenue: number;
+  avgDuration: number;
 }
 
 function emptyVertical(): VerticalRingbaMetrics {
-  return { totalCalls: 0, connectedCalls: 0, convertedCalls: 0, totalRevenue: 0 };
+  return { totalCalls: 0, connectedCalls: 0, convertedCalls: 0, totalRevenue: 0, avgDuration: 0 };
 }
 
 function calcVertical(calls: any[]): VerticalRingbaMetrics {
   const validCalls = calls.filter((c) => c.connected && Number(c.duration_seconds || 0) > 0);
+  const totalDuration = calls.reduce((s, c) => s + Number(c.duration_seconds || 0), 0);
   return {
     totalCalls: calls.length,
     connectedCalls: validCalls.length,
     convertedCalls: validCalls.filter((c) => c.converted).length,
     totalRevenue: validCalls.reduce((s, c) => s + Number(c.revenue || 0), 0),
+    avgDuration: calls.length > 0 ? totalDuration / calls.length : 0,
   };
 }
 

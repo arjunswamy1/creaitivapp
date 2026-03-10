@@ -1,5 +1,6 @@
 import { useBillyKPIs } from "@/hooks/useBillyKPIs";
-import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
+import { syncRingbaCalls } from "@/hooks/useRingbaData";
+import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useClient } from "@/contexts/ClientContext";
 import FlightsForecastCard from "@/components/FlightsForecastCard";
 import FlightsRecommendations from "@/components/FlightsRecommendations";
@@ -132,7 +133,18 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
   
-  const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
+  const { data: ringbaByVertical, isLoading: ringbaLoading } = useRingbaByVertical();
+  const flightsRingba = ringbaByVertical?.allFlights;
+  const ringba = flightsRingba ? {
+    totalCalls: flightsRingba.totalCalls,
+    connectedCalls: flightsRingba.connectedCalls,
+    convertedCalls: flightsRingba.convertedCalls,
+    totalRevenue: flightsRingba.totalRevenue,
+    connectRate: flightsRingba.totalCalls > 0 ? (flightsRingba.connectedCalls / flightsRingba.totalCalls) * 100 : 0,
+    conversionRate: flightsRingba.totalCalls > 0 ? (flightsRingba.convertedCalls / flightsRingba.totalCalls) * 100 : 0,
+    revenuePerCall: flightsRingba.connectedCalls > 0 ? flightsRingba.totalRevenue / flightsRingba.connectedCalls : 0,
+    avgDuration: flightsRingba.avgDuration,
+  } : null;
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
 
