@@ -48,6 +48,9 @@ Deno.serve(async (req) => {
       reportEnd: formatDate(endDate),
       size: 1000,
       offset: 0,
+      filters: [
+        { column: "campaignName", operand: "Is", value: "Premium Flights Call Flow" }
+      ],
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
