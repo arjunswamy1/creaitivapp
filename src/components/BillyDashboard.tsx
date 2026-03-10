@@ -1,7 +1,12 @@
 import { useKPIs, useTopCampaigns } from "@/hooks/useAdData";
+import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
+import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight, ArrowDownRight, MousePointerClick, Eye, DollarSign, BarChart3, Target } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight, ArrowDownRight, MousePointerClick, Eye, DollarSign, BarChart3, Target, Phone, PhoneCall, RefreshCw, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface FunnelMetricProps {
   label: string;
@@ -124,12 +129,40 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useKPIs("meta");
   const { data: campaigns, isLoading: campaignsLoading } = useTopCampaigns("meta");
+  const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
+  const { activeClient } = useClient();
+  const [syncing, setSyncing] = useState(false);
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
   const visitors = totalClicks;
   const ctaClicks = kpis?.totalConversions ?? 0;
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
   const rpv = visitors > 0 ? (kpis?.totalRevenue ?? 0) / visitors : 0;
+
+  // Ringba-derived metrics
+  const totalCalls = ringba?.totalCalls ?? 0;
+  const connectedCalls = ringba?.connectedCalls ?? 0;
+  const convertedCalls = ringba?.convertedCalls ?? 0;
+  const callRevenue = ringba?.totalRevenue ?? 0;
+  const connectRate = ringba?.connectRate ?? 0;
+  const conversionRate = ringba?.conversionRate ?? 0;
+  const revenuePerCall = ringba?.revenuePerCall ?? 0;
+  const adSpend = kpis?.totalSpend ?? 0;
+  const callROAS = adSpend > 0 ? callRevenue / adSpend : 0;
+  const costPerCall = totalCalls > 0 ? adSpend / totalCalls : 0;
+
+  const handleSyncRingba = async () => {
+    if (!activeClient?.id) return;
+    setSyncing(true);
+    try {
+      await syncRingbaCalls(activeClient.id, 30);
+      toast.success("Ringba call data synced successfully");
+    } catch (e: any) {
+      toast.error("Sync failed: " + (e.message || "Unknown error"));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <>
@@ -202,6 +235,93 @@ const BillyDashboard = () => {
             </div>
             <span className={`text-sm font-bold font-mono ${rpv > (kpis?.cpc ?? 0) ? "text-accent" : "text-destructive"}`}>
               {rpv > (kpis?.cpc ?? 0) ? "✓ SCALABLE" : "✗ NOT SCALABLE"}
+            </span>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3 — Call Processing (Ringba) */}
+      <Card className="mb-6 border-primary/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4 text-primary" />
+              <CardTitle className="text-base">Step 3 — Call Processing (Ringba)</CardTitle>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncRingba}
+              disabled={syncing}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync Calls"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Goal: Connect and convert inbound calls from Meta ads</p>
+        </CardHeader>
+        <CardContent>
+          {ringbaLoading ? (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+              <FunnelMetric label="Total Calls" value={totalCalls.toLocaleString()} icon={<Phone className="w-3 h-3" />} />
+              <FunnelMetric label="Connected" value={connectedCalls.toLocaleString()} icon={<PhoneCall className="w-3 h-3" />} />
+              <FunnelMetric label="Connect Rate" value={`${connectRate.toFixed(1)}%`} />
+              <FunnelMetric label="Converted" value={convertedCalls.toLocaleString()} />
+              <FunnelMetric label="Conv. Rate" value={`${conversionRate.toFixed(1)}%`} />
+              <FunnelMetric label="Avg Duration" value={`${Math.round(ringba?.avgDuration ?? 0)}s`} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Step 4 — Monetization (Ringba Revenue) */}
+      <Card className="mb-6 border-primary/20">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            <CardTitle className="text-base">Step 4 — Monetization (Call Revenue)</CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground">Goal: Maximize revenue per connected call</p>
+        </CardHeader>
+        <CardContent>
+          {ringbaLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-lg" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <FunnelMetric label="Call Revenue" value={`$${callRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={<DollarSign className="w-3 h-3" />} />
+              <FunnelMetric label="Rev/Connected Call" value={`$${revenuePerCall.toFixed(2)}`} />
+              <FunnelMetric label="Cost/Call" value={`$${costPerCall.toFixed(2)}`} invertColor />
+              <FunnelMetric label="Call ROAS" value={`${callROAS.toFixed(2)}x`} />
+              <FunnelMetric label="Net Profit" value={`$${(callRevenue - adSpend).toLocaleString(undefined, { minimumFractionDigits: 2 })}`} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Call ROAS Scalability Indicator */}
+      {!ringbaLoading && totalCalls > 0 && (
+        <Card className={`mb-6 ${callROAS > 1 ? "border-accent/40 bg-accent/5" : "border-destructive/40 bg-destructive/5"}`}>
+          <CardContent className="py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Target className="w-5 h-5 text-primary" />
+              <div>
+                <p className="text-sm font-semibold">
+                  Call ROAS: {callROAS.toFixed(2)}x — Ad Spend ${adSpend.toLocaleString()} → Call Revenue ${callRevenue.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Revenue per Connected Call: ${revenuePerCall.toFixed(2)} | Cost per Call: ${costPerCall.toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <span className={`text-sm font-bold font-mono ${callROAS > 1 ? "text-accent" : "text-destructive"}`}>
+              {callROAS > 1 ? "✓ PROFITABLE" : "✗ NOT PROFITABLE"}
             </span>
           </CardContent>
         </Card>

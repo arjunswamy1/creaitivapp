@@ -884,6 +884,77 @@ export type Database = {
         }
         Relationships: []
       }
+      ringba_calls: {
+        Row: {
+          call_date: string
+          call_status: string | null
+          caller_number: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          client_id: string
+          connected: boolean
+          converted: boolean
+          created_at: string
+          duration_seconds: number
+          id: string
+          metadata: Json | null
+          payout: number
+          revenue: number
+          ringba_call_id: string
+          synced_at: string
+          target_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          call_date: string
+          call_status?: string | null
+          caller_number?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          client_id: string
+          connected?: boolean
+          converted?: boolean
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          metadata?: Json | null
+          payout?: number
+          revenue?: number
+          ringba_call_id: string
+          synced_at?: string
+          target_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          call_date?: string
+          call_status?: string | null
+          caller_number?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          client_id?: string
+          connected?: boolean
+          converted?: boolean
+          created_at?: string
+          duration_seconds?: number
+          id?: string
+          metadata?: Json | null
+          payout?: number
+          revenue?: number
+          ringba_call_id?: string
+          synced_at?: string
+          target_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ringba_calls_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       search_terms: {
         Row: {
           adset_name: string | null
