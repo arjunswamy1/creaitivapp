@@ -58,7 +58,7 @@ function calcKPIs(data: any[]): BillyKPIData {
     totalRevenue: Math.round(totalRevenue * 100) / 100,
     blendedROAS: totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : 0,
     totalConversions,
-    cpc: totalClicks > 0 ? Math.round((totalSpend / totalClicks) * 100) / 100 : 0,
+    cpc: totalClicks > 0 ? Math.round((totalSpend / totalClicks) * 1000) / 1000 : 0,
     ctr: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0,
     cpm: totalImpressions > 0 ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0,
     impressions: totalImpressions,
