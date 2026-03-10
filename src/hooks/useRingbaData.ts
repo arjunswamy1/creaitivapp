@@ -43,11 +43,13 @@ export function useRingbaData() {
       }
 
       const calls = (data || []) as any[];
+      // Only count calls with actual duration as valid
+      const validCalls = calls.filter((c) => c.connected && Number(c.duration_seconds || 0) > 0);
       const totalCalls = calls.length;
-      const connectedCalls = calls.filter((c) => c.connected).length;
-      const convertedCalls = calls.filter((c) => c.converted && c.connected && Number(c.duration_seconds || 0) > 0).length;
-      const totalRevenue = calls.reduce((s, c) => s + Number(c.revenue || 0), 0);
-      const totalPayout = calls.reduce((s, c) => s + Number(c.payout || 0), 0);
+      const connectedCalls = validCalls.length;
+      const convertedCalls = validCalls.filter((c) => c.converted).length;
+      const totalRevenue = validCalls.reduce((s, c) => s + Number(c.revenue || 0), 0);
+      const totalPayout = validCalls.reduce((s, c) => s + Number(c.payout || 0), 0);
       const avgDuration = totalCalls > 0
         ? calls.reduce((s, c) => s + Number(c.duration_seconds || 0), 0) / totalCalls
         : 0;
