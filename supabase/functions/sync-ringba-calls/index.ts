@@ -46,8 +46,8 @@ Deno.serve(async (req) => {
     const requestBody: any = {
       reportStart: formatDate(startDate),
       reportEnd: formatDate(endDate),
-      pageSize: 500,
-      pageNumber: 1,
+      size: 500,
+      offset: 0,
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
