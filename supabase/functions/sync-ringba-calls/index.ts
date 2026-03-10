@@ -178,7 +178,8 @@ Deno.serve(async (req) => {
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      }));
+      };
+      });
 
       const { error } = await supabase
         .from("ringba_calls")
