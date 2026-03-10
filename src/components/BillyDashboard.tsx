@@ -129,12 +129,40 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useKPIs("meta");
   const { data: campaigns, isLoading: campaignsLoading } = useTopCampaigns("meta");
+  const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
+  const { activeClient } = useClient();
+  const [syncing, setSyncing] = useState(false);
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
   const visitors = totalClicks;
   const ctaClicks = kpis?.totalConversions ?? 0;
   const lpCvr = visitors > 0 ? (ctaClicks / visitors) * 100 : 0;
   const rpv = visitors > 0 ? (kpis?.totalRevenue ?? 0) / visitors : 0;
+
+  // Ringba-derived metrics
+  const totalCalls = ringba?.totalCalls ?? 0;
+  const connectedCalls = ringba?.connectedCalls ?? 0;
+  const convertedCalls = ringba?.convertedCalls ?? 0;
+  const callRevenue = ringba?.totalRevenue ?? 0;
+  const connectRate = ringba?.connectRate ?? 0;
+  const conversionRate = ringba?.conversionRate ?? 0;
+  const revenuePerCall = ringba?.revenuePerCall ?? 0;
+  const adSpend = kpis?.totalSpend ?? 0;
+  const callROAS = adSpend > 0 ? callRevenue / adSpend : 0;
+  const costPerCall = totalCalls > 0 ? adSpend / totalCalls : 0;
+
+  const handleSyncRingba = async () => {
+    if (!activeClient?.id) return;
+    setSyncing(true);
+    try {
+      await syncRingbaCalls(activeClient.id, 30);
+      toast.success("Ringba call data synced successfully");
+    } catch (e: any) {
+      toast.error("Sync failed: " + (e.message || "Unknown error"));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <>
