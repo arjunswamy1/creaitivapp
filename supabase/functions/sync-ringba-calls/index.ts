@@ -150,15 +150,15 @@ Deno.serve(async (req) => {
         const isConnected = call.hasConnected ?? false;
         // Only count as converted if the call was actually connected
         const isConverted = isConnected && (call.hasConverted ?? false);
-        // Only use conversionAmount for revenue — profitGross/totalCost are cost metrics, not conversion revenue
-        const conversionRevenue = parseFloat(String(call.conversionAmount || 0));
+        // Use Ringba's revenue field (matches their UI "Revenue" column), fallback to conversionAmount
+        const callRevenue = parseFloat(String(call.revenue ?? call.conversionAmount ?? 0));
 
         return {
         client_id: clientId,
         ringba_call_id: call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`,
         call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
         duration_seconds: call.callLengthInSeconds || 0,
-        revenue: conversionRevenue,
+        revenue: callRevenue,
         payout: parseFloat(String(call.payoutAmount || 0)),
         connected: isConnected,
         converted: isConverted,
