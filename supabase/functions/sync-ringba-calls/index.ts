@@ -101,14 +101,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Total calls fetched: ${allCalls.length}`);
+    // Deduplicate by inboundCallId before upserting
+    const seen = new Set<string>();
+    const uniqueCalls = allCalls.filter((call) => {
+      const id = call.inboundCallId || call.callId;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    console.log(`Total calls fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
 
     // Map and upsert calls
     let upserted = 0;
-    const batchSize = 100;
+    const batchSize = 50; // Smaller batches to avoid conflicts
 
-    for (let i = 0; i < allCalls.length; i += batchSize) {
-      const batch = allCalls.slice(i, i + batchSize);
+    for (let i = 0; i < uniqueCalls.length; i += batchSize) {
+      const batch = uniqueCalls.slice(i, i + batchSize);
 
       const rows = batch.map((call: any) => ({
         client_id: clientId,
