@@ -1,4 +1,4 @@
-import { useKPIs, useTopCampaigns } from "@/hooks/useAdData";
+import { useBillyKPIs, useBillyTopCampaigns } from "@/hooks/useBillyKPIs";
 import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
