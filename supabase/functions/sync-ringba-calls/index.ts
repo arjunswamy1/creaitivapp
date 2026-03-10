@@ -6,6 +6,71 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/** Split a date range into 2-day chunks to avoid pagination limits */
+function buildDateChunks(start: Date, end: Date, chunkDays = 2): { from: Date; to: Date }[] {
+  const chunks: { from: Date; to: Date }[] = [];
+  const cur = new Date(start);
+  while (cur < end) {
+    const chunkEnd = new Date(cur);
+    chunkEnd.setDate(chunkEnd.getDate() + chunkDays);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+    chunks.push({ from: new Date(cur), to: new Date(chunkEnd) });
+    cur.setDate(cur.getDate() + chunkDays);
+  }
+  return chunks;
+}
+
+/** Fetch all Premium Flights calls for a single date chunk, paginating fully */
+async function fetchChunk(
+  url: string,
+  token: string,
+  from: Date,
+  to: Date
+): Promise<any[]> {
+  let allCalls: any[] = [];
+  let offset = 0;
+
+  while (true) {
+    const requestBody = {
+      reportStart: from.toISOString(),
+      reportEnd: to.toISOString(),
+      size: 1000,
+      offset,
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Ringba API error for chunk ${from.toISOString()}: ${response.status} ${errText}`);
+      break;
+    }
+
+    const data = await response.json();
+    const records = data.report?.records || [];
+
+    // Client-side filter for Premium Flights
+    const matching = records.filter(
+      (c: any) => c.campaignName === "Premium Flights Call Flow"
+    );
+    allCalls = allCalls.concat(matching);
+
+    if (records.length < 1000) break;
+    offset += records.length;
+    // Safety: each 2-day chunk shouldn't need more than 5k records
+    if (offset > 5000) break;
+  }
+
+  return allCalls;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,7 +88,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Parse request body for client_id and date range
     const body = await req.json().catch(() => ({}));
     const clientId = body.client_id;
     const daysBack = body.days_back || 30;
@@ -32,87 +96,28 @@ Deno.serve(async (req) => {
       throw new Error("client_id is required");
     }
 
-    // Calculate date range
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const formatDate = (d: Date) => d.toISOString();
-
-    // Fetch call logs from Ringba API
-    // The Ringba API v2 calllogs endpoint
     const url = `https://api.ringba.com/v2/${RINGBA_ACCOUNT_ID}/calllogs`;
+    const chunks = buildDateChunks(startDate, endDate, 2);
 
-    const requestBody: any = {
-      reportStart: formatDate(startDate),
-      reportEnd: formatDate(endDate),
-      size: 1000,
-      offset: 0,
-      filters: [
-        { column: "campaignName", operand: "Is", value: "Premium Flights Call Flow" }
-      ],
-    };
+    console.log(
+      `Syncing ${daysBack} days in ${chunks.length} chunks from ${startDate.toISOString()} to ${endDate.toISOString()}`
+    );
 
-    console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
-
+    // Fetch all chunks sequentially (to avoid rate limiting)
     let allCalls: any[] = [];
-    let offset = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      requestBody.offset = offset;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${RINGBA_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("Ringba API error:", response.status, errText);
-        throw new Error(`Ringba API error: ${response.status} - ${errText}`);
-      }
-
-      const data = await response.json();
-      
-      const records = data.report?.records || [];
-      
-      // On first page, log all campaign names containing "flight" or "premium" (case-insensitive)
-      if (offset === 0) {
-        const allNames = [...new Set(records.map((r: any) => r.campaignName))];
-        const flightNames = allNames.filter((n: string) => /flight|premium/i.test(n));
-        console.log("Flight/Premium campaigns found:", JSON.stringify(flightNames));
-        console.log("All campaign names:", JSON.stringify(allNames));
-        
-        // Log date range of records
-        const dates = records.map((r: any) => r.callDt).filter(Boolean).sort();
-        if (dates.length) {
-          console.log("Date range in response:", dates[0], "to", dates[dates.length - 1]);
-        }
-      }
-      
-      // Filter to only "Premium Flights Call Flow"
-      const calls = records.filter((c: any) => 
-        c.campaignName === "Premium Flights Call Flow"
+    for (const chunk of chunks) {
+      const calls = await fetchChunk(url, RINGBA_API_TOKEN, chunk.from, chunk.to);
+      console.log(
+        `Chunk ${chunk.from.toISOString().slice(0, 10)} → ${chunk.to.toISOString().slice(0, 10)}: ${calls.length} calls`
       );
-
-      console.log(`Offset ${offset}: got ${records.length} total records, ${calls.length} matching`);
-
       allCalls = allCalls.concat(calls);
-      
-      if (records.length < 500) {
-        hasMore = false;
-      } else {
-        offset += records.length;
-        if (offset > 20000) hasMore = false;
-      }
     }
 
-    // Deduplicate by inboundCallId before upserting
+    // Deduplicate by inboundCallId
     const seen = new Set<string>();
     const uniqueCalls = allCalls.filter((call) => {
       const id = call.inboundCallId || call.callId;
@@ -121,18 +126,18 @@ Deno.serve(async (req) => {
       return true;
     });
 
-    console.log(`Total calls fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
+    console.log(`Total fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
 
-    // Map and upsert calls
+    // Upsert in batches
     let upserted = 0;
-    const batchSize = 50; // Smaller batches to avoid conflicts
+    const batchSize = 100;
 
     for (let i = 0; i < uniqueCalls.length; i += batchSize) {
       const batch = uniqueCalls.slice(i, i + batchSize);
 
       const rows = batch.map((call: any) => ({
         client_id: clientId,
-        ringba_call_id: call.inboundCallId || call.callId || `unknown-${i}-${Math.random()}`,
+        ringba_call_id: call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`,
         call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
         duration_seconds: call.callLengthInSeconds || 0,
         revenue: parseFloat(String(call.conversionAmount || call.profitGross || call.totalCost || 0)),
@@ -169,11 +174,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        total_fetched: allCalls.length,
-        upserted,
-      }),
+      JSON.stringify({ success: true, total_fetched: allCalls.length, unique: uniqueCalls.length, upserted }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
