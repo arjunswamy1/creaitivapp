@@ -82,18 +82,27 @@ Deno.serve(async (req) => {
       if (offset === 0) {
         const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
         console.log("Campaigns in response:", JSON.stringify(uniqueNames));
-        // Log first Premium Flights call fields for debugging
-        const sample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow");
+        // Log ALL fields with values for first Premium Flights call
+        const sample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow" && r.hasConnected);
         if (sample) {
-          console.log("Sample Premium Flights call keys:", JSON.stringify(Object.keys(sample)));
-          console.log("Sample call revenue fields:", JSON.stringify({
-            revenue: sample.revenue, payout: sample.payout, 
-            totalRevenue: sample.totalRevenue, totalPayout: sample.totalPayout,
-            payoutAmount: sample.payoutAmount, revenueAmount: sample.revenueAmount,
-            profit: sample.profit, margin: sample.margin,
-            hasConverted: sample.hasConverted, isConverted: sample.isConverted,
-            conversionAmount: sample.conversionAmount,
-          }));
+          // Log every field and its value for complete visibility
+          const allFields: Record<string, any> = {};
+          for (const key of Object.keys(sample)) {
+            allFields[key] = sample[key];
+          }
+          console.log("FULL connected call data:", JSON.stringify(allFields));
+          
+          // Also find a call with hasPayout=true
+          const payoutSample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow" && r.hasPayout);
+          if (payoutSample) {
+            const payoutFields: Record<string, any> = {};
+            for (const key of Object.keys(payoutSample)) {
+              payoutFields[key] = payoutSample[key];
+            }
+            console.log("FULL payout call data:", JSON.stringify(payoutFields));
+          } else {
+            console.log("No calls with hasPayout=true found in first page");
+          }
         }
       }
       
