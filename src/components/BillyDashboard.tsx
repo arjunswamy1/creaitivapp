@@ -133,7 +133,17 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
   
-  const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
+  const { data: ringbaByVertical, isLoading: ringbaLoading } = useRingbaByVertical();
+  const ringba = ringbaByVertical ? {
+    totalCalls: ringbaByVertical.allFlights.totalCalls,
+    connectedCalls: ringbaByVertical.allFlights.connectedCalls,
+    convertedCalls: ringbaByVertical.allFlights.convertedCalls,
+    totalRevenue: ringbaByVertical.allFlights.totalRevenue,
+    connectRate: ringbaByVertical.allFlights.totalCalls > 0 ? (ringbaByVertical.allFlights.connectedCalls / ringbaByVertical.allFlights.totalCalls) * 100 : 0,
+    conversionRate: ringbaByVertical.allFlights.totalCalls > 0 ? (ringbaByVertical.allFlights.convertedCalls / ringbaByVertical.allFlights.totalCalls) * 100 : 0,
+    revenuePerCall: ringbaByVertical.allFlights.connectedCalls > 0 ? ringbaByVertical.allFlights.totalRevenue / ringbaByVertical.allFlights.connectedCalls : 0,
+    avgDuration: 0,
+  } : null;
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
 
