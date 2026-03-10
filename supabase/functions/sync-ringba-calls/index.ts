@@ -37,16 +37,15 @@ Deno.serve(async (req) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const formatDate = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const formatDate = (d: Date) => d.toISOString();
 
     // Fetch call logs from Ringba API
     // The Ringba API v2 calllogs endpoint
     const url = `https://api.ringba.com/v2/${RINGBA_ACCOUNT_ID}/calllogs`;
 
     const requestBody: any = {
-      ReportStart: formatDate(startDate),
-      ReportEnd: formatDate(endDate),
+      reportStart: formatDate(startDate),
+      reportEnd: formatDate(endDate),
       filters: [
         {
           column: "CallFlowName",
@@ -54,8 +53,8 @@ Deno.serve(async (req) => {
           value: "Premium Flights Call Flow",
         },
       ],
-      PageSize: 500,
-      PageNumber: 1,
+      pageSize: 500,
+      pageNumber: 1,
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
