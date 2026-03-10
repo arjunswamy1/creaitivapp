@@ -145,6 +145,7 @@ const BillyDashboard = () => {
     revenuePerCall: flightsRingba.connectedCalls > 0 ? flightsRingba.totalRevenue / flightsRingba.connectedCalls : 0,
     avgDuration: flightsRingba.avgDuration,
   } : null;
+  const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
