@@ -60,6 +60,17 @@ async function fetchChunk(
     const matching = records.filter(
       (c: any) => c.campaignName === "Premium Flights Call Flow"
     );
+
+    // Log revenue-related fields from first few matching calls for diagnostics
+    if (matching.length > 0 && offset === 0) {
+      const sample = matching.slice(0, 3);
+      for (const s of sample) {
+        console.log(`REVENUE FIELDS for ${s.inboundCallId}: conversionAmount=${s.conversionAmount}, profitGross=${s.profitGross}, totalCost=${s.totalCost}, payoutAmount=${s.payoutAmount}, revenue=${s.revenue}, buyerCallPrice=${s.buyerCallPrice}, forceBilled=${s.forceBilled}, adjustedPayoutAmount=${s.adjustedPayoutAmount}, adjustedRevenue=${s.adjustedRevenue}, hasPayout=${s.hasPayout}, hasConverted=${s.hasConverted}, endCallSource=${s.endCallSource}`);
+      }
+      // Also log ALL keys from first record to find any force-billing fields
+      console.log(`ALL CALL KEYS: ${JSON.stringify(Object.keys(sample[0]))}`);
+    }
+
     allCalls = allCalls.concat(matching);
 
     if (records.length < 1000) break;
