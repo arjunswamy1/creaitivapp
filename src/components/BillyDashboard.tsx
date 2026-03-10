@@ -143,8 +143,7 @@ const BillyDashboard = () => {
     conversionRate: ringbaByVertical.allFlights.totalCalls > 0 ? (ringbaByVertical.allFlights.convertedCalls / ringbaByVertical.allFlights.totalCalls) * 100 : 0,
     revenuePerCall: ringbaByVertical.allFlights.connectedCalls > 0 ? ringbaByVertical.allFlights.totalRevenue / ringbaByVertical.allFlights.connectedCalls : 0,
     avgDuration: 0,
-  } : null;
-  const { activeClient } = useClient();
+  const ringbaAvgDuration = ringbaByVertical?.allFlights.avgDuration ?? 0;
   const [syncing, setSyncing] = useState(false);
 
   const totalClicks = kpis?.impressions ? Math.round((kpis.ctr / 100) * kpis.impressions) : 0;
