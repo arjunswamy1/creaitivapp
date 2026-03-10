@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
         revenue: parseFloat(String(call.conversionAmount || call.profitGross || call.totalCost || 0)),
         payout: parseFloat(String(call.payoutAmount || 0)),
         connected: call.hasConnected ?? false,
-        converted: call.hasConverted ?? call.hasPayout ?? false,
+        converted: call.hasConverted ?? false,
         caller_number: call.inboundPhoneNumber || null,
         target_name: call.targetName || null,
         campaign_name: call.campaignName || "Premium Flights Call Flow",
