@@ -1,4 +1,4 @@
-import { useKPIs, useTopCampaigns } from "@/hooks/useAdData";
+import { useBillyKPIs, useBillyTopCampaigns } from "@/hooks/useBillyKPIs";
 import { useRingbaData, syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -127,8 +127,8 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 };
 
 const BillyDashboard = () => {
-  const { data: kpis, isLoading } = useKPIs("meta");
-  const { data: campaigns, isLoading: campaignsLoading } = useTopCampaigns("meta");
+  const { data: kpis, isLoading } = useBillyKPIs();
+  const { data: campaigns, isLoading: campaignsLoading } = useBillyTopCampaigns();
   const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
