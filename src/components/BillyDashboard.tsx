@@ -130,7 +130,7 @@ const CampaignFunnelRow = ({ name, spend, clicks, impressions, conversions, reve
 
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
-  const { data: campaigns, isLoading: campaignsLoading } = useBillyTopCampaigns();
+  
   const { data: ringba, isLoading: ringbaLoading } = useRingbaData();
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
