@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
         ringba_call_id: call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`,
         call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
         duration_seconds: call.callLengthInSeconds || 0,
-        revenue: conversionRevenue,
+        revenue: callRevenue,
         payout: parseFloat(String(call.payoutAmount || 0)),
         connected: isConnected,
         converted: isConverted,
