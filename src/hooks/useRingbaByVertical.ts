@@ -33,7 +33,7 @@ function categorizeRingba(campaignName: string): "premiumFlights" | "mixedFlight
   if (lower.includes("premium") && lower.includes("flight")) return "premiumFlights";
   // Fallback: any "flight" that isn't mixed
   if (lower.includes("flight")) return "premiumFlights";
-  if (lower.includes("bath")) return "bath";
+  if (lower.includes("bath") || lower.includes("bathroom")) return "bath";
   return "other";
 }
 
