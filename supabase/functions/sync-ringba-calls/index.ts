@@ -82,6 +82,19 @@ Deno.serve(async (req) => {
       if (offset === 0) {
         const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
         console.log("Campaigns in response:", JSON.stringify(uniqueNames));
+        // Log first Premium Flights call fields for debugging
+        const sample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow");
+        if (sample) {
+          console.log("Sample Premium Flights call keys:", JSON.stringify(Object.keys(sample)));
+          console.log("Sample call revenue fields:", JSON.stringify({
+            revenue: sample.revenue, payout: sample.payout, 
+            totalRevenue: sample.totalRevenue, totalPayout: sample.totalPayout,
+            payoutAmount: sample.payoutAmount, revenueAmount: sample.revenueAmount,
+            profit: sample.profit, margin: sample.margin,
+            hasConverted: sample.hasConverted, isConverted: sample.isConverted,
+            conversionAmount: sample.conversionAmount,
+          }));
+        }
       }
       
       // Filter to only "Premium Flights Call Flow"
