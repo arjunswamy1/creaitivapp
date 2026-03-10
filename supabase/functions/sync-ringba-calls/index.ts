@@ -46,8 +46,11 @@ Deno.serve(async (req) => {
     const requestBody: any = {
       reportStart: formatDate(startDate),
       reportEnd: formatDate(endDate),
-      size: 500,
+      size: 1000,
       offset: 0,
+      filters: [
+        { column: "campaignName", operand: "Is", value: "Premium Flights Call Flow" }
+      ],
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
@@ -78,25 +81,6 @@ Deno.serve(async (req) => {
       
       const records = data.report?.records || [];
       
-      // Log unique campaign names on first page for debugging
-      if (offset === 0) {
-        const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
-        console.log("Campaigns in response:", JSON.stringify(uniqueNames));
-        // Log first Premium Flights call fields for debugging
-        const sample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow");
-        if (sample) {
-          console.log("Sample Premium Flights call keys:", JSON.stringify(Object.keys(sample)));
-          console.log("Sample call revenue fields:", JSON.stringify({
-            revenue: sample.revenue, payout: sample.payout, 
-            totalRevenue: sample.totalRevenue, totalPayout: sample.totalPayout,
-            payoutAmount: sample.payoutAmount, revenueAmount: sample.revenueAmount,
-            profit: sample.profit, margin: sample.margin,
-            hasConverted: sample.hasConverted, isConverted: sample.isConverted,
-            conversionAmount: sample.conversionAmount,
-          }));
-        }
-      }
-      
       // Filter to only "Premium Flights Call Flow"
       const calls = records.filter((c: any) => 
         c.campaignName === "Premium Flights Call Flow"
@@ -109,8 +93,8 @@ Deno.serve(async (req) => {
       if (records.length < 500) {
         hasMore = false;
       } else {
-        offset += 500;
-        if (offset > 10000) hasMore = false; // Safety limit
+        offset += records.length;
+        if (offset > 20000) hasMore = false;
       }
     }
 
@@ -137,10 +121,10 @@ Deno.serve(async (req) => {
         ringba_call_id: call.inboundCallId || call.callId || `unknown-${i}-${Math.random()}`,
         call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
         duration_seconds: call.callLengthInSeconds || 0,
-        revenue: parseFloat(String(call.profitGross || call.totalCost || 0)),
+        revenue: parseFloat(String(call.conversionAmount || call.profitGross || call.totalCost || 0)),
         payout: parseFloat(String(call.payoutAmount || 0)),
         connected: call.hasConnected ?? false,
-        converted: call.hasPayout ?? (parseFloat(String(call.payoutAmount || 0)) > 0),
+        converted: call.hasConverted ?? call.hasPayout ?? false,
         caller_number: call.inboundPhoneNumber || null,
         target_name: call.targetName || null,
         campaign_name: call.campaignName || "Premium Flights Call Flow",
