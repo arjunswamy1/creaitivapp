@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const requestBody: any = {
       reportStart: formatDate(startDate),
       reportEnd: formatDate(endDate),
-      size: 500,
+      size: 1000,
       offset: 0,
     };
 
@@ -77,27 +77,6 @@ Deno.serve(async (req) => {
       const data = await response.json();
       
       const records = data.report?.records || [];
-      
-      if (offset === 0) {
-        const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
-        console.log("Campaigns in response:", JSON.stringify(uniqueNames));
-        // Log first Premium Flights call with ALL its data
-        const premCalls = records.filter((r: any) => r.campaignName === "Premium Flights Call Flow");
-        if (premCalls.length > 0) {
-          // Log the first call fully
-          console.log("FIRST_CALL_FULL_DATA:", JSON.stringify(premCalls[0]));
-          // Find one with most fields (connected)
-          const connected = premCalls.find((r: any) => r.hasConnected === true);
-          if (connected) {
-            console.log("CONNECTED_CALL_FULL_DATA:", JSON.stringify(connected));
-          }
-          // Find one with hasPayout
-          const withPayout = premCalls.find((r: any) => r.hasPayout === true);
-          if (withPayout) {
-            console.log("PAYOUT_CALL_FULL_DATA:", JSON.stringify(withPayout));
-          }
-        }
-      }
       
       // Filter to only "Premium Flights Call Flow"
       const calls = records.filter((c: any) => 
