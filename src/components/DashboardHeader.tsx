@@ -100,8 +100,8 @@ const DashboardHeader = () => {
   };
 
   return (
-    <header className="flex items-center justify-between py-6">
-      <div className="flex items-center gap-4">
+    <header className="flex items-center justify-between py-6 gap-4">
+      <div className="flex items-center gap-4 shrink-0">
         {logoUrl && (
           <img src={logoUrl} alt={clientName} className="h-12 w-auto rounded-lg" />
         )}
@@ -109,10 +109,10 @@ const DashboardHeader = () => {
           <h1 className="text-xl font-bold tracking-tight" style={{ fontFamily: "var(--font-heading)" }}>
             {clientName}
           </h1>
-          <p className="text-sm text-muted-foreground">Marketing Performance</p>
+          <p className="text-sm text-muted-foreground">Performance</p>
         </div>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-wrap justify-end">
         {isAgencyAdmin && <ClientSwitcher />}
         <AccountSelector />
         {isAgencyAdmin && (
