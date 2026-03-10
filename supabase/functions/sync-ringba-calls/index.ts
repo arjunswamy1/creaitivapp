@@ -46,25 +46,18 @@ Deno.serve(async (req) => {
     const requestBody: any = {
       reportStart: formatDate(startDate),
       reportEnd: formatDate(endDate),
-      filters: [
-        {
-          column: "CallFlowName",
-          operand: "Is",
-          value: "Premium Flights Call Flow",
-        },
-      ],
-      pageSize: 500,
-      pageNumber: 1,
+      size: 500,
+      offset: 0,
     };
 
     console.log("Fetching Ringba call logs:", JSON.stringify(requestBody));
 
     let allCalls: any[] = [];
-    let page = 1;
+    let offset = 0;
     let hasMore = true;
 
     while (hasMore) {
-      requestBody.pageNumber = page;
+      requestBody.offset = offset;
 
       const response = await fetch(url, {
         method: "POST",
@@ -82,48 +75,85 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const calls = data.calls || data.records || data.data || [];
+      
+      const records = data.report?.records || [];
+      
+      // Log unique campaign names on first page for debugging
+      if (offset === 0) {
+        const uniqueNames = [...new Set(records.map((r: any) => r.campaignName))];
+        console.log("Campaigns in response:", JSON.stringify(uniqueNames));
+        // Log first Premium Flights call fields for debugging
+        const sample = records.find((r: any) => r.campaignName === "Premium Flights Call Flow");
+        if (sample) {
+          console.log("Sample Premium Flights call keys:", JSON.stringify(Object.keys(sample)));
+          console.log("Sample call revenue fields:", JSON.stringify({
+            revenue: sample.revenue, payout: sample.payout, 
+            totalRevenue: sample.totalRevenue, totalPayout: sample.totalPayout,
+            payoutAmount: sample.payoutAmount, revenueAmount: sample.revenueAmount,
+            profit: sample.profit, margin: sample.margin,
+            hasConverted: sample.hasConverted, isConverted: sample.isConverted,
+            conversionAmount: sample.conversionAmount,
+          }));
+        }
+      }
+      
+      // Filter to only "Premium Flights Call Flow"
+      const calls = records.filter((c: any) => 
+        c.campaignName === "Premium Flights Call Flow"
+      );
 
-      console.log(`Page ${page}: got ${calls.length} calls`);
+      console.log(`Offset ${offset}: got ${records.length} total records, ${calls.length} matching`);
 
-      if (calls.length === 0) {
+      allCalls = allCalls.concat(calls);
+      
+      if (records.length < 500) {
         hasMore = false;
       } else {
-        allCalls = allCalls.concat(calls);
-        page++;
-        // Safety limit
-        if (page > 20) hasMore = false;
+        offset += 500;
+        if (offset > 10000) hasMore = false; // Safety limit
       }
     }
 
-    console.log(`Total calls fetched: ${allCalls.length}`);
+    // Deduplicate by inboundCallId before upserting
+    const seen = new Set<string>();
+    const uniqueCalls = allCalls.filter((call) => {
+      const id = call.inboundCallId || call.callId;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    console.log(`Total calls fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
 
     // Map and upsert calls
     let upserted = 0;
-    const batchSize = 100;
+    const batchSize = 50; // Smaller batches to avoid conflicts
 
-    for (let i = 0; i < allCalls.length; i += batchSize) {
-      const batch = allCalls.slice(i, i + batchSize);
+    for (let i = 0; i < uniqueCalls.length; i += batchSize) {
+      const batch = uniqueCalls.slice(i, i + batchSize);
 
       const rows = batch.map((call: any) => ({
         client_id: clientId,
-        ringba_call_id: call.callId || call.inboundCallId || call.id || `unknown-${i}`,
-        call_date: call.callDt || call.startTime || call.callDateTime || new Date().toISOString(),
-        duration_seconds: call.callLengthInSeconds || call.duration || call.connectedDuration || 0,
-        revenue: parseFloat(call.revenue || call.totalRevenue || call.payoutAmount || "0"),
-        payout: parseFloat(call.payout || call.publisherPayout || "0"),
-        connected: call.isConnected ?? call.connected ?? (call.connectedDuration > 0),
-        converted: call.isConverted ?? call.converted ?? false,
-        caller_number: call.callerNumber || call.caller || call.ani || null,
-        target_name: call.targetName || call.target || call.buyerName || null,
-        campaign_name: call.campaignName || call.callFlowName || "Premium Flights Call Flow",
-        campaign_id: call.campaignId || call.callFlowId || null,
-        call_status: call.callStatus || call.status || call.disposition || null,
+        ringba_call_id: call.inboundCallId || call.callId || `unknown-${i}-${Math.random()}`,
+        call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
+        duration_seconds: call.callLengthInSeconds || 0,
+        revenue: parseFloat(String(call.profitGross || call.totalCost || 0)),
+        payout: parseFloat(String(call.payoutAmount || 0)),
+        connected: call.hasConnected ?? false,
+        converted: call.hasPayout ?? (parseFloat(String(call.payoutAmount || 0)) > 0),
+        caller_number: call.inboundPhoneNumber || null,
+        target_name: call.targetName || null,
+        campaign_name: call.campaignName || "Premium Flights Call Flow",
+        campaign_id: call.campaignId || null,
+        call_status: call.endCallSource || call.callCompletedStatus || null,
         metadata: {
-          raw_call_id: call.callId || call.inboundCallId,
+          raw_call_id: call.inboundCallId,
           publisher: call.publisherName || null,
-          geo: call.callerState || call.callerCity || null,
-          zip: call.callerZip || null,
+          buyer: call.buyer || null,
+          target_number: call.targetNumber || null,
+          connected_duration: call.connectedCallLengthInSeconds || 0,
+          is_duplicate: call.isDuplicate || false,
+          number: call.number || null,
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
