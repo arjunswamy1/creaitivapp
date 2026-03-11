@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { useBillyDailyTrends, DailyFunnelRow } from "@/hooks/useBillyDailyTrends";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowUpRight, ArrowDownRight, AlertTriangle, BarChart3 } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, AlertTriangle, BarChart3, Sparkles, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend,
 } from "recharts";
