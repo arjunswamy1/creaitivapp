@@ -4,10 +4,11 @@ import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
 import BillyMetaDashboard from "@/components/BillyMetaDashboard";
+import BillyDailyTrends from "@/components/BillyDailyTrends";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook, Zap } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap, TrendingUp } from "lucide-react";
 
 const DashboardContent = () => {
   const { dashboardConfig, activeClient } = useClient();
