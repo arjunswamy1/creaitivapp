@@ -242,72 +242,141 @@ function TrendCharts({ rows }: { rows: DailyFunnelRow[] }) {
   );
 }
 
-// Alert summary showing biggest day-over-day changes
+// AI-powered insight summary per funnel step
 function AlertSummary({ rows }: { rows: DailyFunnelRow[] }) {
-  if (rows.length < 2) return null;
+  const [insights, setInsights] = useState<{ title: string; bullets: string[] }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const latest = rows[rows.length - 1];
-  if (Object.keys(latest.deltas).length === 0) return null;
+  const latest = rows.length >= 2 ? rows[rows.length - 1] : null;
 
-  const allMetrics = [...STEP1_METRICS, ...STEP2_METRICS, ...STEP3_METRICS, ...STEP4_METRICS];
-  const alerts: { metric: string; delta: number; invertColor?: boolean; step: string }[] = [];
+  useEffect(() => {
+    if (!latest || Object.keys(latest.deltas).length === 0) return;
 
-  for (const step of ALL_STEPS) {
-    for (const m of step.metrics) {
-      const d = latest.deltas[m.key];
-      if (d !== null && d !== undefined && Math.abs(d) >= ALERT_THRESHOLD) {
-        alerts.push({ metric: m.label, delta: d, invertColor: m.invertColor, step: step.title });
+    const fetchInsights = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const stepsPayload = ALL_STEPS.map(step => ({
+          title: step.title,
+          metrics: step.metrics.map(m => ({
+            label: m.label,
+            value: m.format((latest as any)[m.key] ?? 0),
+            delta: latest.deltas[m.key] ?? null,
+          })),
+        }));
+
+        const { data, error: fnError } = await supabase.functions.invoke("billy-daily-insights", {
+          body: { steps: stepsPayload },
+        });
+
+        if (fnError) throw fnError;
+        setInsights(data?.steps || []);
+      } catch (e: any) {
+        console.error("AI insights error:", e);
+        setError("Could not generate insights");
+      } finally {
+        setLoading(false);
       }
-    }
-  }
+    };
 
-  if (alerts.length === 0) {
-    return (
-      <Card className="border-accent/30 bg-accent/5">
-        <CardContent className="py-4 flex items-center gap-3">
-          <span className="text-accent text-lg">✓</span>
-          <div>
-            <p className="text-sm font-semibold">No major alerts</p>
-            <p className="text-xs text-muted-foreground">All metrics within normal range ({latest.label} vs previous day)</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+    fetchInsights();
+  }, [latest?.date]);
+
+  if (rows.length < 2 || !latest || Object.keys(latest.deltas).length === 0) return null;
+
+  // Also compute raw alert counts per step for the badge
+  const stepAlerts = ALL_STEPS.map(step => {
+    const alerts = step.metrics.filter(m => {
+      const d = latest.deltas[m.key];
+      return d !== null && d !== undefined && Math.abs(d) >= ALERT_THRESHOLD;
+    });
+    return { title: step.title, count: alerts.length, alerts };
+  });
+
+  const totalAlerts = stepAlerts.reduce((sum, s) => sum + s.count, 0);
 
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-destructive" />
-          {alerts.length} Alert{alerts.length > 1 ? "s" : ""} — {latest.label} vs Previous Day
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">Metrics with &gt;{ALERT_THRESHOLD}% day-over-day change</p>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {alerts.map((a, i) => {
-            const isPositive = a.invertColor ? a.delta <= 0 : a.delta >= 0;
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-primary" />
+        <h3 className="text-sm font-semibold">AI Performance Summary — {latest.label}</h3>
+        {totalAlerts > 0 && (
+          <span className="text-xs bg-destructive/10 text-destructive px-2 py-0.5 rounded-full font-medium">
+            {totalAlerts} alert{totalAlerts > 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
+      {loading && (
+        <Card className="border-primary/20">
+          <CardContent className="py-6 flex items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-sm">Analyzing funnel trends…</span>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && !loading && (
+        <Card className="border-destructive/20">
+          <CardContent className="py-4 text-sm text-muted-foreground">{error}</CardContent>
+        </Card>
+      )}
+
+      {!loading && insights && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {insights.map((step, i) => {
+            const alertInfo = stepAlerts[i];
+            const hasAlerts = alertInfo && alertInfo.count > 0;
+
             return (
-              <div key={i} className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                isPositive ? "bg-accent/10" : "bg-destructive/10"
-              }`}>
-                <div>
-                  <span className="text-xs text-muted-foreground">{a.step}</span>
-                  <p className="text-sm font-medium">{a.metric}</p>
-                </div>
-                <span className={`font-mono text-sm font-bold flex items-center gap-1 ${
-                  isPositive ? "text-accent" : "text-destructive"
-                }`}>
-                  {a.delta >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                  {a.delta >= 0 ? "+" : ""}{a.delta.toFixed(1)}%
-                </span>
-              </div>
+              <Card key={step.title} className={`border-border/50 ${hasAlerts ? "border-l-2 border-l-destructive/60" : "border-l-2 border-l-accent/60"}`}>
+                <CardHeader className="pb-1 pt-3 px-4">
+                  <CardTitle className="text-xs font-semibold flex items-center gap-2">
+                    {step.title}
+                    {hasAlerts && (
+                      <span className="flex items-center gap-1 text-destructive">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span className="text-[10px]">{alertInfo.count}</span>
+                      </span>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3">
+                  <ul className="space-y-1.5">
+                    {step.bullets.map((bullet, j) => (
+                      <li key={j} className="text-xs text-muted-foreground leading-relaxed flex gap-2">
+                        <span className="text-primary mt-0.5 shrink-0">•</span>
+                        <span>{bullet}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Key delta badges inline */}
+                  {hasAlerts && (
+                    <div className="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-border/30">
+                      {alertInfo.alerts.map(m => {
+                        const d = latest.deltas[m.key]!;
+                        const isPositive = m.invertColor ? d <= 0 : d >= 0;
+                        return (
+                          <span key={m.key} className={`inline-flex items-center gap-0.5 text-[10px] font-mono font-medium px-1.5 py-0.5 rounded ${
+                            isPositive ? "bg-accent/10 text-accent" : "bg-destructive/10 text-destructive"
+                          }`}>
+                            {d >= 0 ? <ArrowUpRight className="w-2.5 h-2.5" /> : <ArrowDownRight className="w-2.5 h-2.5" />}
+                            {m.label} {d >= 0 ? "+" : ""}{d.toFixed(1)}%
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
