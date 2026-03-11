@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "authorization, x-client-info, apikey, content-type, x-api-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 const cache = new Map<string, { data: any; expires: number }>();
@@ -40,12 +40,20 @@ Deno.serve(async (req) => {
     }
 
     const authHeader = req.headers.get("Authorization");
+    const apiKey = req.headers.get("x-api-key");
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    if (authHeader?.startsWith("Bearer ")) {
+    if (apiKey) {
+      const expected = Deno.env.get("OPENCLAW_API_KEY");
+      if (!expected || apiKey !== expected) {
+        return new Response(JSON.stringify({ error: "Invalid API key" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    } else if (authHeader?.startsWith("Bearer ")) {
       const supabaseUser = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -65,6 +73,10 @@ Deno.serve(async (req) => {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    } else {
+      return new Response(JSON.stringify({ error: "Missing authentication" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const cacheKey = `ads:${clientId}:${platform}:${startDate}:${endDate}:${minImpressions}`;

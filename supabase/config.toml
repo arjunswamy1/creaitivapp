@@ -59,3 +59,15 @@ verify_jwt = false
 
 [functions.sync-ringba-calls]
 verify_jwt = false
+
+[functions.api-ringba]
+verify_jwt = false
+
+[functions.api-revenue]
+verify_jwt = false
+
+[functions.api-daily-summary]
+verify_jwt = false
+
+[functions.api-keywords]
+verify_jwt = false
