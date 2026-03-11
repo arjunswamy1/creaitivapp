@@ -27,13 +27,23 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    const apiKey = req.headers.get("x-api-key");
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     let userId: string | null = null;
-    if (authHeader?.startsWith("Bearer ")) {
+
+    if (apiKey) {
+      const expected = Deno.env.get("OPENCLAW_API_KEY");
+      if (!expected || apiKey !== expected) {
+        return new Response(JSON.stringify({ error: "Invalid API key" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // API key gets access to all clients — userId stays null
+    } else if (authHeader?.startsWith("Bearer ")) {
       const supabaseUser = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -46,6 +56,10 @@ Deno.serve(async (req) => {
         });
       }
       userId = user.id;
+    } else {
+      return new Response(JSON.stringify({ error: "Missing authentication" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const cacheKey = `clients:${userId || "all"}`;
