@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.check-anomalies]
 verify_jwt = false
+
+[functions.billy-daily-insights]
+verify_jwt = false
