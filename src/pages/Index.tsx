@@ -29,6 +29,10 @@ const DashboardContent = () => {
                 <Zap className="w-3.5 h-3.5" />
                 Revenue Engine
               </TabsTrigger>
+              <TabsTrigger value="daily-trends" className="gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Daily Trends
+              </TabsTrigger>
               {showMeta && (
                 <TabsTrigger value="meta" className="gap-1.5">
                   <Facebook className="w-3.5 h-3.5" />
@@ -38,6 +42,9 @@ const DashboardContent = () => {
             </TabsList>
             <TabsContent value="revenue-engine">
               <BillyDashboard />
+            </TabsContent>
+            <TabsContent value="daily-trends">
+              <BillyDailyTrends />
             </TabsContent>
             {showMeta && (
               <TabsContent value="meta">
