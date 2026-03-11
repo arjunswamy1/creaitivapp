@@ -4,10 +4,11 @@ import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
 import BillyMetaDashboard from "@/components/BillyMetaDashboard";
+import BillyDailyTrends from "@/components/BillyDailyTrends";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook, Zap } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap, TrendingUp } from "lucide-react";
 
 const DashboardContent = () => {
   const { dashboardConfig, activeClient } = useClient();
@@ -28,6 +29,10 @@ const DashboardContent = () => {
                 <Zap className="w-3.5 h-3.5" />
                 Revenue Engine
               </TabsTrigger>
+              <TabsTrigger value="daily-trends" className="gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Daily Trends
+              </TabsTrigger>
               {showMeta && (
                 <TabsTrigger value="meta" className="gap-1.5">
                   <Facebook className="w-3.5 h-3.5" />
@@ -37,6 +42,9 @@ const DashboardContent = () => {
             </TabsList>
             <TabsContent value="revenue-engine">
               <BillyDashboard />
+            </TabsContent>
+            <TabsContent value="daily-trends">
+              <BillyDailyTrends />
             </TabsContent>
             {showMeta && (
               <TabsContent value="meta">

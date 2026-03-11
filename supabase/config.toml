@@ -71,3 +71,9 @@ verify_jwt = false
 
 [functions.api-keywords]
 verify_jwt = false
+
+[functions.daily-summary-alert]
+verify_jwt = false
+
+[functions.check-anomalies]
+verify_jwt = false
