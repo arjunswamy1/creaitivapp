@@ -245,24 +245,43 @@ const BillyDashboard = () => {
 
       {/* Scalability Indicator */}
       {!isLoading && (
-        <Card className={`mb-6 ${rpv > (kpis?.cpc ?? 0) ? "border-accent/40 bg-accent/5" : "border-destructive/40 bg-destructive/5"}`}>
-          <CardContent className="py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Target className="w-5 h-5 text-primary" />
-              <div>
-                <p className="text-sm font-semibold">
-                  RPV ${rpv.toFixed(2)} vs CPC ${kpis?.cpc ?? 0}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Max CPC (RPV): ${rpv.toFixed(2)} — {rpv > (kpis?.cpc ?? 0) ? "Room to scale" : "Optimize before scaling"}
-                </p>
-              </div>
-            </div>
-            <span className={`text-sm font-bold font-mono ${rpv > (kpis?.cpc ?? 0) ? "text-accent" : "text-destructive"}`}>
-              {rpv > (kpis?.cpc ?? 0) ? "✓ SCALABLE" : "✗ NOT SCALABLE"}
-            </span>
-          </CardContent>
-        </Card>
+        (() => {
+          const cpcVal = Number(kpis?.cpc ?? 0);
+          const marginPct = cpcVal > 0 ? ((rpv - cpcVal) / cpcVal) * 100 : 0;
+          const isScalable = rpv > cpcVal * 1.25; // 25%+ margin required for scalable
+          const isPositive = rpv > cpcVal;
+
+          return (
+            <Card className={`mb-6 ${isScalable ? "border-accent/40 bg-accent/5" : isPositive ? "border-yellow-500/40 bg-yellow-500/5" : "border-destructive/40 bg-destructive/5"}`}>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <Target className="w-5 h-5 text-primary" />
+                    <div>
+                      <p className="text-sm font-semibold">
+                        RPV ${rpv.toFixed(2)} vs CPC ${kpis?.cpc ?? 0} — Margin: {marginPct > 0 ? "+" : ""}{marginPct.toFixed(0)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isScalable
+                          ? "25%+ margin — room to scale aggressively"
+                          : isPositive
+                            ? "Positive but thin margin — optimize before scaling"
+                            : "Negative margin — every visitor costs more than they generate"}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-sm font-bold font-mono ${isScalable ? "text-accent" : isPositive ? "text-yellow-500" : "text-destructive"}`}>
+                    {isScalable ? "✓ SCALABLE" : isPositive ? "⚠ MARGINAL" : "✗ NOT SCALABLE"}
+                  </span>
+                </div>
+                <div className="flex gap-6 text-xs text-muted-foreground border-t border-border/50 pt-2 mt-1">
+                  <span><strong>RPV/CPC</strong> = Revenue per visitor vs cost per click — measures scalability headroom</span>
+                  <span><strong>ROAS</strong> = Total revenue ÷ total ad spend — measures overall profitability</span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()
       )}
 
       {/* Step 3 — Call Processing (Ringba) */}
