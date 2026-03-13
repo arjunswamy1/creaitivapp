@@ -13,13 +13,17 @@ const SubblyKPIRow = () => {
       <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
         <Package className="w-4 h-4" /> Subscription Metrics
       </h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+          Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           <>
             <KPICard
               title="New Subscriptions"
+              value={(data?.newSubscriptions ?? 0).toLocaleString()}
+            />
+            <KPICard
+              title="Active Subscriptions"
               value={(data?.activeSubscriptions ?? 0).toLocaleString()}
             />
             <KPICard
