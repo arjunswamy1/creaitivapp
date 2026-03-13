@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
-import { format, addDays } from "date-fns";
+import { format, addDays, subDays } from "date-fns";
 
 export interface SubblyKPIs {
   newSubscriptions: number;
@@ -46,13 +46,13 @@ export function useSubblyKPIs() {
       // 2. Active subscriptions — current snapshot (no date filter)
       const { data: activeSubs, error: activeErr } = await supabase
         .from("subbly_subscriptions")
-        .select("id, quantity")
+        .select("id, quantity, subscription_id:subbly_id")
         .eq("client_id", clientId)
         .eq("status", "active");
 
       if (activeErr) throw activeErr;
 
-      // 3. Paid invoices in date range for revenue
+      // 3. Paid invoices in selected date range for revenue
       const { data: invoices, error: invErr } = await supabase
         .from("subbly_invoices")
         .select("amount, invoice_date")
@@ -63,6 +63,19 @@ export function useSubblyKPIs() {
 
       if (invErr) throw invErr;
 
+      // 4. MRR: paid invoices from last 30 days (rolling, independent of date range)
+      const thirtyDaysAgo = format(subDays(new Date(), 30), "yyyy-MM-dd") + "T00:00:00.000Z";
+      const nowUTC = new Date().toISOString();
+      const { data: mrrInvoices, error: mrrErr } = await supabase
+        .from("subbly_invoices")
+        .select("amount")
+        .eq("client_id", clientId)
+        .eq("status", "paid")
+        .gte("invoice_date", thirtyDaysAgo)
+        .lte("invoice_date", nowUTC);
+
+      if (mrrErr) throw mrrErr;
+
       const newSubCount = (newSubs || []).length;
       const activeSubCount = (activeSubs || []).length;
       const cancelledInRange = (newSubs || []).filter((s) => s.status === "cancelled").length;
@@ -70,10 +83,10 @@ export function useSubblyKPIs() {
       // Subbly amounts are in cents, convert to dollars
       const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
 
-      // MRR = total revenue from active subs' most recent invoices
-      // Simple approximation: revenue in period / months in period, or use active sub count * avg invoice
-      const avgRevenuePerSub = newSubCount > 0 ? totalRevenue / newSubCount : 0;
-      const mrr = Math.round(activeSubCount * avgRevenuePerSub);
+      // MRR = sum of paid invoices in last 30 days (already ~1 month window)
+      const mrr = Math.round((mrrInvoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100);
+
+      const avgRevenuePerSub = activeSubCount > 0 ? mrr / activeSubCount : 0;
 
       return {
         newSubscriptions: newSubCount,
