@@ -178,8 +178,9 @@ Deno.serve(async (req) => {
   const daysWithData = activeSeries.length || 1;
 
   const recentWindow = 7;
-  const recentDays = completedSeries.slice(-recentWindow);
-  const olderDays = completedSeries.slice(0, -recentWindow);
+  // Use only active days for recent/older windows to avoid paused-day bias
+  const recentDays = activeSeries.slice(-recentWindow);
+  const olderDays = activeSeries.slice(0, -recentWindow);
 
   const weightedAvg = (arr: typeof completedSeries, older: typeof completedSeries, field: string) => {
     const recentAvg = arr.length > 0 ? arr.reduce((s, d) => s + Number((d as any)[field]), 0) / arr.length : 0;
