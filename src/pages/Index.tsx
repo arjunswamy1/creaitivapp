@@ -5,10 +5,11 @@ import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
 import BillyMetaDashboard from "@/components/BillyMetaDashboard";
 import BillyDailyTrends from "@/components/BillyDailyTrends";
+import BillyTrendAnalysis from "@/components/BillyTrendAnalysis";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook, Zap, TrendingUp } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap, TrendingUp, LineChart } from "lucide-react";
 
 const DashboardContent = () => {
   const { dashboardConfig, activeClient } = useClient();
@@ -17,7 +18,6 @@ const DashboardContent = () => {
   const showMeta = platforms.includes("meta");
   const isBilly = activeClient?.slug === "billy";
 
-  // Billy.com gets its own dedicated funnel dashboard
   if (isBilly) {
     return (
       <div className="min-h-screen bg-background px-6 pb-12">
@@ -33,6 +33,10 @@ const DashboardContent = () => {
                 <TrendingUp className="w-3.5 h-3.5" />
                 Daily Trends
               </TabsTrigger>
+              <TabsTrigger value="trend-analysis" className="gap-1.5">
+                <LineChart className="w-3.5 h-3.5" />
+                Trend Analysis
+              </TabsTrigger>
               {showMeta && (
                 <TabsTrigger value="meta" className="gap-1.5">
                   <Facebook className="w-3.5 h-3.5" />
@@ -45,6 +49,9 @@ const DashboardContent = () => {
             </TabsContent>
             <TabsContent value="daily-trends">
               <BillyDailyTrends />
+            </TabsContent>
+            <TabsContent value="trend-analysis">
+              <BillyTrendAnalysis />
             </TabsContent>
             {showMeta && (
               <TabsContent value="meta">
@@ -61,7 +68,6 @@ const DashboardContent = () => {
     <div className="min-h-screen bg-background px-6 pb-12">
       <div className="max-w-7xl mx-auto">
         <DashboardHeader />
-
         <Tabs key={activeClient?.id} defaultValue="cross-channel" className="w-full">
           <TabsList className="bg-secondary/50 mb-6">
             <TabsTrigger value="cross-channel" className="gap-1.5">
@@ -81,17 +87,14 @@ const DashboardContent = () => {
               </TabsTrigger>
             )}
           </TabsList>
-
           <TabsContent value="cross-channel">
             <CrossChannelView />
           </TabsContent>
-
           {showGoogle && (
             <TabsContent value="google">
               <GoogleDashboard />
             </TabsContent>
           )}
-
           {showMeta && (
             <TabsContent value="meta">
               <MetaDashboard />

@@ -4,15 +4,7 @@ import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { format, differenceInDays, subDays } from "date-fns";
 
-/**
- * Billy.com-specific KPI hook that computes metrics from ad_campaigns table
- * filtered to only flights-related campaigns, avoiding the account-level
- * ad_daily_metrics which includes non-flights campaigns (e.g. Bath/Leads).
- *
- * Campaigns are matched by name containing "Flight" (case-insensitive).
- */
-
-const FLIGHTS_PATTERN = "Flight"; // matches PremFlights, FlightsMixed, etc.
+const FLIGHTS_PATTERN = "Flight";
 
 interface BillyKPIData {
   totalSpend: number;
@@ -27,6 +19,12 @@ interface BillyKPIData {
   atcRate: number;
 }
 
+export interface TrendIndicators {
+  dod: number | null;
+  wow: number | null;
+  mom: number | null;
+}
+
 export interface BillyKPIWithChange extends BillyKPIData {
   changes: {
     spend: number | null;
@@ -39,6 +37,18 @@ export interface BillyKPIWithChange extends BillyKPIData {
     impressions: number | null;
     addToCart: number | null;
     atcRate: number | null;
+  };
+  trends: {
+    spend: TrendIndicators;
+    revenue: TrendIndicators;
+    roas: TrendIndicators;
+    conversions: TrendIndicators;
+    cpc: TrendIndicators;
+    ctr: TrendIndicators;
+    cpm: TrendIndicators;
+    impressions: TrendIndicators;
+    addToCart: TrendIndicators;
+    atcRate: TrendIndicators;
   };
 }
 
@@ -72,6 +82,27 @@ function pctChange(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 1000) / 10;
 }
 
+function buildTrends(cur: BillyKPIData, dod: BillyKPIData, wow: BillyKPIData, mom: BillyKPIData): BillyKPIWithChange["trends"] {
+  const keys: (keyof BillyKPIData)[] = [
+    "totalSpend", "totalRevenue", "blendedROAS", "totalConversions",
+    "cpc", "ctr", "cpm", "impressions", "addToCart", "atcRate",
+  ];
+  const trendKeys: (keyof BillyKPIWithChange["trends"])[] = [
+    "spend", "revenue", "roas", "conversions",
+    "cpc", "ctr", "cpm", "impressions", "addToCart", "atcRate",
+  ];
+
+  const result: any = {};
+  for (let i = 0; i < keys.length; i++) {
+    result[trendKeys[i]] = {
+      dod: pctChange(cur[keys[i]] as number, dod[keys[i]] as number),
+      wow: pctChange(cur[keys[i]] as number, wow[keys[i]] as number),
+      mom: pctChange(cur[keys[i]] as number, mom[keys[i]] as number),
+    };
+  }
+  return result;
+}
+
 export function useBillyKPIs() {
   const { dateRange } = useDateRange();
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
@@ -82,39 +113,47 @@ export function useBillyKPIs() {
   const { activeClient } = useClient();
   const clientId = activeClient?.id;
 
+  // For DoD/WoW/MoM we use fixed comparisons based on "today"
+  const today = new Date();
+  const todayStr = format(today, "yyyy-MM-dd");
+  const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
+  const lastWeekStr = format(subDays(today, 7), "yyyy-MM-dd");
+  const lastMonthStr = format(subDays(today, 30), "yyyy-MM-dd");
+
   return useQuery({
     queryKey: ["billy-kpis", fromStr, toStr, clientId],
     queryFn: async (): Promise<BillyKPIWithChange> => {
-      // Query ad_campaigns filtered to flights campaigns only
-      let currentQuery = supabase
-        .from("ad_campaigns")
-        .select("spend, revenue, impressions, clicks, conversions, add_to_cart")
-        .eq("platform", "meta")
-        .ilike("campaign_name", `%${FLIGHTS_PATTERN}%`)
-        .gte("date", fromStr)
-        .lte("date", toStr);
+      const baseFilters = (q: any) => {
+        q = q.eq("platform", "meta").ilike("campaign_name", `%${FLIGHTS_PATTERN}%`);
+        if (clientId) q = q.eq("client_id", clientId);
+        return q;
+      };
 
-      let previousQuery = supabase
-        .from("ad_campaigns")
-        .select("spend, revenue, impressions, clicks, conversions, add_to_cart")
-        .eq("platform", "meta")
-        .ilike("campaign_name", `%${FLIGHTS_PATTERN}%`)
-        .gte("date", prevFrom)
-        .lte("date", prevTo);
-
-      if (clientId) {
-        currentQuery = currentQuery.eq("client_id", clientId);
-        previousQuery = previousQuery.eq("client_id", clientId);
-      }
-
-      const [{ data: current, error: e1 }, { data: previous }] = await Promise.all([
-        currentQuery,
-        previousQuery,
+      // Main range + previous range + DoD/WoW/MoM single-day queries
+      const [
+        { data: current, error: e1 },
+        { data: previous },
+        { data: todayData },
+        { data: yesterdayData },
+        { data: lastWeekData },
+        { data: lastMonthData },
+      ] = await Promise.all([
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").gte("date", fromStr).lte("date", toStr)),
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").gte("date", prevFrom).lte("date", prevTo)),
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", todayStr)),
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", yesterdayStr)),
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", lastWeekStr)),
+        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", lastMonthStr)),
       ]);
 
       if (e1) throw e1;
       const cur = calcKPIs(current || []);
       const prev = calcKPIs(previous || []);
+
+      const todayKPIs = calcKPIs(todayData || []);
+      const yesterdayKPIs = calcKPIs(yesterdayData || []);
+      const lastWeekKPIs = calcKPIs(lastWeekData || []);
+      const lastMonthKPIs = calcKPIs(lastMonthData || []);
 
       return {
         ...cur,
@@ -130,6 +169,7 @@ export function useBillyKPIs() {
           addToCart: pctChange(cur.addToCart, prev.addToCart),
           atcRate: pctChange(cur.atcRate, prev.atcRate),
         },
+        trends: buildTrends(todayKPIs, yesterdayKPIs, lastWeekKPIs, lastMonthKPIs),
       };
     },
   });
