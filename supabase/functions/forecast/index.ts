@@ -169,11 +169,18 @@ Deno.serve(async (req) => {
   // Use only completed days (exclude today) for projection averages.
   // Today's partial data would otherwise drag down all daily rate estimates.
   const completedSeries = mtdSeries.slice(0, -1);
-  const daysWithData = completedSeries.filter(d => d.spend > 0 || d.subs > 0).length || 1;
+
+  // IMPORTANT: Exclude "inactive days" where campaigns were paused (spend = 0).
+  // When call centers can't accept calls, campaigns get paused which drops
+  // spend/revenue to zero. Including these days would artificially lower
+  // the daily averages and distort forecasts.
+  const activeSeries = completedSeries.filter(d => d.spend > 0);
+  const daysWithData = activeSeries.length || 1;
 
   const recentWindow = 7;
-  const recentDays = completedSeries.slice(-recentWindow);
-  const olderDays = completedSeries.slice(0, -recentWindow);
+  // Use only active days for recent/older windows to avoid paused-day bias
+  const recentDays = activeSeries.slice(-recentWindow);
+  const olderDays = activeSeries.slice(0, -recentWindow);
 
   const weightedAvg = (arr: typeof completedSeries, older: typeof completedSeries, field: string) => {
     const recentAvg = arr.length > 0 ? arr.reduce((s, d) => s + Number((d as any)[field]), 0) / arr.length : 0;
