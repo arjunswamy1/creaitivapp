@@ -5,6 +5,7 @@ import { useDateRange } from "@/contexts/DateRangeContext";
 import { format, addDays } from "date-fns";
 
 export interface SubblyKPIs {
+  newSubscriptions: number;
   activeSubscriptions: number;
   mrr: number;
   totalRevenue: number;
@@ -28,28 +29,33 @@ export function useSubblyKPIs() {
       if (!clientId) throw new Error("No client");
 
       // Subbly uses US Eastern Time (UTC-5) for date boundaries
-      // Start of fromDate in ET = fromDate 05:00 UTC
-      // End of toDate in ET = toDate+1 day 04:59:59 UTC
       const fromUTC = fromStr + "T05:00:00.000Z";
       const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
       const toUTC = toNextDay + "T04:59:59.999Z";
 
-      // Fetch subscriptions created within the date range (server-side filter)
-      const { data: subs, error: subErr } = await supabase
+      // 1. New subscriptions created within date range (all statuses)
+      const { data: newSubs, error: newSubErr } = await supabase
         .from("subbly_subscriptions")
-        .select("status, quantity, successful_charges_count, subbly_created_at")
+        .select("status, quantity, subbly_created_at")
         .eq("client_id", clientId)
         .gte("subbly_created_at", fromUTC)
         .lte("subbly_created_at", toUTC);
 
-      if (subErr) throw subErr;
+      if (newSubErr) throw newSubErr;
 
-      const cancelledSubs = (subs || []).filter((s) => s.status === "cancelled");
+      // 2. Active subscriptions — current snapshot (no date filter)
+      const { data: activeSubs, error: activeErr } = await supabase
+        .from("subbly_subscriptions")
+        .select("id, quantity")
+        .eq("client_id", clientId)
+        .eq("status", "active");
 
-      // Fetch paid invoices filtered by date range
+      if (activeErr) throw activeErr;
+
+      // 3. Paid invoices in date range for revenue
       const { data: invoices, error: invErr } = await supabase
         .from("subbly_invoices")
-        .select("amount, status, invoice_date")
+        .select("amount, invoice_date")
         .eq("client_id", clientId)
         .eq("status", "paid")
         .gte("invoice_date", fromUTC)
@@ -57,18 +63,26 @@ export function useSubblyKPIs() {
 
       if (invErr) throw invErr;
 
+      const newSubCount = (newSubs || []).length;
+      const activeSubCount = (activeSubs || []).length;
+      const cancelledInRange = (newSubs || []).filter((s) => s.status === "cancelled").length;
+
       // Subbly amounts are in cents, convert to dollars
       const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
-      const newSubCount = (subs || []).length;
-      const totalCount = (subs || []).length;
+
+      // MRR = total revenue from active subs' most recent invoices
+      // Simple approximation: revenue in period / months in period, or use active sub count * avg invoice
+      const avgRevenuePerSub = newSubCount > 0 ? totalRevenue / newSubCount : 0;
+      const mrr = Math.round(activeSubCount * avgRevenuePerSub);
 
       return {
-        activeSubscriptions: newSubCount,
-        mrr: totalCount > 0 ? Math.round(totalRevenue / Math.max(1, (subs || []).reduce((s, sub) => s + (sub.successful_charges_count || 1), 0)) * newSubCount) : 0,
+        newSubscriptions: newSubCount,
+        activeSubscriptions: activeSubCount,
+        mrr,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
-        churnedCount: cancelledSubs.length,
-        churnRate: totalCount > 0 ? Math.round((cancelledSubs.length / totalCount) * 10000) / 100 : 0,
-        avgRevenuePerSub: newSubCount > 0 ? Math.round((totalRevenue / newSubCount) * 100) / 100 : 0,
+        churnedCount: cancelledInRange,
+        churnRate: newSubCount > 0 ? Math.round((cancelledInRange / newSubCount) * 10000) / 100 : 0,
+        avgRevenuePerSub: Math.round(avgRevenuePerSub * 100) / 100,
       };
     },
   });
