@@ -36,7 +36,7 @@ const Auth = () => {
     return <Navigate to="/" replace />;
   }
 
-  const [forgotMode, setForgotMode] = useState(false);
+
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
