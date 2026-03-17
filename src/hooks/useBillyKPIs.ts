@@ -231,15 +231,22 @@ export function useBillyTopCampaigns() {
       for (const platform of adPlatforms) {
         let query = supabase
           .from("ad_campaigns")
-          .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type")
+          .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type, account_id")
           .eq("platform", platform)
           .gte("date", fromStr)
           .lte("date", toStr);
         if (clientId) query = query.eq("client_id", clientId);
+        const accountIds = getVerticalAccountIds(activeVertical, platform);
+        if (accountIds.length === 1) {
+          query = query.eq("account_id", accountIds[0]);
+        } else if (accountIds.length > 1) {
+          query = query.in("account_id", accountIds);
+        }
         const { data, error } = await query;
         if (error) throw error;
         const matched = (data || []).filter((r: any) =>
-          matchesVertical(r.campaign_name, activeVertical, platform)
+          matchesVertical(r.campaign_name, activeVertical, platform) &&
+          matchesVerticalAccount(r.account_id, activeVertical, platform)
         );
         allData.push(...matched);
       }
