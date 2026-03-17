@@ -143,9 +143,10 @@ async function fetchVerticalCampaigns(
     const { data, error } = results[i];
     if (error) throw error;
     const platform = adPlatforms[i];
-    // Filter by vertical patterns
+    // Filter by vertical patterns (and account if configured)
     const matched = (data || []).filter((r: any) =>
-      matchesVertical(r.campaign_name, vertical, platform)
+      matchesVertical(r.campaign_name, vertical, platform) &&
+      matchesVerticalAccount(r.account_id, vertical, platform)
     );
     allRows.push(...matched);
   }
