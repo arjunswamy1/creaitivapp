@@ -193,16 +193,18 @@ const Auth = () => {
             </p>
           )}
 
-          <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="hover:underline font-medium"
-              style={{ color: "hsl(15,78%,55%)" }}
-            >
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
-          </p>
+          {!forgotMode && (
+            <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
+              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="hover:underline font-medium"
+                style={{ color: "hsl(15,78%,55%)" }}
+              >
+                {isLogin ? "Sign up" : "Sign in"}
+              </button>
+            </p>
+          )}
         </div>
 
         <p className="text-xs text-center mt-6" style={{ color: "hsl(230,10%,40%)" }}>
