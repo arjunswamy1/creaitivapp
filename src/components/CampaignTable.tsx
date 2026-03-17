@@ -14,6 +14,11 @@ interface RingbaEnriched {
 const CampaignTable = ({ platform }: { platform?: string }) => {
   const { data: campaigns, isLoading } = useTopCampaigns(platform);
   const { data: ringba } = useRingbaByVertical();
+  const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
+  const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
+  const isGoogle = platform === "google";
+  const isMeta = platform === "meta";
+
   // Use active vertical Ringba data for proportional attribution
   const ringbaEnrichment = useMemo(() => {
     if (!isMeta || !campaigns || !ringba) return new Map<string, RingbaEnriched>();
