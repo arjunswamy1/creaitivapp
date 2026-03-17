@@ -91,7 +91,10 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
-    const isCron = cronSecret && token === cronSecret;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const isCron =
+      (cronSecret && token === cronSecret) ||
+      (serviceRoleKey && token === serviceRoleKey);
 
     if (!isCron) {
       // Normal user auth flow
@@ -166,7 +169,12 @@ Deno.serve(async (req) => {
     await sleep(1000);
 
     // Sync invoices (paid only for revenue tracking)
-    const invoices = await fetchAllPages("/invoices", SUBBLY_API_KEY, { "statuses[]": "paid" });
+    const invoices = await fetchAllPages(
+      "/invoices",
+      SUBBLY_API_KEY,
+      { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
+      20
+    );
     let invoicesUpserted = 0;
 
     if (invoices.length > 0) {
