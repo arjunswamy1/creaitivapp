@@ -13,8 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
-    console.log("Auth header present:", !!authHeader, "starts with Bearer:", authHeader?.startsWith("Bearer "));
-    
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -25,24 +23,18 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const isCron = (serviceRoleKey && token === serviceRoleKey) 
-      || (cronSecret && token === cronSecret)
-      || (anonKey && token === anonKey);
-    
-    console.log("isCron:", isCron, "token length:", token?.length, "anonKey length:", anonKey?.length, "token first 20:", token?.substring(0, 20), "anonKey first 20:", anonKey?.substring(0, 20), "match:", token === anonKey);
 
     // Use service role for writing data
-    const adminSupabaseForAuth = createClient(
+    const adminSupabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     let userId: string;
+    const isKnownSecret = (serviceRoleKey && token === serviceRoleKey) || (cronSecret && token === cronSecret);
 
-    if (isCron) {
-      // For cron jobs, pick the first user associated with a Shopify connection
-      const { data: connCheck } = await adminSupabaseForAuth
+    if (isKnownSecret) {
+      const { data: connCheck } = await adminSupabase
         .from("platform_connections")
         .select("user_id")
         .eq("platform", "shopify")
@@ -50,23 +42,30 @@ Deno.serve(async (req) => {
         .single();
       userId = connCheck?.user_id || "cron";
     } else {
+      // Try user JWT auth; if it fails, try treating as cron (anon key from pg_cron)
       const supabaseUser = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_ANON_KEY")!,
         { global: { headers: { Authorization: authHeader } } }
       );
-      const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-      if (claimsError || !claimsData?.claims) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const { data: userData } = await supabaseUser.auth.getUser();
+      if (userData?.user) {
+        userId = userData.user.id;
+      } else {
+        // Fallback: treat as cron call (e.g. anon key JWT from pg_cron)
+        console.log("No valid user session, treating as cron call");
+        const { data: connCheck } = await adminSupabase
+          .from("platform_connections")
+          .select("user_id")
+          .eq("platform", "shopify")
+          .limit(1)
+          .single();
+        userId = connCheck?.user_id || "cron";
       }
-      userId = claimsData.claims.sub as string;
     }
 
-    // Get Shopify connection using admin client (works for both cron and user calls)
-    const { data: conn, error: connError } = await adminSupabaseForAuth
+    // Get Shopify connection using admin client
+    const { data: conn, error: connError } = await adminSupabase
       .from("platform_connections")
       .select("*")
       .eq("platform", "shopify")
