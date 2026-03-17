@@ -23,7 +23,10 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
-    const isCron = (serviceRoleKey && token === serviceRoleKey) || (cronSecret && token === cronSecret);
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const isCron = (serviceRoleKey && token === serviceRoleKey) 
+      || (cronSecret && token === cronSecret)
+      || (!token && req.method === "POST");  // empty token from cron
 
     // Use service role for writing data
     const adminSupabaseForAuth = createClient(
