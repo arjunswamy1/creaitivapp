@@ -82,11 +82,7 @@ Deno.serve(async (req) => {
     const accessToken = conn.access_token;
     const clientId = conn.client_id;
 
-    // Use service role for writing data
-    const adminSupabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Reuse adminSupabase from above for sync operations
 
     // Create sync log
     const { data: syncLog } = await adminSupabase
