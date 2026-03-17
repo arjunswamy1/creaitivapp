@@ -2,6 +2,7 @@ import { useBillyKPIs, type TrendIndicators } from "@/hooks/useBillyKPIs";
 import { syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useClient } from "@/contexts/ClientContext";
+import { useVertical } from "@/contexts/VerticalContext";
 import FlightsForecastCard from "@/components/FlightsForecastCard";
 import FlightsRecommendations from "@/components/FlightsRecommendations";
 import TrendIndicator from "@/components/TrendIndicator";
@@ -52,18 +53,18 @@ const FunnelMetric = ({ label, value, change, invertColor, icon, trends }: Funne
 
 const BillyDashboard = () => {
   const { data: kpis, isLoading } = useBillyKPIs();
-  
   const { data: ringbaByVertical, isLoading: ringbaLoading } = useRingbaByVertical();
-  const flightsRingba = ringbaByVertical?.allFlights;
-  const ringba = flightsRingba ? {
-    totalCalls: flightsRingba.totalCalls,
-    connectedCalls: flightsRingba.connectedCalls,
-    convertedCalls: flightsRingba.convertedCalls,
-    totalRevenue: flightsRingba.totalRevenue,
-    connectRate: flightsRingba.totalCalls > 0 ? (flightsRingba.connectedCalls / flightsRingba.totalCalls) * 100 : 0,
-    conversionRate: flightsRingba.totalCalls > 0 ? (flightsRingba.convertedCalls / flightsRingba.totalCalls) * 100 : 0,
-    revenuePerCall: flightsRingba.connectedCalls > 0 ? flightsRingba.totalRevenue / flightsRingba.connectedCalls : 0,
-    avgDuration: flightsRingba.avgDuration,
+  const { activeVertical } = useVertical();
+  const verticalRingba = ringbaByVertical?.active;
+  const ringba = verticalRingba ? {
+    totalCalls: verticalRingba.totalCalls,
+    connectedCalls: verticalRingba.connectedCalls,
+    convertedCalls: verticalRingba.convertedCalls,
+    totalRevenue: verticalRingba.totalRevenue,
+    connectRate: verticalRingba.totalCalls > 0 ? (verticalRingba.connectedCalls / verticalRingba.totalCalls) * 100 : 0,
+    conversionRate: verticalRingba.totalCalls > 0 ? (verticalRingba.convertedCalls / verticalRingba.totalCalls) * 100 : 0,
+    revenuePerCall: verticalRingba.connectedCalls > 0 ? verticalRingba.totalRevenue / verticalRingba.connectedCalls : 0,
+    avgDuration: verticalRingba.avgDuration,
   } : null;
   const { activeClient } = useClient();
   const [syncing, setSyncing] = useState(false);
@@ -102,12 +103,17 @@ const BillyDashboard = () => {
 
   return (
     <>
-      {/* Flights Revenue Engine Header */}
+      {/* Revenue Engine Header */}
       <div className="mb-6 flex items-center gap-3">
         <div className="h-8 w-1 rounded-full bg-primary" />
         <div>
-          <h2 className="text-lg font-bold tracking-tight">✈️ Premium Flights — Revenue Engine</h2>
+          <h2 className="text-lg font-bold tracking-tight">{activeVertical.emoji} {activeVertical.label} — Revenue Engine</h2>
           <p className="text-xs text-muted-foreground">4-step lead-gen funnel: Traffic → Landing Page → Call Processing → Monetization</p>
+          {kpis?.activePlatforms && kpis.activePlatforms.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Platforms: {kpis.activePlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" + ")}
+            </p>
+          )}
         </div>
       </div>
 

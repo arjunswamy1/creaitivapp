@@ -5,15 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-type MetaVertical = "flights" | "bath" | "other";
-
-function categorizeMetaCampaign(name: string): MetaVertical {
-  const lower = (name || "").toLowerCase();
-  if (lower.includes("flight")) return "flights";
-  if (lower.includes("bath") || lower.includes("bathroom")) return "bath";
-  return "other";
-}
-
 interface RingbaEnriched {
   ringbaRevenue: number;
   ringbaConversions: number;
@@ -28,32 +19,19 @@ const CampaignTable = ({ platform }: { platform?: string }) => {
   const isGoogle = platform === "google";
   const isMeta = platform === "meta";
 
-  // For Meta campaigns, distribute Ringba revenue proportionally by spend share within each vertical
+  // Use active vertical Ringba data for proportional attribution
   const ringbaEnrichment = useMemo(() => {
     if (!isMeta || !campaigns || !ringba) return new Map<string, RingbaEnriched>();
 
-    const verticalSpend: Record<MetaVertical, number> = { flights: 0, bath: 0, other: 0 };
-    const campaignVerticals = new Map<string, MetaVertical>();
-
-    for (const c of campaigns) {
-      const vertical = categorizeMetaCampaign(c.name);
-      campaignVerticals.set(c.name, vertical);
-      verticalSpend[vertical] += c.spend;
-    }
-
-    const verticalRingba: Record<MetaVertical, { revenue: number; conversions: number }> = {
-      flights: { revenue: ringba.allFlights?.totalRevenue ?? 0, conversions: ringba.allFlights?.convertedCalls ?? 0 },
-      bath: { revenue: ringba.bath?.totalRevenue ?? 0, conversions: ringba.bath?.convertedCalls ?? 0 },
-      other: { revenue: 0, conversions: 0 },
-    };
+    const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+    const activeRevenue = ringba.active?.totalRevenue ?? 0;
+    const activeConversions = ringba.active?.convertedCalls ?? 0;
 
     const result = new Map<string, RingbaEnriched>();
     for (const c of campaigns) {
-      const vertical = campaignVerticals.get(c.name) || "other";
-      const totalVerticalSpend = verticalSpend[vertical];
-      const spendShare = totalVerticalSpend > 0 ? c.spend / totalVerticalSpend : 0;
-      const rev = Math.round(verticalRingba[vertical].revenue * spendShare);
-      const conv = Math.round(verticalRingba[vertical].conversions * spendShare);
+      const spendShare = totalSpend > 0 ? c.spend / totalSpend : 0;
+      const rev = Math.round(activeRevenue * spendShare);
+      const conv = Math.round(activeConversions * spendShare);
       const roas = c.spend > 0 ? Math.round((rev / c.spend) * 100) / 100 : 0;
       result.set(c.name, { ringbaRevenue: rev, ringbaConversions: conv, ringbaRoas: roas });
     }

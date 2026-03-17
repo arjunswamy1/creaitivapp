@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
+import { useVertical } from "@/contexts/VerticalContext";
+import { matchesVertical } from "@/config/billyVerticals";
 import { format } from "date-fns";
 
 export interface VerticalRingbaMetrics {
@@ -28,38 +30,26 @@ function calcVertical(calls: any[]): VerticalRingbaMetrics {
   };
 }
 
-type VerticalKey = "premiumFlights" | "mixedFlights" | "bath" | "allFlights" | "all";
-
-function categorizeRingba(campaignName: string): "premiumFlights" | "mixedFlights" | "bath" | "other" {
-  const lower = (campaignName || "").toLowerCase();
-  if (lower.includes("mixed") && lower.includes("flight")) return "mixedFlights";
-  if (lower.includes("premium") && lower.includes("flight")) return "premiumFlights";
-  // Fallback: any "flight" that isn't mixed
-  if (lower.includes("flight")) return "premiumFlights";
-  if (lower.includes("bath") || lower.includes("bathroom")) return "bath";
-  return "other";
-}
-
 export interface RingbaByVertical {
-  premiumFlights: VerticalRingbaMetrics;
-  mixedFlights: VerticalRingbaMetrics;
-  allFlights: VerticalRingbaMetrics;
-  bath: VerticalRingbaMetrics;
+  /** Ringba metrics for the active vertical */
+  active: VerticalRingbaMetrics;
+  /** All calls (unfiltered) */
   all: VerticalRingbaMetrics;
 }
 
 export function useRingbaByVertical() {
   const { activeClient } = useClient();
   const { dateRange } = useDateRange();
+  const { activeVertical } = useVertical();
   const clientId = activeClient?.id;
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
   const toStr = format(dateRange.to, "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["ringba-by-vertical", clientId, fromStr, toStr],
+    queryKey: ["ringba-by-vertical", clientId, fromStr, toStr, activeVertical.id],
     enabled: !!clientId,
     queryFn: async (): Promise<RingbaByVertical> => {
-      if (!clientId) return { premiumFlights: emptyVertical(), mixedFlights: emptyVertical(), allFlights: emptyVertical(), bath: emptyVertical(), all: emptyVertical() };
+      if (!clientId) return { active: emptyVertical(), all: emptyVertical() };
 
       const { data, error } = await supabase
         .from("ringba_calls")
@@ -70,20 +60,16 @@ export function useRingbaByVertical() {
 
       if (error) {
         console.error("Ringba vertical fetch error:", error);
-        return { premiumFlights: emptyVertical(), mixedFlights: emptyVertical(), allFlights: emptyVertical(), bath: emptyVertical(), all: emptyVertical() };
+        return { active: emptyVertical(), all: emptyVertical() };
       }
 
       const calls = (data || []) as any[];
-      const premium = calls.filter(c => categorizeRingba(c.campaign_name) === "premiumFlights");
-      const mixed = calls.filter(c => categorizeRingba(c.campaign_name) === "mixedFlights");
-      const bathCalls = calls.filter(c => categorizeRingba(c.campaign_name) === "bath");
-      const allFlightsCalls = [...premium, ...mixed];
+      const verticalCalls = calls.filter((c) =>
+        matchesVertical(c.campaign_name, activeVertical, "ringba")
+      );
 
       return {
-        premiumFlights: calcVertical(premium),
-        mixedFlights: calcVertical(mixed),
-        allFlights: calcVertical(allFlightsCalls),
-        bath: calcVertical(bathCalls),
+        active: calcVertical(verticalCalls),
         all: calcVertical(calls),
       };
     },

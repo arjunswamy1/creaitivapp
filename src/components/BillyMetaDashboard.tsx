@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
+import { useVertical } from "@/contexts/VerticalContext";
+import { matchesVertical } from "@/config/billyVerticals";
 import { format, differenceInDays, subDays } from "date-fns";
 import KPICard from "@/components/KPICard";
 import CampaignTable from "@/components/CampaignTable";
 import CreativeReporting from "@/components/CreativeReporting";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plane, Bath, DollarSign } from "lucide-react";
+import { DollarSign } from "lucide-react";
 
 interface VerticalKPIs {
   spend: number;
@@ -25,23 +27,12 @@ function calcDerived(v: VerticalKPIs) {
   const ctr = v.impressions > 0 ? Math.round((v.clicks / v.impressions) * 10000) / 100 : 0;
   const cpm = v.impressions > 0 ? Math.round((v.spend / v.impressions) * 1000 * 100) / 100 : 0;
   const roas = v.spend > 0 ? Math.round((v.revenue / v.spend) * 100) / 100 : 0;
-  const atcRate = v.clicks > 0 ? Math.round((v.addToCart / v.clicks) * 10000) / 100 : 0;
-  return { ...v, cpc, ctr, cpm, roas, atcRate };
+  return { ...v, cpc, ctr, cpm, roas };
 }
 
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 1000) / 10;
-}
-
-const FLIGHTS_PATTERN = "Flight";
-const BATH_PATTERN = "Bath";
-
-function categorize(name: string): "flights" | "bath" | "other" {
-  const lower = name.toLowerCase();
-  if (lower.includes(FLIGHTS_PATTERN.toLowerCase())) return "flights";
-  if (lower.includes(BATH_PATTERN.toLowerCase())) return "bath";
-  return "other";
 }
 
 function aggregate(rows: any[]): VerticalKPIs {
@@ -55,7 +46,7 @@ function aggregate(rows: any[]): VerticalKPIs {
   };
 }
 
-function useBillyVerticalKPIs() {
+function useBillyVerticalMetaKPIs() {
   const { dateRange } = useDateRange();
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
   const toStr = format(dateRange.to, "yyyy-MM-dd");
@@ -63,10 +54,11 @@ function useBillyVerticalKPIs() {
   const prevFrom = format(subDays(dateRange.from, days), "yyyy-MM-dd");
   const prevTo = format(subDays(dateRange.from, 1), "yyyy-MM-dd");
   const { activeClient } = useClient();
+  const { activeVertical } = useVertical();
   const clientId = activeClient?.id;
 
   return useQuery({
-    queryKey: ["billy-vertical-kpis", fromStr, toStr, clientId],
+    queryKey: ["billy-meta-vertical-kpis", fromStr, toStr, clientId, activeVertical.id],
     queryFn: async () => {
       const baseSelect = "campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart";
 
@@ -83,18 +75,13 @@ function useBillyVerticalKPIs() {
       const [{ data: curData, error }, { data: prevData }] = await Promise.all([curQ, prevQ]);
       if (error) throw error;
 
-      const curFlights = (curData || []).filter(r => categorize(r.campaign_name) === "flights");
-      const curBath = (curData || []).filter(r => categorize(r.campaign_name) === "bath");
-      const curOther = (curData || []).filter(r => categorize(r.campaign_name) === "other");
-      const prevFlights = (prevData || []).filter(r => categorize(r.campaign_name) === "flights");
-      const prevBath = (prevData || []).filter(r => categorize(r.campaign_name) === "bath");
+      // Filter by active vertical patterns
+      const curVertical = (curData || []).filter(r => matchesVertical(r.campaign_name, activeVertical, "meta"));
+      const prevVertical = (prevData || []).filter(r => matchesVertical(r.campaign_name, activeVertical, "meta"));
 
-      const fCur = calcDerived(aggregate(curFlights));
-      const fPrev = calcDerived(aggregate(prevFlights));
-      const bCur = calcDerived(aggregate(curBath));
-      const bPrev = calcDerived(aggregate(prevBath));
+      const vCur = calcDerived(aggregate(curVertical));
+      const vPrev = calcDerived(aggregate(prevVertical));
       const allCur = calcDerived(aggregate(curData || []));
-      const oCur = calcDerived(aggregate(curOther));
 
       const changes = (cur: ReturnType<typeof calcDerived>, prev: ReturnType<typeof calcDerived>) => ({
         spend: pctChange(cur.spend, prev.spend),
@@ -106,9 +93,7 @@ function useBillyVerticalKPIs() {
       });
 
       return {
-        flights: { ...fCur, changes: changes(fCur, fPrev) },
-        bath: { ...bCur, changes: changes(bCur, bPrev) },
-        other: oCur,
+        vertical: { ...vCur, changes: changes(vCur, vPrev) },
         total: allCur,
       };
     },
@@ -116,34 +101,25 @@ function useBillyVerticalKPIs() {
 }
 
 const BillyMetaDashboard = () => {
-  const { data, isLoading } = useBillyVerticalKPIs();
+  const { data, isLoading } = useBillyVerticalMetaKPIs();
   const { data: ringba, isLoading: ringbaLoading } = useRingbaByVertical();
+  const { activeVertical } = useVertical();
 
-  const flights = data?.flights;
-  const bath = data?.bath;
+  const vertical = data?.vertical;
   const total = data?.total;
-
-  // Per-vertical Ringba metrics
-  const flightsRingba = ringba?.allFlights;
-  const bathRingba = ringba?.bath;
+  const activeRingba = ringba?.active;
   const allRingba = ringba?.all;
-
-  const flightsSpend = flights?.spend ?? 0;
-  const flightsRevenue = flightsRingba?.totalRevenue ?? 0;
-  const flightsConversions = flightsRingba?.convertedCalls ?? 0;
-  const flightsRoas = flightsSpend > 0 ? Math.round((flightsRevenue / flightsSpend) * 100) / 100 : 0;
-  const flightsCpa = flightsConversions > 0 ? Math.round((flightsSpend / flightsConversions) * 100) / 100 : 0;
-
-  const bathSpend = bath?.spend ?? 0;
-  const bathRevenue = bathRingba?.totalRevenue ?? 0;
-  const bathConversions = bathRingba?.convertedCalls ?? 0;
-  const bathRoas = bathSpend > 0 ? Math.round((bathRevenue / bathSpend) * 100) / 100 : 0;
-  const bathCpa = bathConversions > 0 ? Math.round((bathSpend / bathConversions) * 100) / 100 : 0;
 
   const totalSpend = total?.spend ?? 0;
   const totalRevenue = allRingba?.totalRevenue ?? 0;
   const totalConversions = allRingba?.convertedCalls ?? 0;
   const blendedRoas = totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : 0;
+
+  const vSpend = vertical?.spend ?? 0;
+  const vRevenue = activeRingba?.totalRevenue ?? 0;
+  const vConversions = activeRingba?.convertedCalls ?? 0;
+  const vRoas = vSpend > 0 ? Math.round((vRevenue / vSpend) * 100) / 100 : 0;
+  const vCpa = vConversions > 0 ? Math.round((vSpend / vConversions) * 100) / 100 : 0;
 
   const loading = isLoading || ringbaLoading;
 
@@ -174,15 +150,14 @@ const BillyMetaDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* ✈️ Flights Vertical */}
+      {/* Active Vertical */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
-            <Plane className="w-4 h-4 text-primary" />
-            <CardTitle className="text-base">✈️ Flights Campaigns</CardTitle>
+            <CardTitle className="text-base">{activeVertical.emoji} {activeVertical.label} — Meta Campaigns</CardTitle>
           </div>
           <p className="text-xs text-muted-foreground">
-            Premium + Mixed Flights — revenue from Ringba Flights campaigns
+            {activeVertical.description} — revenue from Ringba
           </p>
         </CardHeader>
         <CardContent>
@@ -192,43 +167,13 @@ const BillyMetaDashboard = () => {
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
-              <KPICard title="Spend" value={`$${flightsSpend.toLocaleString()}`} change={flights?.changes.spend} invertColor />
-              <KPICard title="Revenue" value={`$${flightsRevenue.toLocaleString()}`} subtitle="Ringba" />
-              <KPICard title="ROAS" value={`${flightsRoas}x`} subtitle="Ringba rev ÷ spend" />
-              <KPICard title="CPA" value={`$${flightsCpa}`} subtitle={`${flightsConversions} conv.`} invertColor />
-              <KPICard title="CPC" value={`$${flights?.cpc ?? 0}`} change={flights?.changes.cpc} invertColor />
-              <KPICard title="CTR" value={`${flights?.ctr ?? 0}%`} change={flights?.changes.ctr} />
-              <KPICard title="CPM" value={`$${flights?.cpm ?? 0}`} change={flights?.changes.cpm} invertColor />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* 🛁 Bath / Home Services Vertical */}
-      <Card className="mb-6 border-primary/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <Bath className="w-4 h-4 text-primary" />
-            <CardTitle className="text-base">🛁 Bath / Home Services Campaigns</CardTitle>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Campaigns matching "Bath" — revenue from Ringba Bath campaigns
-          </p>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
-              {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
-              <KPICard title="Spend" value={`$${bathSpend.toLocaleString()}`} change={bath?.changes.spend} invertColor />
-              <KPICard title="Revenue" value={`$${bathRevenue.toLocaleString()}`} subtitle="Ringba" />
-              <KPICard title="ROAS" value={`${bathRoas}x`} subtitle="Ringba rev ÷ spend" />
-              <KPICard title="CPA" value={bathConversions > 0 ? `$${bathCpa}` : "–"} subtitle={`${bathConversions} conv.`} invertColor />
-              <KPICard title="CPC" value={`$${bath?.cpc ?? 0}`} change={bath?.changes.cpc} invertColor />
-              <KPICard title="CTR" value={`${bath?.ctr ?? 0}%`} change={bath?.changes.ctr} />
-              <KPICard title="CPM" value={`$${bath?.cpm ?? 0}`} change={bath?.changes.cpm} invertColor />
+              <KPICard title="Spend" value={`$${vSpend.toLocaleString()}`} change={vertical?.changes.spend} invertColor />
+              <KPICard title="Revenue" value={`$${vRevenue.toLocaleString()}`} subtitle="Ringba" />
+              <KPICard title="ROAS" value={`${vRoas}x`} subtitle="Ringba rev ÷ spend" />
+              <KPICard title="CPA" value={vConversions > 0 ? `$${vCpa}` : "–"} subtitle={`${vConversions} conv.`} invertColor />
+              <KPICard title="CPC" value={`$${vertical?.cpc ?? 0}`} change={vertical?.changes.cpc} invertColor />
+              <KPICard title="CTR" value={`${vertical?.ctr ?? 0}%`} change={vertical?.changes.ctr} />
+              <KPICard title="CPM" value={`$${vertical?.cpm ?? 0}`} change={vertical?.changes.cpm} invertColor />
             </div>
           )}
         </CardContent>
