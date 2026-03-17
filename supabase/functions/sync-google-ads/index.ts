@@ -318,6 +318,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   platform_campaign_id: String(row.campaign?.id),
                   platform_adset_id: String(row.adGroup?.id),
