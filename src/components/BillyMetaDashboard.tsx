@@ -119,26 +119,11 @@ const BillyMetaDashboard = () => {
   const { data, isLoading } = useBillyVerticalKPIs();
   const { data: ringba, isLoading: ringbaLoading } = useRingbaByVertical();
 
-  const flights = data?.flights;
-  const bath = data?.bath;
   const total = data?.total;
 
-  // Per-vertical Ringba metrics
-  const flightsRingba = ringba?.allFlights;
-  const bathRingba = ringba?.bath;
+  // Use active vertical Ringba data
+  const activeRingba = ringba?.active;
   const allRingba = ringba?.all;
-
-  const flightsSpend = flights?.spend ?? 0;
-  const flightsRevenue = flightsRingba?.totalRevenue ?? 0;
-  const flightsConversions = flightsRingba?.convertedCalls ?? 0;
-  const flightsRoas = flightsSpend > 0 ? Math.round((flightsRevenue / flightsSpend) * 100) / 100 : 0;
-  const flightsCpa = flightsConversions > 0 ? Math.round((flightsSpend / flightsConversions) * 100) / 100 : 0;
-
-  const bathSpend = bath?.spend ?? 0;
-  const bathRevenue = bathRingba?.totalRevenue ?? 0;
-  const bathConversions = bathRingba?.convertedCalls ?? 0;
-  const bathRoas = bathSpend > 0 ? Math.round((bathRevenue / bathSpend) * 100) / 100 : 0;
-  const bathCpa = bathConversions > 0 ? Math.round((bathSpend / bathConversions) * 100) / 100 : 0;
 
   const totalSpend = total?.spend ?? 0;
   const totalRevenue = allRingba?.totalRevenue ?? 0;
