@@ -131,6 +131,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
     const accountPromises = adAccounts.map(async (account: any) => {
       const accountId = account.id || account.account_id;
       if (!accountId) return 0;
+      const accountIdTag = accountId.replace(/^act_/, "");
       let records = 0;
 
       const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
