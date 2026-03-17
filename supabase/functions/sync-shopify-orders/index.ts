@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       || (cronSecret && token === cronSecret)
       || (anonKey && token === anonKey);
     
-    console.log("isCron:", isCron, "token length:", token?.length);
+    console.log("isCron:", isCron, "token length:", token?.length, "anonKey length:", anonKey?.length, "token first 20:", token?.substring(0, 20), "anonKey first 20:", anonKey?.substring(0, 20), "match:", token === anonKey);
 
     // Use service role for writing data
     const adminSupabaseForAuth = createClient(
