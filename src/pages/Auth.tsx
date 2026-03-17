@@ -19,6 +19,7 @@ const Auth = () => {
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { session, loading: authLoading } = useAuth();
