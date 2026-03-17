@@ -103,12 +103,17 @@ const BillyDashboard = () => {
 
   return (
     <>
-      {/* Flights Revenue Engine Header */}
+      {/* Revenue Engine Header */}
       <div className="mb-6 flex items-center gap-3">
         <div className="h-8 w-1 rounded-full bg-primary" />
         <div>
-          <h2 className="text-lg font-bold tracking-tight">✈️ Premium Flights — Revenue Engine</h2>
+          <h2 className="text-lg font-bold tracking-tight">{activeVertical.emoji} {activeVertical.label} — Revenue Engine</h2>
           <p className="text-xs text-muted-foreground">4-step lead-gen funnel: Traffic → Landing Page → Call Processing → Monetization</p>
+          {kpis?.activePlatforms && kpis.activePlatforms.length > 0 && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Platforms: {kpis.activePlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" + ")}
+            </p>
+          )}
         </div>
       </div>
 
