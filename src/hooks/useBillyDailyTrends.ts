@@ -60,15 +60,22 @@ export function useBillyDailyTrends() {
       const adPlatforms = getAdPlatforms(activeVertical);
 
       // Fetch ad campaigns for all configured platforms + Ringba calls in parallel
-      const campaignQueries = adPlatforms.map((platform) =>
-        supabase
+      const campaignQueries = adPlatforms.map((platform) => {
+        let q = supabase
           .from("ad_campaigns")
-          .select("date, spend, impressions, clicks, conversions, campaign_name, platform")
+          .select("date, spend, impressions, clicks, conversions, campaign_name, platform, account_id")
           .eq("platform", platform)
           .eq("client_id", clientId)
           .gte("date", fromStr)
-          .lte("date", toStr)
-      );
+          .lte("date", toStr);
+        const accountIds = getVerticalAccountIds(activeVertical, platform);
+        if (accountIds.length === 1) {
+          q = q.eq("account_id", accountIds[0]);
+        } else if (accountIds.length > 1) {
+          q = q.in("account_id", accountIds);
+        }
+        return q;
+      });
 
       const [ringbaRes, ...campaignResults] = await Promise.all([
         supabase
