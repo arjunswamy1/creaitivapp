@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
-import { matchesVertical, getAdPlatforms } from "@/config/billyVerticals";
+import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount } from "@/config/billyVerticals";
 import { format, eachDayOfInterval } from "date-fns";
 
 export interface DailyFunnelRow {
@@ -60,15 +60,22 @@ export function useBillyDailyTrends() {
       const adPlatforms = getAdPlatforms(activeVertical);
 
       // Fetch ad campaigns for all configured platforms + Ringba calls in parallel
-      const campaignQueries = adPlatforms.map((platform) =>
-        supabase
+      const campaignQueries = adPlatforms.map((platform) => {
+        let q = supabase
           .from("ad_campaigns")
-          .select("date, spend, impressions, clicks, conversions, campaign_name, platform")
+          .select("date, spend, impressions, clicks, conversions, campaign_name, platform, account_id")
           .eq("platform", platform)
           .eq("client_id", clientId)
           .gte("date", fromStr)
-          .lte("date", toStr)
-      );
+          .lte("date", toStr);
+        const accountIds = getVerticalAccountIds(activeVertical, platform);
+        if (accountIds.length === 1) {
+          q = q.eq("account_id", accountIds[0]);
+        } else if (accountIds.length > 1) {
+          q = q.in("account_id", accountIds);
+        }
+        return q;
+      });
 
       const [ringbaRes, ...campaignResults] = await Promise.all([
         supabase
@@ -88,6 +95,7 @@ export function useBillyDailyTrends() {
         const platform = adPlatforms[i];
         for (const r of (data || [])) {
           if (!matchesVertical(r.campaign_name, activeVertical, platform)) continue;
+          if (!matchesVerticalAccount((r as any).account_id, activeVertical, platform)) continue;
           const d = adByDate.get(r.date) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
           d.spend += Number(r.spend);
           d.impressions += Number(r.impressions);

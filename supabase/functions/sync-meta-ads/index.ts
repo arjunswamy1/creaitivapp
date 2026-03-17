@@ -131,6 +131,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
     const accountPromises = adAccounts.map(async (account: any) => {
       const accountId = account.id || account.account_id;
       if (!accountId) return 0;
+      const accountIdTag = accountId.replace(/^act_/, "");
       let records = 0;
 
       const [dailyInsights, campaignInsights, adsetInsights] = await Promise.all([
@@ -151,6 +152,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const m = extractMetrics(day);
           return {
             user_id: userId, client_id: clientId, platform: "meta", date: day.date_start,
+            account_id: accountIdTag,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
             cpc: m.clicks > 0 ? m.spend / m.clicks : null,
@@ -174,6 +176,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const m = extractMetrics(c);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: c.campaign_id,
+            account_id: accountIdTag,
             campaign_name: c.campaign_name, status: campaignStatusMap.get(c.campaign_id) || "unknown", date: c.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
             add_to_cart: m.addToCart,
@@ -191,6 +194,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const m = extractMetrics(a);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: a.campaign_id,
+            account_id: accountIdTag,
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
             status: adsetStatusMap.get(a.adset_id) || "unknown", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
@@ -212,6 +216,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const format = detectFormat(ad.ad_name, creative);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
+            account_id: accountIdTag,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
             status: creative?.effective_status || "unknown", date: ad.date_start,

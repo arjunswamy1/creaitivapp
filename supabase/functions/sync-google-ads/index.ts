@@ -219,6 +219,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   date: row.segments?.date,
                   spend, revenue, impressions, clicks, conversions,
@@ -266,6 +267,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   platform_campaign_id: String(row.campaign?.id),
                   campaign_name: row.campaign?.name || "Unknown",
@@ -316,6 +318,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   platform_campaign_id: String(row.campaign?.id),
                   platform_adset_id: String(row.adGroup?.id),
@@ -373,6 +376,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   platform_ad_id: String(row.adGroupAd?.ad?.id || ""),
                   platform_adset_id: String(row.adGroup?.id),
@@ -429,6 +433,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 return {
                   user_id: userId,
                   client_id: clientId,
+                  account_id: cid,
                   platform: "google",
                   platform_campaign_id: String(row.campaign?.id),
                   platform_adset_id: String(row.adGroup?.id),
@@ -510,6 +515,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                       deduped.set(dedupeKey, {
                         user_id: userId,
                         client_id: clientId,
+                        account_id: cid,
                         platform: "google",
                         platform_campaign_id: String(row.campaign?.id),
                         platform_adset_id: adsetId,

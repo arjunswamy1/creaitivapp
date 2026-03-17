@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
-import { matchesVertical, getAdPlatforms, type VerticalConfig } from "@/config/billyVerticals";
+import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount, type VerticalConfig } from "@/config/billyVerticals";
 import { format, differenceInDays, subDays } from "date-fns";
 
 interface BillyKPIData {
@@ -122,11 +122,18 @@ async function fetchVerticalCampaigns(
   const queries = adPlatforms.map((platform) => {
     let q = supabase
       .from("ad_campaigns")
-      .select("platform, campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart")
+      .select("platform, campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart, account_id")
       .eq("platform", platform)
       .gte("date", fromDate)
       .lte("date", toDate);
     if (clientId) q = q.eq("client_id", clientId);
+    // Filter by account IDs if configured for this vertical+platform
+    const accountIds = getVerticalAccountIds(vertical, platform);
+    if (accountIds.length === 1) {
+      q = q.eq("account_id", accountIds[0]);
+    } else if (accountIds.length > 1) {
+      q = q.in("account_id", accountIds);
+    }
     return q;
   });
 
@@ -136,9 +143,10 @@ async function fetchVerticalCampaigns(
     const { data, error } = results[i];
     if (error) throw error;
     const platform = adPlatforms[i];
-    // Filter by vertical patterns
+    // Filter by vertical patterns (and account if configured)
     const matched = (data || []).filter((r: any) =>
-      matchesVertical(r.campaign_name, vertical, platform)
+      matchesVertical(r.campaign_name, vertical, platform) &&
+      matchesVerticalAccount(r.account_id, vertical, platform)
     );
     allRows.push(...matched);
   }
@@ -223,15 +231,22 @@ export function useBillyTopCampaigns() {
       for (const platform of adPlatforms) {
         let query = supabase
           .from("ad_campaigns")
-          .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type")
+          .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type, account_id")
           .eq("platform", platform)
           .gte("date", fromStr)
           .lte("date", toStr);
         if (clientId) query = query.eq("client_id", clientId);
+        const accountIds = getVerticalAccountIds(activeVertical, platform);
+        if (accountIds.length === 1) {
+          query = query.eq("account_id", accountIds[0]);
+        } else if (accountIds.length > 1) {
+          query = query.in("account_id", accountIds);
+        }
         const { data, error } = await query;
         if (error) throw error;
         const matched = (data || []).filter((r: any) =>
-          matchesVertical(r.campaign_name, activeVertical, platform)
+          matchesVertical(r.campaign_name, activeVertical, platform) &&
+          matchesVerticalAccount(r.account_id, activeVertical, platform)
         );
         allData.push(...matched);
       }

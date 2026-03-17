@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       ad_campaigns: {
         Row: {
+          account_id: string | null
           add_to_cart: number
           bidding_strategy_type: string | null
           campaign_name: string
@@ -40,6 +41,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           add_to_cart?: number
           bidding_strategy_type?: string | null
           campaign_name: string
@@ -64,6 +66,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           add_to_cart?: number
           bidding_strategy_type?: string | null
           campaign_name?: string
@@ -99,6 +102,7 @@ export type Database = {
       }
       ad_daily_metrics: {
         Row: {
+          account_id: string | null
           add_to_cart: number
           clicks: number
           client_id: string | null
@@ -118,6 +122,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           add_to_cart?: number
           clicks?: number
           client_id?: string | null
@@ -137,6 +142,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           add_to_cart?: number
           clicks?: number
           client_id?: string | null
@@ -167,6 +173,7 @@ export type Database = {
       }
       ad_sets: {
         Row: {
+          account_id: string | null
           add_to_cart: number
           adset_name: string
           campaign_name: string | null
@@ -188,6 +195,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           add_to_cart?: number
           adset_name: string
           campaign_name?: string | null
@@ -209,6 +217,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           add_to_cart?: number
           adset_name?: string
           campaign_name?: string | null
@@ -274,6 +283,7 @@ export type Database = {
       }
       ads: {
         Row: {
+          account_id: string | null
           ad_name: string
           add_to_cart: number
           adset_name: string | null
@@ -305,6 +315,7 @@ export type Database = {
           video_views_95: number | null
         }
         Insert: {
+          account_id?: string | null
           ad_name: string
           add_to_cart?: number
           adset_name?: string | null
@@ -336,6 +347,7 @@ export type Database = {
           video_views_95?: number | null
         }
         Update: {
+          account_id?: string | null
           ad_name?: string
           add_to_cart?: number
           adset_name?: string | null
@@ -640,6 +652,7 @@ export type Database = {
       }
       keywords: {
         Row: {
+          account_id: string | null
           adset_name: string | null
           campaign_name: string | null
           clicks: number
@@ -663,6 +676,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
@@ -686,6 +700,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
@@ -957,6 +972,7 @@ export type Database = {
       }
       search_terms: {
         Row: {
+          account_id: string | null
           adset_name: string | null
           campaign_name: string | null
           clicks: number
@@ -979,6 +995,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
@@ -1001,6 +1018,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          account_id?: string | null
           adset_name?: string | null
           campaign_name?: string | null
           clicks?: number
