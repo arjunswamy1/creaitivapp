@@ -2,6 +2,7 @@ import { useBillyKPIs, type TrendIndicators } from "@/hooks/useBillyKPIs";
 import { syncRingbaCalls } from "@/hooks/useRingbaData";
 import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useClient } from "@/contexts/ClientContext";
+import { useVertical } from "@/contexts/VerticalContext";
 import FlightsForecastCard from "@/components/FlightsForecastCard";
 import FlightsRecommendations from "@/components/FlightsRecommendations";
 import TrendIndicator from "@/components/TrendIndicator";
