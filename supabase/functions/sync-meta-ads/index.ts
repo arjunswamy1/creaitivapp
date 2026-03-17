@@ -194,6 +194,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const m = extractMetrics(a);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_campaign_id: a.campaign_id,
+            account_id: accountIdTag,
             platform_adset_id: a.adset_id, adset_name: a.adset_name, campaign_name: a.campaign_name,
             status: adsetStatusMap.get(a.adset_id) || "unknown", date: a.date_start,
             spend: m.spend, revenue: m.revenue, impressions: m.impressions, clicks: m.clicks, conversions: m.conversions,
