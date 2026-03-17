@@ -95,6 +95,7 @@ export function useBillyDailyTrends() {
         const platform = adPlatforms[i];
         for (const r of (data || [])) {
           if (!matchesVertical(r.campaign_name, activeVertical, platform)) continue;
+          if (!matchesVerticalAccount((r as any).account_id, activeVertical, platform)) continue;
           const d = adByDate.get(r.date) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
           d.spend += Number(r.spend);
           d.impressions += Number(r.impressions);
