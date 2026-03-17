@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
+import { useVertical } from "@/contexts/VerticalContext";
+import { matchesVertical, getAdPlatforms, type VerticalConfig } from "@/config/billyVerticals";
 import { format, differenceInDays, subDays } from "date-fns";
-
-const FLIGHTS_PATTERN = "Flight";
 
 interface BillyKPIData {
   totalSpend: number;
@@ -50,6 +50,8 @@ export interface BillyKPIWithChange extends BillyKPIData {
     addToCart: TrendIndicators;
     atcRate: TrendIndicators;
   };
+  /** Which ad platforms contributed data */
+  activePlatforms: string[];
 }
 
 function calcKPIs(data: any[]): BillyKPIData {
@@ -103,6 +105,46 @@ function buildTrends(cur: BillyKPIData, dod: BillyKPIData, wow: BillyKPIData, mo
   return result;
 }
 
+/**
+ * Fetch ad_campaigns rows for all platforms in the vertical's config,
+ * then filter by campaign name patterns client-side.
+ */
+async function fetchVerticalCampaigns(
+  vertical: VerticalConfig,
+  clientId: string | undefined,
+  fromDate: string,
+  toDate: string
+) {
+  const adPlatforms = getAdPlatforms(vertical);
+  if (adPlatforms.length === 0) return [];
+
+  // Query all configured platforms
+  const queries = adPlatforms.map((platform) => {
+    let q = supabase
+      .from("ad_campaigns")
+      .select("platform, campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart")
+      .eq("platform", platform)
+      .gte("date", fromDate)
+      .lte("date", toDate);
+    if (clientId) q = q.eq("client_id", clientId);
+    return q;
+  });
+
+  const results = await Promise.all(queries);
+  const allRows: any[] = [];
+  for (let i = 0; i < results.length; i++) {
+    const { data, error } = results[i];
+    if (error) throw error;
+    const platform = adPlatforms[i];
+    // Filter by vertical patterns
+    const matched = (data || []).filter((r: any) =>
+      matchesVertical(r.campaign_name, vertical, platform)
+    );
+    allRows.push(...matched);
+  }
+  return allRows;
+}
+
 export function useBillyKPIs() {
   const { dateRange } = useDateRange();
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
@@ -112,8 +154,8 @@ export function useBillyKPIs() {
   const prevTo = format(subDays(dateRange.from, 1), "yyyy-MM-dd");
   const { activeClient } = useClient();
   const clientId = activeClient?.id;
+  const { activeVertical } = useVertical();
 
-  // For DoD/WoW/MoM we use fixed comparisons based on "today"
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
   const yesterdayStr = format(subDays(today, 1), "yyyy-MM-dd");
@@ -121,39 +163,26 @@ export function useBillyKPIs() {
   const lastMonthStr = format(subDays(today, 30), "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["billy-kpis", fromStr, toStr, clientId],
+    queryKey: ["billy-kpis", fromStr, toStr, clientId, activeVertical.id],
     queryFn: async (): Promise<BillyKPIWithChange> => {
-      const baseFilters = (q: any) => {
-        q = q.eq("platform", "meta").ilike("campaign_name", `%${FLIGHTS_PATTERN}%`);
-        if (clientId) q = q.eq("client_id", clientId);
-        return q;
-      };
-
-      // Main range + previous range + DoD/WoW/MoM single-day queries
-      const [
-        { data: current, error: e1 },
-        { data: previous },
-        { data: todayData },
-        { data: yesterdayData },
-        { data: lastWeekData },
-        { data: lastMonthData },
-      ] = await Promise.all([
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").gte("date", fromStr).lte("date", toStr)),
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").gte("date", prevFrom).lte("date", prevTo)),
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", todayStr)),
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", yesterdayStr)),
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", lastWeekStr)),
-        baseFilters(supabase.from("ad_campaigns").select("spend, revenue, impressions, clicks, conversions, add_to_cart").eq("date", lastMonthStr)),
+      const [current, previous, todayData, yesterdayData, lastWeekData, lastMonthData] = await Promise.all([
+        fetchVerticalCampaigns(activeVertical, clientId, fromStr, toStr),
+        fetchVerticalCampaigns(activeVertical, clientId, prevFrom, prevTo),
+        fetchVerticalCampaigns(activeVertical, clientId, todayStr, todayStr),
+        fetchVerticalCampaigns(activeVertical, clientId, yesterdayStr, yesterdayStr),
+        fetchVerticalCampaigns(activeVertical, clientId, lastWeekStr, lastWeekStr),
+        fetchVerticalCampaigns(activeVertical, clientId, lastMonthStr, lastMonthStr),
       ]);
 
-      if (e1) throw e1;
-      const cur = calcKPIs(current || []);
-      const prev = calcKPIs(previous || []);
+      const cur = calcKPIs(current);
+      const prev = calcKPIs(previous);
+      const todayKPIs = calcKPIs(todayData);
+      const yesterdayKPIs = calcKPIs(yesterdayData);
+      const lastWeekKPIs = calcKPIs(lastWeekData);
+      const lastMonthKPIs = calcKPIs(lastMonthData);
 
-      const todayKPIs = calcKPIs(todayData || []);
-      const yesterdayKPIs = calcKPIs(yesterdayData || []);
-      const lastWeekKPIs = calcKPIs(lastWeekData || []);
-      const lastMonthKPIs = calcKPIs(lastMonthData || []);
+      // Determine which platforms had data
+      const platformsWithData = new Set(current.map((r: any) => r.platform));
 
       return {
         ...cur,
@@ -170,50 +199,59 @@ export function useBillyKPIs() {
           atcRate: pctChange(cur.atcRate, prev.atcRate),
         },
         trends: buildTrends(todayKPIs, yesterdayKPIs, lastWeekKPIs, lastMonthKPIs),
+        activePlatforms: Array.from(platformsWithData),
       };
     },
   });
 }
 
-/** Billy-specific top campaigns — only flights campaigns */
+/** Billy-specific top campaigns — filtered by active vertical, all platforms */
 export function useBillyTopCampaigns() {
   const { dateRange } = useDateRange();
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
   const toStr = format(dateRange.to, "yyyy-MM-dd");
   const { activeClient } = useClient();
   const clientId = activeClient?.id;
+  const { activeVertical } = useVertical();
 
   return useQuery({
-    queryKey: ["billy-top-campaigns", fromStr, toStr, clientId],
+    queryKey: ["billy-top-campaigns", fromStr, toStr, clientId, activeVertical.id],
     queryFn: async () => {
-      let query = supabase
-        .from("ad_campaigns")
-        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type")
-        .eq("platform", "meta")
-        .ilike("campaign_name", `%${FLIGHTS_PATTERN}%`)
-        .gte("date", fromStr)
-        .lte("date", toStr);
+      const adPlatforms = getAdPlatforms(activeVertical);
+      const allData: any[] = [];
 
-      if (clientId) query = query.eq("client_id", clientId);
+      for (const platform of adPlatforms) {
+        let query = supabase
+          .from("ad_campaigns")
+          .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type")
+          .eq("platform", platform)
+          .gte("date", fromStr)
+          .lte("date", toStr);
+        if (clientId) query = query.eq("client_id", clientId);
+        const { data, error } = await query;
+        if (error) throw error;
+        const matched = (data || []).filter((r: any) =>
+          matchesVertical(r.campaign_name, activeVertical, platform)
+        );
+        allData.push(...matched);
+      }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      if (!data) return [];
-
-      const byCampaign = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
-      for (const row of data) {
-        const existing = byCampaign.get(row.campaign_name) || { spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
+      const byCampaign = new Map<string, { spend: number; revenue: number; impressions: number; clicks: number; conversions: number; platform: string }>();
+      for (const row of allData) {
+        const key = `${row.platform}:${row.campaign_name}`;
+        const existing = byCampaign.get(key) || { spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, platform: row.platform };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);
         existing.impressions += Number(row.impressions);
         existing.clicks += Number(row.clicks);
         existing.conversions += Number(row.conversions);
-        byCampaign.set(row.campaign_name, existing);
+        byCampaign.set(key, existing);
       }
 
       return Array.from(byCampaign.entries())
-        .map(([name, vals]) => ({
-          name,
+        .map(([key, vals]) => ({
+          name: key.split(":").slice(1).join(":"),
+          platform: vals.platform,
           spend: vals.spend,
           clicks: vals.clicks,
           impressions: vals.impressions,
