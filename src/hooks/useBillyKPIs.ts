@@ -122,11 +122,18 @@ async function fetchVerticalCampaigns(
   const queries = adPlatforms.map((platform) => {
     let q = supabase
       .from("ad_campaigns")
-      .select("platform, campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart")
+      .select("platform, campaign_name, spend, revenue, impressions, clicks, conversions, add_to_cart, account_id")
       .eq("platform", platform)
       .gte("date", fromDate)
       .lte("date", toDate);
     if (clientId) q = q.eq("client_id", clientId);
+    // Filter by account IDs if configured for this vertical+platform
+    const accountIds = getVerticalAccountIds(vertical, platform);
+    if (accountIds.length === 1) {
+      q = q.eq("account_id", accountIds[0]);
+    } else if (accountIds.length > 1) {
+      q = q.in("account_id", accountIds);
+    }
     return q;
   });
 
