@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -20,25 +20,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
+    const token = authHeader.replace("Bearer ", "");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const isCron = serviceRoleKey && token === serviceRoleKey;
+
+    // Use service role for writing data
+    const adminSupabaseForAuth = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    let userId: string;
+
+    if (isCron) {
+      // For cron jobs, pick the first user associated with a Shopify connection
+      const { data: connCheck } = await adminSupabaseForAuth
+        .from("platform_connections")
+        .select("user_id")
+        .eq("platform", "shopify")
+        .limit(1)
+        .single();
+      userId = connCheck?.user_id || "cron";
+    } else {
+      const supabaseUser = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = claimsData.claims.sub as string;
     }
 
-    const userId = claimsData.claims.sub as string;
-
-    // Get Shopify connection (scoped to user's clients)
-    const { data: conn, error: connError } = await supabase
+    // Get Shopify connection using admin client (works for both cron and user calls)
+    const { data: conn, error: connError } = await adminSupabaseForAuth
       .from("platform_connections")
       .select("*")
       .eq("platform", "shopify")
