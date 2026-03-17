@@ -13,6 +13,8 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    console.log("Auth header present:", !!authHeader, "starts with Bearer:", authHeader?.startsWith("Bearer "));
+    
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -27,6 +29,8 @@ Deno.serve(async (req) => {
     const isCron = (serviceRoleKey && token === serviceRoleKey) 
       || (cronSecret && token === cronSecret)
       || (anonKey && token === anonKey);
+    
+    console.log("isCron:", isCron, "token length:", token?.length);
 
     // Use service role for writing data
     const adminSupabaseForAuth = createClient(
