@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
-import { matchesVertical, getAdPlatforms, type VerticalConfig } from "@/config/billyVerticals";
+import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount, type VerticalConfig } from "@/config/billyVerticals";
 import { format, differenceInDays, subDays } from "date-fns";
 
 interface BillyKPIData {
