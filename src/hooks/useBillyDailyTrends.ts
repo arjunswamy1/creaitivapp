@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
+import { useVertical } from "@/contexts/VerticalContext";
+import { matchesVertical, getAdPlatforms } from "@/config/billyVerticals";
 import { format, eachDayOfInterval } from "date-fns";
-
-const FLIGHTS_PATTERN = "Flight";
 
 export interface DailyFunnelRow {
   date: string;
@@ -18,7 +18,7 @@ export interface DailyFunnelRow {
   cpm: number;
   // Step 2 — Landing Page
   visitors: number;
-  ctaClicks: number; // ringba total calls
+  ctaClicks: number;
   lpCvr: number;
   rpv: number;
   // Step 3 — Call Processing
@@ -46,55 +46,64 @@ function pctDelta(current: number, previous: number): number | null {
 export function useBillyDailyTrends() {
   const { dateRange } = useDateRange();
   const { activeClient } = useClient();
+  const { activeVertical } = useVertical();
   const clientId = activeClient?.id;
   const fromStr = format(dateRange.from, "yyyy-MM-dd");
   const toStr = format(dateRange.to, "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["billy-daily-trends", clientId, fromStr, toStr],
+    queryKey: ["billy-daily-trends", clientId, fromStr, toStr, activeVertical.id],
     enabled: !!clientId,
     queryFn: async (): Promise<DailyFunnelRow[]> => {
       if (!clientId) return [];
 
-      // Fetch ad campaigns (Meta flights only) and Ringba calls in parallel
-      const [campaignRes, ringbaRes] = await Promise.all([
+      const adPlatforms = getAdPlatforms(activeVertical);
+
+      // Fetch ad campaigns for all configured platforms + Ringba calls in parallel
+      const campaignQueries = adPlatforms.map((platform) =>
         supabase
           .from("ad_campaigns")
-          .select("date, spend, impressions, clicks, conversions")
-          .eq("platform", "meta")
+          .select("date, spend, impressions, clicks, conversions, campaign_name, platform")
+          .eq("platform", platform)
           .eq("client_id", clientId)
-          .ilike("campaign_name", `%${FLIGHTS_PATTERN}%`)
           .gte("date", fromStr)
-          .lte("date", toStr),
+          .lte("date", toStr)
+      );
+
+      const [ringbaRes, ...campaignResults] = await Promise.all([
         supabase
           .from("ringba_calls")
           .select("call_date, duration_seconds, revenue, connected, converted, campaign_name")
           .eq("client_id", clientId)
           .gte("call_date", fromStr + "T00:00:00.000Z")
           .lte("call_date", toStr + "T23:59:59.999Z"),
+        ...campaignQueries,
       ]);
 
-      if (campaignRes.error) throw campaignRes.error;
-
-      // Aggregate campaigns by date
+      // Aggregate campaigns by date (filtered by vertical patterns)
       const adByDate = new Map<string, { spend: number; impressions: number; clicks: number; conversions: number }>();
-      for (const r of (campaignRes.data || [])) {
-        const d = adByDate.get(r.date) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
-        d.spend += Number(r.spend);
-        d.impressions += Number(r.impressions);
-        d.clicks += Number(r.clicks);
-        d.conversions += Number(r.conversions);
-        adByDate.set(r.date, d);
+      for (let i = 0; i < campaignResults.length; i++) {
+        const { data, error } = campaignResults[i];
+        if (error) throw error;
+        const platform = adPlatforms[i];
+        for (const r of (data || [])) {
+          if (!matchesVertical(r.campaign_name, activeVertical, platform)) continue;
+          const d = adByDate.get(r.date) || { spend: 0, impressions: 0, clicks: 0, conversions: 0 };
+          d.spend += Number(r.spend);
+          d.impressions += Number(r.impressions);
+          d.clicks += Number(r.clicks);
+          d.conversions += Number(r.conversions);
+          adByDate.set(r.date, d);
+        }
       }
 
-      // Filter ringba to flights only and aggregate by date
-      const flightsCalls = ((ringbaRes.data || []) as any[]).filter(c => {
-        const name = (c.campaign_name || "").toLowerCase();
-        return name.includes("flight");
-      });
+      // Filter ringba to active vertical and aggregate by date
+      const verticalCalls = ((ringbaRes.data || []) as any[]).filter(c =>
+        matchesVertical(c.campaign_name, activeVertical, "ringba")
+      );
 
       const ringbaByDate = new Map<string, { totalCalls: number; connected: number; converted: number; revenue: number; totalDuration: number }>();
-      for (const c of flightsCalls) {
+      for (const c of verticalCalls) {
         const dateKey = c.call_date.split("T")[0];
         const d = ringbaByDate.get(dateKey) || { totalCalls: 0, connected: 0, converted: 0, revenue: 0, totalDuration: 0 };
         d.totalCalls++;
@@ -149,7 +158,6 @@ export function useBillyDailyTrends() {
           callRevenue: rb.revenue, revenuePerCall, costPerCall, callROAS, profit,
         };
 
-        // Compute deltas vs previous day
         const deltas: Record<string, number | null> = {};
         if (i > 0) {
           const prev = rows[i - 1];
