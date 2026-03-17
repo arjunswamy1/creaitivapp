@@ -216,6 +216,7 @@ async function syncMetaForUser(supabase: any, userId: string, accessToken: strin
           const format = detectFormat(ad.ad_name, creative);
           return {
             user_id: userId, client_id: clientId, platform: "meta", platform_ad_id: ad.ad_id,
+            account_id: accountIdTag,
             platform_adset_id: ad.adset_id, platform_campaign_id: ad.campaign_id,
             ad_name: ad.ad_name, adset_name: ad.adset_name, campaign_name: ad.campaign_name,
             status: creative?.effective_status || "unknown", date: ad.date_start,
