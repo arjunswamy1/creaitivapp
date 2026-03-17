@@ -19,6 +19,7 @@ const Auth = () => {
   const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { session, loading: authLoading } = useAuth();
@@ -34,6 +35,29 @@ const Auth = () => {
   if (session) {
     return <Navigate to="/" replace />;
   }
+
+
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast({ title: "Enter your email", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast({ title: "Check your email", description: "We sent you a password reset link." });
+      setForgotMode(false);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,17 +112,19 @@ const Auth = () => {
           }}
         >
           <h2 className="text-lg font-semibold mb-1" style={{ color: "hsl(0,0%,98%)", fontFamily: "Inter, sans-serif" }}>
-            {isLogin ? "Welcome back" : "Create account"}
+            {forgotMode ? "Reset password" : isLogin ? "Welcome back" : "Create account"}
           </h2>
           <p className="text-sm mb-6" style={{ color: "hsl(230,10%,60%)" }}>
-            {inviteToken
-              ? "Create an account to access your dashboard"
-              : isLogin
-                ? "Sign in to view your performance data"
-                : "Get access to your marketing dashboard"}
+            {forgotMode
+              ? "Enter your email and we'll send you a reset link"
+              : inviteToken
+                ? "Create an account to access your dashboard"
+                : isLogin
+                  ? "Sign in to view your performance data"
+                  : "Get access to your marketing dashboard"}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={forgotMode ? handleForgotPassword : handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email" style={{ color: "hsl(0,0%,85%)" }}>Email</Label>
               <Input
@@ -111,19 +137,33 @@ const Auth = () => {
                 className="border-[hsl(230,20%,28%)] bg-[hsl(230,30%,16%)] text-white placeholder:text-[hsl(230,10%,45%)]"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" style={{ color: "hsl(0,0%,85%)" }}>Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="border-[hsl(230,20%,28%)] bg-[hsl(230,30%,16%)] text-white placeholder:text-[hsl(230,10%,45%)]"
-              />
-            </div>
+            {!forgotMode && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" style={{ color: "hsl(0,0%,85%)" }}>Password</Label>
+                  {isLogin && (
+                    <button
+                      type="button"
+                      onClick={() => setForgotMode(true)}
+                      className="text-xs hover:underline"
+                      style={{ color: "hsl(15,78%,55%)" }}
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="border-[hsl(230,20%,28%)] bg-[hsl(230,30%,16%)] text-white placeholder:text-[hsl(230,10%,45%)]"
+                />
+              </div>
+            )}
             <Button
               type="submit"
               className="w-full gap-2 text-white font-semibold"
@@ -134,23 +174,37 @@ const Auth = () => {
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  {isLogin ? "Sign in" : "Create account"}
+                  {forgotMode ? "Send reset link" : isLogin ? "Sign in" : "Create account"}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </Button>
           </form>
 
-          <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="hover:underline font-medium"
-              style={{ color: "hsl(15,78%,55%)" }}
-            >
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
-          </p>
+          {forgotMode && (
+            <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
+              <button
+                onClick={() => setForgotMode(false)}
+                className="hover:underline font-medium"
+                style={{ color: "hsl(15,78%,55%)" }}
+              >
+                Back to sign in
+              </button>
+            </p>
+          )}
+
+          {!forgotMode && (
+            <p className="text-sm text-center mt-6" style={{ color: "hsl(230,10%,60%)" }}>
+              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => setIsLogin(!isLogin)}
+                className="hover:underline font-medium"
+                style={{ color: "hsl(15,78%,55%)" }}
+              >
+                {isLogin ? "Sign up" : "Sign in"}
+              </button>
+            </p>
+          )}
         </div>
 
         <p className="text-xs text-center mt-6" style={{ color: "hsl(230,10%,40%)" }}>

@@ -52,14 +52,21 @@ Deno.serve(async (req) => {
       .single();
     if (invErr) throw invErr;
 
-    // Generate signup link using Supabase admin API
-    const appUrl = Deno.env.get("APP_URL") || "https://tinnedfishclub.lovable.app";
+    // Generate signup link
+    const appUrl = Deno.env.get("APP_URL") || "https://creaitivapp.lovable.app";
     const signupLink = `${appUrl}/auth?invite=${invite.token}&email=${encodeURIComponent(email.toLowerCase())}`;
 
     // Send invite email via Supabase Auth admin
     const { error: emailErr } = await supabase.auth.admin.inviteUserByEmail(
       email.toLowerCase(),
-      { redirectTo: signupLink, data: { invite_token: invite.token, client_name: client.name } }
+      {
+        redirectTo: signupLink,
+        data: {
+          invite_token: invite.token,
+          client_name: client.name,
+          invited_by_app: "Creaitiv App",
+        },
+      }
     );
 
     // If user already exists, that's fine - they'll just need to log in
