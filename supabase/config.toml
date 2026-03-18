@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.billy-daily-insights]
 verify_jwt = false
+
+[functions.sync-triplewhale]
+verify_jwt = false
