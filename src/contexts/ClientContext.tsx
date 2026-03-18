@@ -112,6 +112,8 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
               enabled_kpis: data.enabled_kpis || [],
               custom_metrics: data.custom_metrics as any[] || [],
               revenue_source: (data as any).revenue_source || "subbly",
+              triplewhale_enabled: (data as any).triplewhale_enabled || false,
+              triplewhale_shop_domain: (data as any).triplewhale_shop_domain || undefined,
             }
           : {
               enabled_platforms: ["meta", "google", "shopify"],
