@@ -28,6 +28,19 @@ const CreativeReporting = ({ platformFilter: initialPlatform }: { platformFilter
   const formatData = useFormatComparison(creatives);
   const fatigueAlerts = useFatigueAlerts(creatives);
   const [platformFilter, setPlatformFilter] = useState<string>(initialPlatform || "all");
+  const twEnabled = useTripleWhaleEnabled();
+  const { data: twAdData } = useTripleWhaleAdAttribution(platformFilter !== "all" ? platformFilter : "meta");
+
+  // Build a lookup map for TW attribution by ad_id
+  const twByAdId = useMemo(() => {
+    const map = new Map<string, any>();
+    if (twAdData) {
+      for (const ad of twAdData) {
+        map.set(ad.adId, ad);
+      }
+    }
+    return map;
+  }, [twAdData]);
 
   if (isLoading) {
     return <Skeleton className="h-[400px] rounded-xl" />;
