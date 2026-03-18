@@ -268,25 +268,23 @@ function extractDailyMetrics(data: any, startDate: string, endDate: string): Rec
   };
 
   for (const metric of metrics) {
-    const id = metric.id || metric.metricId || "";
-    const mapping = metricMapping[id];
-    if (!mapping || mapping.field.startsWith("_")) continue;
+    const id = metric.id || "";
+    const field = metricMapping[id];
+    if (!field) continue;
 
-    // Try daily chart data first
     const chartData = metric.charts?.current || [];
     if (chartData.length > 0) {
       for (const point of chartData) {
         const dateStr = doyToDate.get(point.x);
         if (dateStr && result[dateStr]) {
-          result[dateStr][mapping.field] = Number(point.y || 0);
+          result[dateStr][field] = Number(point.y || 0);
         }
       }
     } else {
-      // Fall back to aggregate value spread across all dates
       const totalValue = Number(metric.values?.current || 0);
       const dateKeys = Object.keys(result);
       if (dateKeys.length === 1) {
-        result[dateKeys[0]][mapping.field] = totalValue;
+        result[dateKeys[0]][field] = totalValue;
       }
     }
   }
