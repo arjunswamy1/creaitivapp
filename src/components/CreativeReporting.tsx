@@ -95,7 +95,7 @@ const CreativeReporting = ({ platformFilter: initialPlatform }: { platformFilter
         </TabsContent>
 
         <TabsContent value="creatives">
-          <CreativeTable creatives={filtered || []} />
+          <CreativeTable creatives={filtered || []} twByAdId={twEnabled ? twByAdId : undefined} />
         </TabsContent>
 
         <TabsContent value="fatigue">
