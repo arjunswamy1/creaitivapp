@@ -156,7 +156,7 @@ async function syncSummaryData(
   }
 
   const data = await response.json();
-  console.log("TW Summary response keys:", Object.keys(data));
+  console.log("TW Summary full response:", JSON.stringify(data).substring(0, 2000));
 
   // Parse daily data from the summary response
   // TW returns data grouped by date with channel breakdowns
