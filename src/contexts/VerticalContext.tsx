@@ -21,6 +21,13 @@ export function VerticalProvider({ children }: { children: ReactNode }) {
 
 export function useVertical() {
   const ctx = useContext(VerticalContext);
-  if (!ctx) throw new Error("useVertical must be used within VerticalProvider");
+  if (!ctx) {
+    // Return a safe default when used outside VerticalProvider (non-Billy clients)
+    return {
+      activeVertical: BILLY_VERTICALS[0],
+      setActiveVertical: () => {},
+      verticals: BILLY_VERTICALS,
+    } as VerticalContextValue;
+  }
   return ctx;
 }
