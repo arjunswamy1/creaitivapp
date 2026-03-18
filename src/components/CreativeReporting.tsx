@@ -146,10 +146,12 @@ function FormatComparisonView({ data }: { data: ReturnType<typeof useFormatCompa
   );
 }
 
-function CreativeTable({ creatives }: { creatives: CreativeRow[] }) {
+function CreativeTable({ creatives, twByAdId }: { creatives: CreativeRow[]; twByAdId?: Map<string, any> }) {
   if (creatives.length === 0) {
     return <p className="text-sm text-muted-foreground">No creative data available yet.</p>;
   }
+
+  const hasTw = twByAdId && twByAdId.size > 0;
 
   return (
     <div className="overflow-x-auto">
@@ -160,8 +162,11 @@ function CreativeTable({ creatives }: { creatives: CreativeRow[] }) {
             <th className="text-left py-2 text-muted-foreground font-medium">Format</th>
             <th className="text-right py-2 text-muted-foreground font-medium">Spend</th>
             <th className="text-right py-2 text-muted-foreground font-medium">Revenue</th>
+            {hasTw && <th className="text-right py-2 font-medium text-emerald-500">TW Revenue</th>}
             <th className="text-right py-2 text-muted-foreground font-medium">ROAS</th>
+            {hasTw && <th className="text-right py-2 font-medium text-emerald-500">TW ROAS</th>}
             <th className="text-right py-2 text-muted-foreground font-medium">Conv.</th>
+            {hasTw && <th className="text-right py-2 font-medium text-emerald-500">TW Purch.</th>}
             <th className="text-right py-2 text-muted-foreground font-medium">CPA</th>
             <th className="text-right py-2 text-muted-foreground font-medium">CTR</th>
             <th className="text-right py-2 text-muted-foreground font-medium">Freq.</th>
@@ -169,36 +174,54 @@ function CreativeTable({ creatives }: { creatives: CreativeRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {creatives.slice(0, 25).map(c => (
-            <tr key={c.adId} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
-              <td className="py-2 max-w-[220px]">
-                <p className="font-medium truncate">{c.name}</p>
-                <p className="text-muted-foreground text-[10px] truncate">{c.campaignName}</p>
-              </td>
-              <td className="py-2">
-                <Badge variant="outline" className="text-[10px] gap-1">
-                  {formatIcons[c.format]}
-                  {formatLabels[c.format] || c.format}
-                </Badge>
-              </td>
-              <td className="py-2 text-right font-mono">${c.spend.toLocaleString()}</td>
-              <td className="py-2 text-right font-mono">${c.revenue.toLocaleString()}</td>
-              <td className="py-2 text-right font-mono">
-                <span className={c.roas >= 2 ? "text-accent" : c.roas < 1 ? "text-destructive" : ""}>{c.roas}x</span>
-              </td>
-              <td className="py-2 text-right font-mono">{c.conversions}</td>
-              <td className="py-2 text-right font-mono">{c.conversions > 0 ? `$${c.cpa}` : "—"}</td>
-              <td className="py-2 text-right font-mono">{c.ctr}%</td>
-              <td className="py-2 text-right font-mono">
-                {c.frequency != null ? (
-                  <span className={c.frequency > 2.5 ? "text-destructive" : ""}>{c.frequency}</span>
-                ) : "—"}
-              </td>
-              <td className="py-2 text-right font-mono">
-                {c.thumbStopRate != null ? `${c.thumbStopRate}%` : "—"}
-              </td>
-            </tr>
-          ))}
+          {creatives.slice(0, 25).map(c => {
+            const tw = twByAdId?.get(c.adId);
+            return (
+              <tr key={c.adId} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
+                <td className="py-2 max-w-[220px]">
+                  <p className="font-medium truncate">{c.name}</p>
+                  <p className="text-muted-foreground text-[10px] truncate">{c.campaignName}</p>
+                </td>
+                <td className="py-2">
+                  <Badge variant="outline" className="text-[10px] gap-1">
+                    {formatIcons[c.format]}
+                    {formatLabels[c.format] || c.format}
+                  </Badge>
+                </td>
+                <td className="py-2 text-right font-mono">${c.spend.toLocaleString()}</td>
+                <td className="py-2 text-right font-mono">${c.revenue.toLocaleString()}</td>
+                {hasTw && (
+                  <td className="py-2 text-right font-mono text-emerald-500">
+                    {tw ? `$${tw.twRevenue.toLocaleString()}` : "—"}
+                  </td>
+                )}
+                <td className="py-2 text-right font-mono">
+                  <span className={c.roas >= 2 ? "text-accent" : c.roas < 1 ? "text-destructive" : ""}>{c.roas}x</span>
+                </td>
+                {hasTw && (
+                  <td className="py-2 text-right font-mono text-emerald-500">
+                    {tw ? <span className={tw.twRoas >= 2 ? "text-accent" : tw.twRoas < 1 ? "text-destructive" : "text-emerald-500"}>{tw.twRoas}x</span> : "—"}
+                  </td>
+                )}
+                <td className="py-2 text-right font-mono">{c.conversions}</td>
+                {hasTw && (
+                  <td className="py-2 text-right font-mono text-emerald-500">
+                    {tw ? tw.twPurchases : "—"}
+                  </td>
+                )}
+                <td className="py-2 text-right font-mono">{c.conversions > 0 ? `$${c.cpa}` : "—"}</td>
+                <td className="py-2 text-right font-mono">{c.ctr}%</td>
+                <td className="py-2 text-right font-mono">
+                  {c.frequency != null ? (
+                    <span className={c.frequency > 2.5 ? "text-destructive" : ""}>{c.frequency}</span>
+                  ) : "—"}
+                </td>
+                <td className="py-2 text-right font-mono">
+                  {c.thumbStopRate != null ? `${c.thumbStopRate}%` : "—"}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
