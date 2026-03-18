@@ -14,7 +14,9 @@ export interface ClientDashboardConfig {
   enabled_platforms: string[];
   enabled_kpis: string[];
   custom_metrics: any[];
-  revenue_source: string; // 'subbly' | 'shopify'
+  revenue_source: string;
+  triplewhale_enabled?: boolean;
+  triplewhale_shop_domain?: string;
 }
 
 interface ClientContextType {
