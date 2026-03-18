@@ -101,20 +101,21 @@ Deno.serve(async (req) => {
         const summaryResult = await syncSummaryData(
           supabaseAdmin, twApiKey, shopDomain, client.client_id, sd, ed
         );
+        results.push({ client_id: client.client_id, summary: summaryResult });
+      } catch (err) {
+        console.error(`Error syncing TW summary for client ${client.client_id}:`, err);
+        results.push({ client_id: client.client_id, summary_error: err.message });
+      }
 
+      try {
         // 2. Fetch Attribution data (order-level with ad attribution)
         const attrResult = await syncAttributionData(
           supabaseAdmin, twApiKey, shopDomain, client.client_id, sd, ed
         );
-
-        results.push({
-          client_id: client.client_id,
-          summary: summaryResult,
-          attribution: attrResult,
-        });
+        results.push({ client_id: client.client_id, attribution: attrResult });
       } catch (err) {
-        console.error(`Error syncing TW for client ${client.client_id}:`, err);
-        results.push({ client_id: client.client_id, error: err.message });
+        console.error(`Error syncing TW attribution for client ${client.client_id}:`, err);
+        results.push({ client_id: client.client_id, attribution_error: err.message });
       }
     }
 
