@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useCreativePerformance, useFormatComparison, useFatigueAlerts } from "@/hooks/useCreativeData";
 import type { CreativeRow } from "@/hooks/useCreativeData";
+import { useTripleWhaleEnabled, useTripleWhaleAdAttribution } from "@/hooks/useTripleWhaleData";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
