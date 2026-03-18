@@ -444,6 +444,8 @@ export type Database = {
           kpi: string
           revenue_source: string
           target: number
+          triplewhale_enabled: boolean | null
+          triplewhale_shop_domain: string | null
           updated_at: string
         }
         Insert: {
@@ -457,6 +459,8 @@ export type Database = {
           kpi?: string
           revenue_source?: string
           target?: number
+          triplewhale_enabled?: boolean | null
+          triplewhale_shop_domain?: string | null
           updated_at?: string
         }
         Update: {
@@ -470,6 +474,8 @@ export type Database = {
           kpi?: string
           revenue_source?: string
           target?: number
+          triplewhale_enabled?: boolean | null
+          triplewhale_shop_domain?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1235,6 +1241,190 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "subbly_subscriptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      triplewhale_ad_attribution: {
+        Row: {
+          ad_id: string | null
+          ad_name: string | null
+          adset_id: string | null
+          adset_name: string | null
+          attribution_model: string | null
+          campaign_id: string | null
+          campaign_name: string | null
+          clicks: number | null
+          client_id: string
+          created_at: string
+          date: string
+          id: string
+          impressions: number | null
+          platform: string
+          raw_data: Json | null
+          spend: number | null
+          synced_at: string
+          tw_cpa: number | null
+          tw_purchases: number
+          tw_revenue: number
+          tw_roas: number | null
+          updated_at: string
+        }
+        Insert: {
+          ad_id?: string | null
+          ad_name?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          attribution_model?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          client_id: string
+          created_at?: string
+          date: string
+          id?: string
+          impressions?: number | null
+          platform?: string
+          raw_data?: Json | null
+          spend?: number | null
+          synced_at?: string
+          tw_cpa?: number | null
+          tw_purchases?: number
+          tw_revenue?: number
+          tw_roas?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ad_id?: string | null
+          ad_name?: string | null
+          adset_id?: string | null
+          adset_name?: string | null
+          attribution_model?: string | null
+          campaign_id?: string | null
+          campaign_name?: string | null
+          clicks?: number | null
+          client_id?: string
+          created_at?: string
+          date?: string
+          id?: string
+          impressions?: number | null
+          platform?: string
+          raw_data?: Json | null
+          spend?: number | null
+          synced_at?: string
+          tw_cpa?: number | null
+          tw_purchases?: number
+          tw_revenue?: number
+          tw_roas?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "triplewhale_ad_attribution_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      triplewhale_summary: {
+        Row: {
+          blended_cpa: number | null
+          blended_roas: number | null
+          client_id: string
+          created_at: string
+          date: string
+          google_clicks: number | null
+          google_impressions: number | null
+          google_spend: number | null
+          google_tw_cpa: number | null
+          google_tw_purchases: number | null
+          google_tw_revenue: number | null
+          google_tw_roas: number | null
+          id: string
+          meta_clicks: number | null
+          meta_impressions: number | null
+          meta_spend: number | null
+          meta_tw_cpa: number | null
+          meta_tw_purchases: number | null
+          meta_tw_revenue: number | null
+          meta_tw_roas: number | null
+          new_customers: number | null
+          raw_data: Json | null
+          returning_customers: number | null
+          synced_at: string
+          total_orders: number
+          total_revenue: number
+          total_spend: number
+          updated_at: string
+        }
+        Insert: {
+          blended_cpa?: number | null
+          blended_roas?: number | null
+          client_id: string
+          created_at?: string
+          date: string
+          google_clicks?: number | null
+          google_impressions?: number | null
+          google_spend?: number | null
+          google_tw_cpa?: number | null
+          google_tw_purchases?: number | null
+          google_tw_revenue?: number | null
+          google_tw_roas?: number | null
+          id?: string
+          meta_clicks?: number | null
+          meta_impressions?: number | null
+          meta_spend?: number | null
+          meta_tw_cpa?: number | null
+          meta_tw_purchases?: number | null
+          meta_tw_revenue?: number | null
+          meta_tw_roas?: number | null
+          new_customers?: number | null
+          raw_data?: Json | null
+          returning_customers?: number | null
+          synced_at?: string
+          total_orders?: number
+          total_revenue?: number
+          total_spend?: number
+          updated_at?: string
+        }
+        Update: {
+          blended_cpa?: number | null
+          blended_roas?: number | null
+          client_id?: string
+          created_at?: string
+          date?: string
+          google_clicks?: number | null
+          google_impressions?: number | null
+          google_spend?: number | null
+          google_tw_cpa?: number | null
+          google_tw_purchases?: number | null
+          google_tw_revenue?: number | null
+          google_tw_roas?: number | null
+          id?: string
+          meta_clicks?: number | null
+          meta_impressions?: number | null
+          meta_spend?: number | null
+          meta_tw_cpa?: number | null
+          meta_tw_purchases?: number | null
+          meta_tw_revenue?: number | null
+          meta_tw_roas?: number | null
+          new_customers?: number | null
+          raw_data?: Json | null
+          returning_customers?: number | null
+          synced_at?: string
+          total_orders?: number
+          total_revenue?: number
+          total_spend?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "triplewhale_summary_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
