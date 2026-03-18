@@ -14,7 +14,9 @@ export interface ClientDashboardConfig {
   enabled_platforms: string[];
   enabled_kpis: string[];
   custom_metrics: any[];
-  revenue_source: string; // 'subbly' | 'shopify'
+  revenue_source: string;
+  triplewhale_enabled?: boolean;
+  triplewhale_shop_domain?: string;
 }
 
 interface ClientContextType {
@@ -99,7 +101,7 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
     const fetchConfig = async () => {
       const { data } = await supabase
         .from("client_dashboard_config")
-        .select("enabled_platforms, enabled_kpis, custom_metrics, revenue_source")
+        .select("enabled_platforms, enabled_kpis, custom_metrics, revenue_source, triplewhale_enabled, triplewhale_shop_domain")
         .eq("client_id", activeClientId)
         .maybeSingle();
 
@@ -110,6 +112,8 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
               enabled_kpis: data.enabled_kpis || [],
               custom_metrics: data.custom_metrics as any[] || [],
               revenue_source: (data as any).revenue_source || "subbly",
+              triplewhale_enabled: (data as any).triplewhale_enabled || false,
+              triplewhale_shop_domain: (data as any).triplewhale_shop_domain || undefined,
             }
           : {
               enabled_platforms: ["meta", "google", "shopify"],
