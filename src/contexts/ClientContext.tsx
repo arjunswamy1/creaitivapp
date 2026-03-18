@@ -99,7 +99,7 @@ export const ClientProvider = ({ children }: { children: ReactNode }) => {
     const fetchConfig = async () => {
       const { data } = await supabase
         .from("client_dashboard_config")
-        .select("enabled_platforms, enabled_kpis, custom_metrics, revenue_source")
+        .select("enabled_platforms, enabled_kpis, custom_metrics, revenue_source, triplewhale_enabled, triplewhale_shop_domain")
         .eq("client_id", activeClientId)
         .maybeSingle();
 
