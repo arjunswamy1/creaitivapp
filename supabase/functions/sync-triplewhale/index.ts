@@ -242,42 +242,29 @@ function extractDailyMetrics(data: any, startDate: string, endDate: string): Rec
   // id, title, metricId, services, values.current, charts.current [{x: dayOfYear, y: value}]
   const metrics = data.metrics || [];
   
-  // Map TW metric IDs to our fields
-  const metricMapping: Record<string, { field: string; isDaily?: boolean }> = {
+  // Map TW metric IDs to our fields (using actual TW metric IDs from API response)
+  const metricMapping: Record<string, string> = {
     // Store-level
-    "sales": { field: "totalRevenue" },
-    "totalSales": { field: "totalRevenue" },
-    "netSales": { field: "totalRevenue" },
-    "totalOrders": { field: "totalOrders" },
-    "orders": { field: "totalOrders" },
-    "newCustomerOrders": { field: "newCustomers" },
-    "rcOrders": { field: "returningCustomers" },
-    // Meta (Facebook)
-    "facebookSpend": { field: "metaSpend" },
-    "facebookAdSpend": { field: "metaSpend" },
-    "facebook-ads-spend": { field: "metaSpend" },
-    "facebookRoas": { field: "metaTwRevenue" }, // We'll handle ROAS differently
-    "facebookPixelPurchaseRoas": { field: "_metaRoas" },
-    "facebookPixelPurchaseRevenue": { field: "metaTwRevenue" },
-    "facebookPixelRevenue": { field: "metaTwRevenue" },
-    "facebookPurchases": { field: "metaPurchases" },
-    "facebookPixelPurchases": { field: "metaPurchases" },
-    "facebookClicks": { field: "metaClicks" },
-    "facebookOutboundClicks": { field: "metaClicks" },
-    "facebookImpressions": { field: "metaImpressions" },
+    "sales": "totalRevenue",
+    "shopifyOrders": "totalOrders",
+    "orders": "totalOrders",
+    "newCustomersOrders": "newCustomers",
+    "returningCustomerOrders": "returningCustomers",
+    // Meta (Facebook) - use "id" field from TW response
+    "facebookAds": "metaSpend",           // fb_ads_spend
+    "facebookConversionValue": "metaTwRevenue",  // TW-attributed revenue from FB
+    "facebookPurchases": "metaPurchases",
+    "facebookClicks": "metaClicks",
+    "facebookOutboundClicks": "metaClicks",
+    "facebookImpressions": "metaImpressions",
     // Google
-    "googleSpend": { field: "googleSpend" },
-    "googleAdSpend": { field: "googleSpend" },
-    "google-ads-spend": { field: "googleSpend" },
-    "googlePixelPurchaseRevenue": { field: "googleTwRevenue" },
-    "googlePixelRevenue": { field: "googleTwRevenue" },
-    "googlePurchases": { field: "googlePurchases" },
-    "googlePixelPurchases": { field: "googlePurchases" },
-    "googleClicks": { field: "googleClicks" },
-    "googleImpressions": { field: "googleImpressions" },
+    "googleAds": "googleSpend",           // ga_adCost
+    "googleConversionValue": "googleTwRevenue",  // TW-attributed revenue from Google
+    "ga_transactions_adGroup": "googlePurchases",
+    "totalGoogleAdsClicks": "googleClicks",
+    "totalGoogleAdsImpressions": "googleImpressions",
     // Total ad spend
-    "adSpend": { field: "totalSpend" },
-    "totalAdSpend": { field: "totalSpend" },
+    "adsSpend": "totalSpend",
   };
 
   for (const metric of metrics) {
