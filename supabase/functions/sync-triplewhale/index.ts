@@ -217,16 +217,18 @@ async function syncSummaryData(
 function extractDailyMetrics(data: any, startDate: string, endDate: string): Record<string, any> {
   const result: Record<string, any> = {};
   
-  // TW Summary API returns data in various formats
-  // Common structure: { [metricName]: { [date]: value } } or array format
-  // Also may have channel-specific data under keys like "facebook", "googleAds", etc.
-
   // Initialize dates
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = d.toISOString().split("T")[0];
-    result[key] = {
+  const start = new Date(startDate + "T00:00:00Z");
+  const end = new Date(endDate + "T00:00:00Z");
+  const year = start.getFullYear();
+  
+  // Build day-of-year to date mapping
+  const doyToDate = new Map<number, string>();
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dateStr = d.toISOString().split("T")[0];
+    const doy = getDayOfYear(d);
+    doyToDate.set(doy, dateStr);
+    result[dateStr] = {
       totalRevenue: 0, totalOrders: 0, totalSpend: 0,
       newCustomers: 0, returningCustomers: 0,
       metaSpend: 0, metaTwRevenue: 0, metaPurchases: 0, metaClicks: 0, metaImpressions: 0,
@@ -235,78 +237,89 @@ function extractDailyMetrics(data: any, startDate: string, endDate: string): Rec
     };
   }
 
-  // The TW API typically returns data as:
-  // { data: { [serviceName]: { metrics: [...] } } } or flat daily arrays
-  // We'll handle the most common response shapes
+  // TW returns { metrics: [...] } where each metric has:
+  // id, title, metricId, services, values.current, charts.current [{x: dayOfYear, y: value}]
+  const metrics = data.metrics || [];
+  
+  // Map TW metric IDs to our fields
+  const metricMapping: Record<string, { field: string; isDaily?: boolean }> = {
+    // Store-level
+    "sales": { field: "totalRevenue" },
+    "totalSales": { field: "totalRevenue" },
+    "netSales": { field: "totalRevenue" },
+    "totalOrders": { field: "totalOrders" },
+    "orders": { field: "totalOrders" },
+    "newCustomerOrders": { field: "newCustomers" },
+    "rcOrders": { field: "returningCustomers" },
+    // Meta (Facebook)
+    "facebookSpend": { field: "metaSpend" },
+    "facebookAdSpend": { field: "metaSpend" },
+    "facebook-ads-spend": { field: "metaSpend" },
+    "facebookRoas": { field: "metaTwRevenue" }, // We'll handle ROAS differently
+    "facebookPixelPurchaseRoas": { field: "_metaRoas" },
+    "facebookPixelPurchaseRevenue": { field: "metaTwRevenue" },
+    "facebookPixelRevenue": { field: "metaTwRevenue" },
+    "facebookPurchases": { field: "metaPurchases" },
+    "facebookPixelPurchases": { field: "metaPurchases" },
+    "facebookClicks": { field: "metaClicks" },
+    "facebookOutboundClicks": { field: "metaClicks" },
+    "facebookImpressions": { field: "metaImpressions" },
+    // Google
+    "googleSpend": { field: "googleSpend" },
+    "googleAdSpend": { field: "googleSpend" },
+    "google-ads-spend": { field: "googleSpend" },
+    "googlePixelPurchaseRevenue": { field: "googleTwRevenue" },
+    "googlePixelRevenue": { field: "googleTwRevenue" },
+    "googlePurchases": { field: "googlePurchases" },
+    "googlePixelPurchases": { field: "googlePurchases" },
+    "googleClicks": { field: "googleClicks" },
+    "googleImpressions": { field: "googleImpressions" },
+    // Total ad spend
+    "adSpend": { field: "totalSpend" },
+    "totalAdSpend": { field: "totalSpend" },
+  };
 
-  try {
-    // If data has a "data" wrapper
-    const payload = data.data || data;
-    
-    // Check for channel-level data (facebook/meta, google, etc.)
-    const channelMappings: Record<string, string> = {
-      facebook: "meta", "facebook-ads": "meta", meta: "meta",
-      "google-ads": "google", google: "google", googleAds: "google",
-    };
+  for (const metric of metrics) {
+    const id = metric.id || metric.metricId || "";
+    const mapping = metricMapping[id];
+    if (!mapping || mapping.field.startsWith("_")) continue;
 
-    // Extract overall store metrics
-    if (payload.totalRevenue || payload.grossSales || payload.revenue) {
-      for (const dateKey of Object.keys(result)) {
-        // If TW returns aggregated data, we store it as a single-day summary
-        if (Object.keys(result).length === 1 || !payload.dailyBreakdown) {
-          result[dateKey].totalRevenue = Number(payload.totalRevenue || payload.grossSales || payload.revenue || 0);
-          result[dateKey].totalOrders = Number(payload.totalOrders || payload.orders || 0);
-          result[dateKey].raw = payload;
+    // Try daily chart data first
+    const chartData = metric.charts?.current || [];
+    if (chartData.length > 0) {
+      for (const point of chartData) {
+        const dateStr = doyToDate.get(point.x);
+        if (dateStr && result[dateStr]) {
+          result[dateStr][mapping.field] = Number(point.y || 0);
         }
       }
-    }
-
-    // Try to extract per-channel data
-    for (const [twChannel, ourChannel] of Object.entries(channelMappings)) {
-      const channelData = payload[twChannel] || payload[twChannel + "Ads"];
-      if (!channelData) continue;
-
-      for (const dateKey of Object.keys(result)) {
-        const spend = Number(channelData.spend || channelData.adSpend || 0);
-        const revenue = Number(channelData.revenue || channelData.pixelRevenue || channelData.twRevenue || 0);
-        const purchases = Number(channelData.purchases || channelData.pixelPurchases || channelData.twPurchases || 0);
-        const clicks = Number(channelData.clicks || channelData.outboundClicks || 0);
-        const impressions = Number(channelData.impressions || 0);
-
-        if (ourChannel === "meta") {
-          result[dateKey].metaSpend = spend;
-          result[dateKey].metaTwRevenue = revenue;
-          result[dateKey].metaPurchases = purchases;
-          result[dateKey].metaClicks = clicks;
-          result[dateKey].metaImpressions = impressions;
-        } else if (ourChannel === "google") {
-          result[dateKey].googleSpend = spend;
-          result[dateKey].googleTwRevenue = revenue;
-          result[dateKey].googlePurchases = purchases;
-          result[dateKey].googleClicks = clicks;
-          result[dateKey].googleImpressions = impressions;
-        }
-
-        result[dateKey].totalSpend += spend;
+    } else {
+      // Fall back to aggregate value spread across all dates
+      const totalValue = Number(metric.values?.current || 0);
+      const dateKeys = Object.keys(result);
+      if (dateKeys.length === 1) {
+        result[dateKeys[0]][mapping.field] = totalValue;
       }
     }
+  }
 
-    // Handle if data comes as an array of daily entries
-    if (Array.isArray(payload)) {
-      for (const entry of payload) {
-        const date = entry.date || entry.day;
-        if (!date || !result[date]) continue;
-        result[date].totalRevenue = Number(entry.revenue || entry.totalRevenue || 0);
-        result[date].totalOrders = Number(entry.orders || entry.totalOrders || 0);
-        result[date].totalSpend = Number(entry.spend || entry.totalSpend || 0);
-        result[date].raw = entry;
-      }
-    }
-  } catch (e) {
-    console.error("Error parsing TW summary data:", e);
+  // Store raw metrics array for the aggregate
+  const allDates = Object.keys(result);
+  if (allDates.length > 0) {
+    // Store the full metrics list in raw_data of the first date for reference
+    result[allDates[0]].raw = { metrics: metrics.map((m: any) => ({
+      id: m.id, title: m.title, current: m.values?.current, previous: m.values?.previous,
+      services: m.services,
+    }))};
   }
 
   return result;
+}
+
+function getDayOfYear(date: Date): number {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
+  const diff = date.getTime() - start.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
 async function syncAttributionData(
