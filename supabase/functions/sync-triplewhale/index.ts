@@ -17,27 +17,34 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Auth: accept bearer token or cron secret
+    // Auth: accept bearer token (user or service role) or cron secret
     const authHeader = req.headers.get("Authorization");
     const cronSecret = req.headers.get("x-cron-secret");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
     if (cronSecret) {
-      if (cronSecret !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+      if (cronSecret !== serviceRoleKey) {
         return new Response(JSON.stringify({ error: "Invalid cron secret" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     } else if (authHeader?.startsWith("Bearer ")) {
-      const supabaseUser = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const { data: { user } } = await supabaseUser.auth.getUser();
-      if (!user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      const token = authHeader.replace("Bearer ", "");
+      // Allow service role key as bearer token
+      if (token === serviceRoleKey) {
+        // Authenticated as service role
+      } else {
+        const supabaseUser = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: { user } } = await supabaseUser.auth.getUser();
+        if (!user) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
     } else {
       return new Response(JSON.stringify({ error: "Missing auth" }), {
