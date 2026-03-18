@@ -156,7 +156,8 @@ async function syncSummaryData(
   }
 
   const data = await response.json();
-  console.log("TW Summary full response:", JSON.stringify(data).substring(0, 2000));
+  const metricIds = (data.metrics || []).map((m: any) => `${m.id}(${m.metricId})[${(m.services||[]).join(",")}]`);
+  console.log("TW metric IDs:", metricIds.join(" | "));
 
   // Parse daily data from the summary response
   // TW returns data grouped by date with channel breakdowns
