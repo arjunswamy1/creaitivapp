@@ -34,9 +34,11 @@ Deno.serve(async (req) => {
 
   // Parse optional client_id from request body
   let bodyClientId: string | null = null;
+  let bodyDaysBack: number | null = null;
   try {
     const body = await req.json();
     bodyClientId = body?.client_id || body?.clientId || null;
+    bodyDaysBack = body?.days_back || null;
   } catch { /* no body */ }
 
   if (userId) {
@@ -81,7 +83,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id);
+    const daysBack = bodyDaysBack || 30;
+    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id, daysBack);
     results.push(result);
   }
 
@@ -134,7 +137,14 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
   }
 }
 
-async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null) {
+async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30) {
+  const startTime = Date.now();
+  const TIME_BUDGET_MS = 50_000; // 50s budget out of 60s edge function limit
+
+  function hasTimeBudget() {
+    return (Date.now() - startTime) < TIME_BUDGET_MS;
+  }
+
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "google", status: "running" })
@@ -181,22 +191,27 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       return { error: "No customer accounts found." };
     }
 
-    // 90-day rolling window with 7-day chunks (smaller chunks to avoid edge function timeouts)
+    // Use requested days_back with 7-day chunks
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 90);
+    startDate.setDate(startDate.getDate() - daysBack);
     const chunks = buildDateChunks(startDate, endDate, 7);
+    console.log(`Google sync: ${daysBack} days, ${chunks.length} chunks, time budget ${TIME_BUDGET_MS}ms`);
 
     let totalRecords = 0;
 
+    let timedOut = false;
     for (const customerResource of customers) {
+      if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
       const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
       console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
 
       for (const cid of customerIds) {
+        if (!hasTimeBudget()) { timedOut = true; break; }
         for (const { since, until } of chunks) {
+          if (!hasTimeBudget()) { timedOut = true; break; }
           // Daily account metrics
           try {
             const dailyRows = await queryGoogleAds(cid, accessToken, developerToken, `
@@ -565,8 +580,14 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       }
     }
 
-    await updateSyncLog(supabase, syncId, "success", totalRecords);
-    return { success: true, records_synced: totalRecords };
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    const status = timedOut ? "success" : "success";
+    const message = timedOut
+      ? `Partial sync (${elapsed}s elapsed, time budget reached). Synced ${totalRecords} records.`
+      : `Full sync complete in ${elapsed}s. Synced ${totalRecords} records.`;
+    console.log(message);
+    await updateSyncLog(supabase, syncId, "success", totalRecords, timedOut ? "Partial: time budget reached" : undefined);
+    return { success: true, records_synced: totalRecords, partial: timedOut, message };
   } catch (err) {
     console.error("Google sync error:", err);
     await updateSyncLog(supabase, syncId, "error", 0, err.message);
