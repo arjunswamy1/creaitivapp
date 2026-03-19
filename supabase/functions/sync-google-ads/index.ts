@@ -200,14 +200,18 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
 
     let totalRecords = 0;
 
+    let timedOut = false;
     for (const customerResource of customers) {
+      if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
       const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
       console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
 
       for (const cid of customerIds) {
+        if (!hasTimeBudget()) { timedOut = true; break; }
         for (const { since, until } of chunks) {
+          if (!hasTimeBudget()) { timedOut = true; break; }
           // Daily account metrics
           try {
             const dailyRows = await queryGoogleAds(cid, accessToken, developerToken, `
