@@ -4,6 +4,7 @@ import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
 import BillyMetaDashboard from "@/components/BillyMetaDashboard";
+import BillyGoogleDashboard from "@/components/BillyGoogleDashboard";
 import BillyDailyTrends from "@/components/BillyDailyTrends";
 import BillyTrendAnalysis from "@/components/BillyTrendAnalysis";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
@@ -38,6 +39,7 @@ const BillyDashboardContent = () => {
   const { dashboardConfig, activeClient } = useClient();
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
   const showMeta = platforms.includes("meta");
+  const showGoogle = platforms.includes("google");
 
   return (
     <div className="min-h-screen bg-background px-6 pb-12">
@@ -62,6 +64,12 @@ const BillyDashboardContent = () => {
               <LineChart className="w-3.5 h-3.5" />
               Trend Analysis
             </TabsTrigger>
+            {showGoogle && (
+              <TabsTrigger value="google" className="gap-1.5">
+                <Chrome className="w-3.5 h-3.5" />
+                Google Ads
+              </TabsTrigger>
+            )}
             {showMeta && (
               <TabsTrigger value="meta" className="gap-1.5">
                 <Facebook className="w-3.5 h-3.5" />
@@ -78,6 +86,11 @@ const BillyDashboardContent = () => {
           <TabsContent value="trend-analysis">
             <BillyTrendAnalysis />
           </TabsContent>
+          {showGoogle && (
+            <TabsContent value="google">
+              <BillyGoogleDashboard />
+            </TabsContent>
+          )}
           {showMeta && (
             <TabsContent value="meta">
               <BillyMetaDashboard />
