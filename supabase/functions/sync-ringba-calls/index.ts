@@ -56,12 +56,13 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter for Billy verticals: Flights + Bath campaigns
+    // Client-side filter for Billy verticals: Flights, Bath, Pest Control, Porta Potty
     const matching = records.filter(
       (c: any) => {
         if (!c.campaignName) return false;
         const name = c.campaignName.toLowerCase();
-        return name.includes("flights") || name.includes("bath") || name.includes("bathroom");
+        return name.includes("flights") || name.includes("bath") || name.includes("bathroom") ||
+               name.includes("pest") || name.includes("porta") || name.includes("potty") || name.includes("portapotty");
       }
     );
 
