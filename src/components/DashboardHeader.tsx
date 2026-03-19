@@ -73,7 +73,7 @@ const DashboardHeader = () => {
       // Run Meta, Google, Subbly, and Shopify syncs in parallel
       const [metaResult, googleResult, subblyResult, shopifyResult] = await Promise.allSettled([
         supabase.functions.invoke("sync-meta-ads", { body: { client_id: clientId } }),
-        supabase.functions.invoke("sync-google-ads", { body: { client_id: clientId } }),
+        supabase.functions.invoke("sync-google-ads", { body: { client_id: clientId, days_back: 90 } }),
         supabase.functions.invoke("sync-subbly", { body: { client_id: clientId } }),
         supabase.functions.invoke("sync-shopify-orders", { body: { client_id: clientId } }),
       ]);
