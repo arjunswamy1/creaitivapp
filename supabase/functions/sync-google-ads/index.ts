@@ -596,17 +596,24 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
       FROM customer_client
       WHERE customer_client.status = 'ENABLED'
     `);
-    // If we get child accounts, filter out managers and return the non-manager children
+    // Log all children for debugging
+    const allChildren = childRows.map((r: any) => ({
+      id: String(r.customerClient?.id),
+      name: r.customerClient?.descriptiveName || "unnamed",
+      manager: r.customerClient?.manager || false,
+    }));
+    console.log(`Customer ${customerId} children: ${JSON.stringify(allChildren)}`);
+
     const nonManagerChildren = childRows
       .filter((r: any) => !r.customerClient?.manager)
       .map((r: any) => String(r.customerClient?.id));
     if (nonManagerChildren.length > 0) {
-      console.log(`Customer ${customerId} is MCC with ${nonManagerChildren.length} child accounts: ${JSON.stringify(nonManagerChildren)}`);
+      console.log(`Customer ${customerId} is MCC with ${nonManagerChildren.length} non-manager children: ${JSON.stringify(nonManagerChildren)}`);
       return nonManagerChildren;
     }
-    // If the only child is itself (non-manager), it's a direct account
-    const allChildren = childRows.map((r: any) => String(r.customerClient?.id));
-    if (allChildren.includes(customerId)) {
+    // If the only child is itself, it's a direct account
+    const allIds = childRows.map((r: any) => String(r.customerClient?.id));
+    if (allIds.includes(customerId)) {
       return [customerId];
     }
   } catch (err) {
