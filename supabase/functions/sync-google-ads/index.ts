@@ -207,9 +207,19 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
-      const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
+      let customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
       console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
 
+      // If a specific account_id was requested, only process that one
+      if (targetAccountId) {
+        if (customerIds.includes(targetAccountId)) {
+          customerIds = [targetAccountId];
+          console.log(`Scoped to target account: ${targetAccountId}`);
+        } else {
+          console.log(`Target account ${targetAccountId} not found under ${customerId}, skipping`);
+          continue;
+        }
+      }
       for (const cid of customerIds) {
         if (!hasTimeBudget()) { timedOut = true; break; }
         for (const { since, until } of chunks) {
