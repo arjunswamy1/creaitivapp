@@ -341,7 +341,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM ad_group
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             if (adGroupRows.length > 0) {
               const batch = adGroupRows.map((row: any) => {
