@@ -589,26 +589,41 @@ function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: st
 }
 
 async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<string[]> {
-  // Try querying directly first - if it works, this is a direct account
+  // First, check if this is a manager account by trying to list child accounts
+  try {
+    const childRows = await queryGoogleAds(customerId, accessToken, developerToken, `
+      SELECT customer_client.id, customer_client.manager, customer_client.descriptive_name
+      FROM customer_client
+      WHERE customer_client.status = 'ENABLED'
+    `);
+    // If we get child accounts, filter out managers and return the non-manager children
+    const nonManagerChildren = childRows
+      .filter((r: any) => !r.customerClient?.manager)
+      .map((r: any) => String(r.customerClient?.id));
+    if (nonManagerChildren.length > 0) {
+      console.log(`Customer ${customerId} is MCC with ${nonManagerChildren.length} child accounts: ${JSON.stringify(nonManagerChildren)}`);
+      return nonManagerChildren;
+    }
+    // If the only child is itself (non-manager), it's a direct account
+    const allChildren = childRows.map((r: any) => String(r.customerClient?.id));
+    if (allChildren.includes(customerId)) {
+      return [customerId];
+    }
+  } catch (err) {
+    console.log(`customer_client query failed for ${customerId}, treating as direct account: ${err?.message || err}`);
+  }
+
+  // Fallback: try querying directly
   try {
     const testRows = await queryGoogleAds(customerId, accessToken, developerToken, `
       SELECT customer.id FROM customer LIMIT 1
     `);
     if (testRows.length > 0) return [customerId];
   } catch {
-    // May be an MCC - try listing child accounts
+    // ignore
   }
 
-  try {
-    const childRows = await queryGoogleAds(customerId, accessToken, developerToken, `
-      SELECT customer_client.id, customer_client.manager FROM customer_client WHERE customer_client.status = 'ENABLED'
-    `);
-    return childRows
-      .filter((r: any) => !r.customerClient?.manager)
-      .map((r: any) => String(r.customerClient?.id));
-  } catch {
-    return [customerId];
-  }
+  return [customerId];
 }
 
 async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string): Promise<any[]> {
