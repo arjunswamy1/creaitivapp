@@ -139,7 +139,7 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
   }
 }
 
-async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30) {
+async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30, targetAccountId: string | null = null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 50_000; // 50s budget out of 60s edge function limit
 
