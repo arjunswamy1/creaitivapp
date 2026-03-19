@@ -260,6 +260,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               WHERE segments.date BETWEEN '${since}' AND '${until}'
             `);
 
+            console.log(`Campaign rows for ${cid} (${since}-${until}): ${campaignRows.length}`);
             if (campaignRows.length > 0) {
               const batch = campaignRows.map((row: any) => {
                 const spend = (row.metrics?.costMicros || 0) / 1_000_000;
