@@ -18,6 +18,8 @@ export interface PlatformConfig {
   patterns: string[];
   /** Optional: restrict to specific ad account IDs. If empty/omitted, all accounts match. */
   accountIds?: string[];
+  /** If true, campaign name must exactly equal a pattern (case-insensitive) instead of contains */
+  exactMatch?: boolean;
 }
 
 export interface VerticalConfig {
@@ -64,7 +66,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     platforms: {
       meta: { patterns: ["Pest", "PestControl"], accountIds: ["448669084867269", "1779578786137314"] },
       google: { patterns: ["Pest"], accountIds: ["1939246766"] },
-      ringba: { patterns: ["Pest Control US Call Flow"] },
+      ringba: { patterns: ["Pest Control US Call Flow"], exactMatch: true },
     },
   },
 ];
@@ -78,6 +80,9 @@ export function matchesVertical(
   const cfg = vertical.platforms[platform];
   if (!cfg || cfg.patterns.length === 0) return false;
   const lower = (campaignName || "").toLowerCase();
+  if (cfg.exactMatch) {
+    return cfg.patterns.some((p) => lower === p.toLowerCase());
+  }
   return cfg.patterns.some((p) => lower.includes(p.toLowerCase()));
 }
 
