@@ -207,8 +207,10 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
-      let customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
-      console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
+      const resolved = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
+      let customerIds = resolved.childIds;
+      const loginCustomerId = resolved.mccId || customerId;
+      console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}, loginCustomerId: ${loginCustomerId}`);
 
       // If a specific account_id was requested, only process that one
       if (targetAccountId) {
@@ -236,7 +238,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM customer
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             if (dailyRows.length > 0) {
               const batch = dailyRows.map((row: any) => {
@@ -285,7 +287,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.search_rank_lost_impression_share
               FROM campaign
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             console.log(`Campaign rows for ${cid} (${since}-${until}): ${campaignRows.length}`);
             if (campaignRows.length > 0) {
@@ -339,7 +341,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM ad_group
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             if (adGroupRows.length > 0) {
               const batch = adGroupRows.map((row: any) => {
@@ -390,7 +392,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM ad_group_ad
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             if (adRows.length > 0) {
               const batch = adRows.map((row: any) => {
@@ -452,7 +454,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM keyword_view
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             console.log(`Keyword rows returned for ${cid}: ${kwRows.length}`);
 
@@ -517,7 +519,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                     metrics.conversions_value
                   FROM search_term_view
                   WHERE segments.date BETWEEN '${sub.since}' AND '${sub.until}'
-                `);
+                `, loginCustomerId);
 
                 console.log(`Search term rows returned for ${cid}: ${stRows.length}`);
 
@@ -621,14 +623,19 @@ function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: st
   return chunks;
 }
 
-async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<string[]> {
+interface ResolvedAccounts {
+  mccId: string | null; // The MCC parent ID to use as login-customer-id, or null if direct account
+  childIds: string[];   // The actual accounts to query
+}
+
+async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<ResolvedAccounts> {
   // First, check if this is a manager account by trying to list child accounts
   try {
     const childRows = await queryGoogleAds(customerId, accessToken, developerToken, `
       SELECT customer_client.id, customer_client.manager, customer_client.descriptive_name
       FROM customer_client
       WHERE customer_client.status = 'ENABLED'
-    `);
+    `, customerId);
     // Log all children for debugging
     const allChildren = childRows.map((r: any) => ({
       id: String(r.customerClient?.id),
@@ -642,12 +649,12 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
       .map((r: any) => String(r.customerClient?.id));
     if (nonManagerChildren.length > 0) {
       console.log(`Customer ${customerId} is MCC with ${nonManagerChildren.length} non-manager children: ${JSON.stringify(nonManagerChildren)}`);
-      return nonManagerChildren;
+      return { mccId: customerId, childIds: nonManagerChildren };
     }
     // If the only child is itself, it's a direct account
     const allIds = childRows.map((r: any) => String(r.customerClient?.id));
     if (allIds.includes(customerId)) {
-      return [customerId];
+      return { mccId: null, childIds: [customerId] };
     }
   } catch (err) {
     console.log(`customer_client query failed for ${customerId}, treating as direct account: ${err?.message || err}`);
@@ -658,24 +665,29 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
     const testRows = await queryGoogleAds(customerId, accessToken, developerToken, `
       SELECT customer.id FROM customer LIMIT 1
     `);
-    if (testRows.length > 0) return [customerId];
+    if (testRows.length > 0) return { mccId: null, childIds: [customerId] };
   } catch {
     // ignore
   }
 
-  return [customerId];
+  return { mccId: null, childIds: [customerId] };
 }
 
-async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string): Promise<any[]> {
+async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string, loginCustomerId?: string): Promise<any[]> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": developerToken,
+    "Content-Type": "application/json",
+  };
+  // When querying a child account under an MCC, set login-customer-id to the MCC
+  if (loginCustomerId && loginCustomerId !== customerId) {
+    headers["login-customer-id"] = loginCustomerId;
+  }
   const res = await fetch(
     `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "developer-token": developerToken,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ query }),
     }
   );
