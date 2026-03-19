@@ -18,6 +18,8 @@ export interface PlatformConfig {
   patterns: string[];
   /** Optional: restrict to specific ad account IDs. If empty/omitted, all accounts match. */
   accountIds?: string[];
+  /** If true, campaign name must exactly equal a pattern (case-insensitive) instead of contains */
+  exactMatch?: boolean;
 }
 
 export interface VerticalConfig {
