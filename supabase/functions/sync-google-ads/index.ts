@@ -137,7 +137,14 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
   }
 }
 
-async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null) {
+async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30) {
+  const startTime = Date.now();
+  const TIME_BUDGET_MS = 50_000; // 50s budget out of 60s edge function limit
+
+  function hasTimeBudget() {
+    return (Date.now() - startTime) < TIME_BUDGET_MS;
+  }
+
   const { data: syncLog } = await supabase
     .from("ad_sync_log")
     .insert({ user_id: userId, platform: "google", status: "running" })
@@ -184,11 +191,12 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       return { error: "No customer accounts found." };
     }
 
-    // 90-day rolling window with 7-day chunks (smaller chunks to avoid edge function timeouts)
+    // Use requested days_back with 7-day chunks
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setDate(startDate.getDate() - 90);
+    startDate.setDate(startDate.getDate() - daysBack);
     const chunks = buildDateChunks(startDate, endDate, 7);
+    console.log(`Google sync: ${daysBack} days, ${chunks.length} chunks, time budget ${TIME_BUDGET_MS}ms`);
 
     let totalRecords = 0;
 
