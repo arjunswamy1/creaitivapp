@@ -519,7 +519,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                     metrics.conversions_value
                   FROM search_term_view
                   WHERE segments.date BETWEEN '${sub.since}' AND '${sub.until}'
-                `);
+                `, loginCustomerId);
 
                 console.log(`Search term rows returned for ${cid}: ${stRows.length}`);
 
