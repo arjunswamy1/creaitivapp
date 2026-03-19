@@ -43,7 +43,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Premium & Mixed Flights lead-gen funnel",
     platforms: {
       meta: { patterns: ["Flight"] },
-      google: { patterns: ["Flight"], accountIds: ["1939246766"] },
+      google: { patterns: ["Flight"] },
       ringba: { patterns: ["Flight"] },
     },
   },
@@ -54,7 +54,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Porta Potty rental lead-gen funnel",
     platforms: {
       meta: { patterns: ["Porta", "Potty"] },
-      google: { patterns: ["Porta", "Potty"], accountIds: ["1939246766"] },
+      google: { patterns: ["Porta", "Potty"] },
       ringba: { patterns: ["Porta", "Potty", "Portapotty"] },
     },
   },
@@ -65,7 +65,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Pest Control lead-gen funnel",
     platforms: {
       meta: { patterns: ["Pest", "PestControl"], accountIds: ["448669084867269", "1779578786137314"] },
-      google: { patterns: ["Pest"], accountIds: ["7522495080"] },
+      google: { patterns: ["Pest"] },
       ringba: { patterns: ["Pest Control US Call Flow"], exactMatch: true },
     },
   },
