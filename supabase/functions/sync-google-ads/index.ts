@@ -238,7 +238,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM customer
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             if (dailyRows.length > 0) {
               const batch = dailyRows.map((row: any) => {
