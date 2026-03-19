@@ -181,10 +181,10 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       return { error: "No customer accounts found." };
     }
 
-    // 12-month rolling window with 30-day chunks
+    // 90-day rolling window with 30-day chunks (reduced from 12 months to avoid timeouts)
     const endDate = new Date();
     const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setDate(startDate.getDate() - 90);
     const chunks = buildDateChunks(startDate, endDate, 30);
 
     let totalRecords = 0;
