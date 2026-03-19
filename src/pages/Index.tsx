@@ -4,6 +4,7 @@ import GoogleDashboard from "@/components/GoogleDashboard";
 import MetaDashboard from "@/components/MetaDashboard";
 import BillyDashboard from "@/components/BillyDashboard";
 import BillyMetaDashboard from "@/components/BillyMetaDashboard";
+import BillyGoogleDashboard from "@/components/BillyGoogleDashboard";
 import BillyDailyTrends from "@/components/BillyDailyTrends";
 import BillyTrendAnalysis from "@/components/BillyTrendAnalysis";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
