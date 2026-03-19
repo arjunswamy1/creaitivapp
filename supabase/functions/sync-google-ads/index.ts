@@ -621,14 +621,19 @@ function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: st
   return chunks;
 }
 
-async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<string[]> {
+interface ResolvedAccounts {
+  mccId: string | null; // The MCC parent ID to use as login-customer-id, or null if direct account
+  childIds: string[];   // The actual accounts to query
+}
+
+async function getAccessibleCustomerIds(customerId: string, accessToken: string, developerToken: string): Promise<ResolvedAccounts> {
   // First, check if this is a manager account by trying to list child accounts
   try {
     const childRows = await queryGoogleAds(customerId, accessToken, developerToken, `
       SELECT customer_client.id, customer_client.manager, customer_client.descriptive_name
       FROM customer_client
       WHERE customer_client.status = 'ENABLED'
-    `);
+    `, customerId);
     // Log all children for debugging
     const allChildren = childRows.map((r: any) => ({
       id: String(r.customerClient?.id),
@@ -642,12 +647,12 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
       .map((r: any) => String(r.customerClient?.id));
     if (nonManagerChildren.length > 0) {
       console.log(`Customer ${customerId} is MCC with ${nonManagerChildren.length} non-manager children: ${JSON.stringify(nonManagerChildren)}`);
-      return nonManagerChildren;
+      return { mccId: customerId, childIds: nonManagerChildren };
     }
     // If the only child is itself, it's a direct account
     const allIds = childRows.map((r: any) => String(r.customerClient?.id));
     if (allIds.includes(customerId)) {
-      return [customerId];
+      return { mccId: null, childIds: [customerId] };
     }
   } catch (err) {
     console.log(`customer_client query failed for ${customerId}, treating as direct account: ${err?.message || err}`);
@@ -658,12 +663,12 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
     const testRows = await queryGoogleAds(customerId, accessToken, developerToken, `
       SELECT customer.id FROM customer LIMIT 1
     `);
-    if (testRows.length > 0) return [customerId];
+    if (testRows.length > 0) return { mccId: null, childIds: [customerId] };
   } catch {
     // ignore
   }
 
-  return [customerId];
+  return { mccId: null, childIds: [customerId] };
 }
 
 async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string, loginCustomerId?: string): Promise<any[]> {
