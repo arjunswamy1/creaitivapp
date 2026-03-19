@@ -207,8 +207,10 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
-      let customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
-      console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
+      const resolved = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
+      let customerIds = resolved.childIds;
+      const loginCustomerId = resolved.mccId || customerId;
+      console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}, loginCustomerId: ${loginCustomerId}`);
 
       // If a specific account_id was requested, only process that one
       if (targetAccountId) {
