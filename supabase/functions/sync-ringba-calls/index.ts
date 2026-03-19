@@ -56,9 +56,14 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter for Billy verticals: Flights, Bath, Pest Control, Porta Potty
+    // Client-side filter: only calls from publisher "CPM" (our paid traffic tag)
+    // AND matching Billy verticals: Flights, Bath, Pest Control, Porta Potty
     const matching = records.filter(
       (c: any) => {
+        // Must be from CPM publisher (our generated traffic)
+        const publisher = (c.publisherName || "").toLowerCase();
+        if (publisher !== "cpm") return false;
+        
         if (!c.campaignName) return false;
         const name = c.campaignName.toLowerCase();
         return name.includes("flights") || name.includes("bath") || name.includes("bathroom") ||
