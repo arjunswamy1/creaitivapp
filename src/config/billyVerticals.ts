@@ -64,7 +64,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     platforms: {
       meta: { patterns: ["Pest"], accountIds: ["448669084867269"] },
       google: { patterns: ["Pest"], accountIds: ["1939246766"] },
-      ringba: { patterns: ["Pest"] },
+      ringba: { patterns: ["Pest Control US Call Flow"] },
     },
   },
 ];
