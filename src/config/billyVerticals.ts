@@ -53,7 +53,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     platforms: {
       meta: { patterns: ["Porta", "Potty"] },
       google: { patterns: ["Porta", "Potty"] },
-      ringba: { patterns: ["Porta", "Potty"] },
+      ringba: { patterns: ["Porta", "Potty", "Portapotty"] },
     },
   },
   {
@@ -62,8 +62,8 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     emoji: "🐛",
     description: "Pest Control lead-gen funnel",
     platforms: {
-      meta: { patterns: ["Pest"], accountIds: ["act_1779578786137314"] },
-      google: { patterns: ["Pest"] },
+      meta: { patterns: ["Pest"], accountIds: ["448669084867269"] },
+      google: { patterns: ["Pest"], accountIds: ["1939246766"] },
       ringba: { patterns: ["Pest"] },
     },
   },
