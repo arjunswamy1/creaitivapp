@@ -191,7 +191,9 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
 
     for (const customerResource of customers) {
       const customerId = customerResource.replace("customers/", "");
+      console.log(`Resolving customer ${customerId}...`);
       const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
+      console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
 
       for (const cid of customerIds) {
         for (const { since, until } of chunks) {
