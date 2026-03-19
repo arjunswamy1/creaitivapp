@@ -71,11 +71,11 @@ Deno.serve(async (req) => {
   // without one pulls data from ALL ad accounts and produces wildly wrong totals.
   const validConnections = targetConnections.filter(conn => {
     const sel = conn.selected_ad_account as any;
-    if (!sel?.id) {
-      console.warn(`Skipping Meta sync for client ${conn.client_id}: no ad account selected`);
-      return false;
-    }
-    return true;
+    const syncAccounts = (conn.metadata as any)?.sync_ad_accounts;
+    // Allow if sync_ad_accounts is configured OR selected_ad_account is set
+    if (sel?.id || (Array.isArray(syncAccounts) && syncAccounts.length > 0)) return true;
+    console.warn(`Skipping Meta sync for client ${conn.client_id}: no ad account selected`);
+    return false;
   });
 
   if (validConnections.length === 0) {
@@ -90,10 +90,26 @@ Deno.serve(async (req) => {
 
   const results = [];
   for (const conn of validConnections) {
-    const selectedAccount = conn.selected_ad_account as any;
-    const metadata = selectedAccount?.id
-      ? { ...conn.metadata, ad_accounts: [selectedAccount] }
-      : conn.metadata;
+    // Support syncing multiple ad accounts via metadata.sync_ad_accounts
+    const syncAccounts = (conn.metadata as any)?.sync_ad_accounts;
+    let adAccountsToSync: any[];
+
+    if (Array.isArray(syncAccounts) && syncAccounts.length > 0) {
+      // Multi-account mode: sync all specified accounts
+      adAccountsToSync = syncAccounts;
+      console.log(`Multi-account sync for client ${conn.client_id}: ${syncAccounts.map((a: any) => a.account_id).join(', ')}`);
+    } else {
+      // Single account mode (default): use selected_ad_account
+      const selectedAccount = conn.selected_ad_account as any;
+      adAccountsToSync = selectedAccount?.id ? [selectedAccount] : [];
+    }
+
+    if (adAccountsToSync.length === 0) {
+      console.warn(`No accounts to sync for client ${conn.client_id}`);
+      continue;
+    }
+
+    const metadata = { ...conn.metadata, ad_accounts: adAccountsToSync };
     const result = await syncMetaForUser(supabaseAdmin, conn.user_id, conn.access_token, metadata, conn.client_id);
     results.push(result);
   }
