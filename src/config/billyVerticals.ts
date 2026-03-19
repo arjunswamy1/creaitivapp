@@ -80,6 +80,9 @@ export function matchesVertical(
   const cfg = vertical.platforms[platform];
   if (!cfg || cfg.patterns.length === 0) return false;
   const lower = (campaignName || "").toLowerCase();
+  if (cfg.exactMatch) {
+    return cfg.patterns.some((p) => lower === p.toLowerCase());
+  }
   return cfg.patterns.some((p) => lower.includes(p.toLowerCase()));
 }
 
