@@ -72,7 +72,7 @@ async function fetchAllPages(path: string, apiKey: string, extraParams: Record<s
     // Also check pagination metadata
     if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
     page++;
-    await sleep(500);
+    await sleep(300);
   }
   console.log(`fetchAllPages: ${path} total records: ${allData.length}`);
   return allData;
@@ -131,10 +131,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Sync subscriptions — fetch more pages to cover all recent activity
-    // With 9500+ total subs, 5 pages (500) misses recent ones
+    // Sync subscriptions — only fetch recent pages to stay within timeout
+    // 3 pages × 100 = 300 most recent subs (plenty for daily sync)
     console.log("sync-subbly: fetching subscriptions");
-    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, { "order_by": "created_at", "order_dir": "desc" }, 10);
+    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, { "order_by": "created_at", "order_dir": "desc" }, 3);
     console.log("sync-subbly: got", subs.length, "subscriptions");
     let subsUpserted = 0;
 
@@ -166,14 +166,14 @@ Deno.serve(async (req) => {
     }
 
     // Small delay before fetching invoices
-    await sleep(1000);
+    await sleep(500);
 
-    // Sync invoices (paid only for revenue tracking)
+    // Sync invoices — 5 pages (500 records) covers recent paid invoices
     const invoices = await fetchAllPages(
       "/invoices",
       SUBBLY_API_KEY,
       { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
-      20
+      5
     );
     let invoicesUpserted = 0;
 
