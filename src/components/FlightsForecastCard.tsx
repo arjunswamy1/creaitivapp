@@ -1,10 +1,11 @@
 import { useFlightsForecast, FlightsDailyData } from "@/hooks/useFlightsForecast";
+import { useVertical } from "@/contexts/VerticalContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   Target, CalendarDays, TrendingUp, TrendingDown, DollarSign,
-  Users, BarChart3, Phone, Plane,
+  Users, BarChart3, Phone,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
