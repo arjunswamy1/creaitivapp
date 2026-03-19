@@ -34,9 +34,11 @@ Deno.serve(async (req) => {
 
   // Parse optional client_id from request body
   let bodyClientId: string | null = null;
+  let bodyDaysBack: number | null = null;
   try {
     const body = await req.json();
     bodyClientId = body?.client_id || body?.clientId || null;
+    bodyDaysBack = body?.days_back || null;
   } catch { /* no body */ }
 
   if (userId) {
