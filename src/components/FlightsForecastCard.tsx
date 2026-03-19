@@ -14,6 +14,7 @@ import {
 
 const FlightsForecastCard = () => {
   const { data: fc, isLoading, error } = useFlightsForecast();
+  const { activeVertical } = useVertical();
 
   if (error) {
     return (
