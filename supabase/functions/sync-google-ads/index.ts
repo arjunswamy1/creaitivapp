@@ -287,7 +287,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.search_rank_lost_impression_share
               FROM campaign
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             console.log(`Campaign rows for ${cid} (${since}-${until}): ${campaignRows.length}`);
             if (campaignRows.length > 0) {
