@@ -289,10 +289,17 @@ function extractDailyMetrics(data: any, startDate: string, endDate: string): Rec
     }
   }
 
+  // Derive totalSpend from platform spends if not set directly
+  for (const dateStr of Object.keys(result)) {
+    const m = result[dateStr];
+    if (!m.totalSpend || m.totalSpend === 0) {
+      m.totalSpend = (m.metaSpend || 0) + (m.googleSpend || 0);
+    }
+  }
+
   // Store raw metrics array for the aggregate
   const allDates = Object.keys(result);
   if (allDates.length > 0) {
-    // Store the full metrics list in raw_data of the first date for reference
     result[allDates[0]].raw = { metrics: metrics.map((m: any) => ({
       id: m.id, title: m.title, current: m.values?.current, previous: m.values?.previous,
       services: m.services,
