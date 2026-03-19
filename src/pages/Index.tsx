@@ -64,6 +64,12 @@ const BillyDashboardContent = () => {
               <LineChart className="w-3.5 h-3.5" />
               Trend Analysis
             </TabsTrigger>
+            {showGoogle && (
+              <TabsTrigger value="google" className="gap-1.5">
+                <Chrome className="w-3.5 h-3.5" />
+                Google Ads
+              </TabsTrigger>
+            )}
             {showMeta && (
               <TabsTrigger value="meta" className="gap-1.5">
                 <Facebook className="w-3.5 h-3.5" />
@@ -80,6 +86,11 @@ const BillyDashboardContent = () => {
           <TabsContent value="trend-analysis">
             <BillyTrendAnalysis />
           </TabsContent>
+          {showGoogle && (
+            <TabsContent value="google">
+              <BillyGoogleDashboard />
+            </TabsContent>
+          )}
           {showMeta && (
             <TabsContent value="meta">
               <BillyMetaDashboard />
