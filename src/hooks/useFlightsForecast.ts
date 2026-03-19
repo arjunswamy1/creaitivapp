@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
-import { matchesVertical, getAdPlatforms } from "@/config/billyVerticals";
+import { matchesVertical, matchesVerticalAccount, getAdPlatforms, getVerticalAccountIds } from "@/config/billyVerticals";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 
 export interface FlightsDailyData {
@@ -72,16 +72,23 @@ export function useFlightsForecast() {
 
       const adPlatforms = getAdPlatforms(activeVertical);
 
-      // Fetch campaigns for all configured platforms + Ringba
-      const campaignQueries = adPlatforms.map((platform) =>
-        supabase
+      // Fetch campaigns for all configured platforms, scoped by account IDs
+      const campaignQueries = adPlatforms.map((platform) => {
+        let q = supabase
           .from("ad_campaigns")
-          .select("date, spend, clicks, impressions, campaign_name, platform")
+          .select("date, spend, clicks, impressions, campaign_name, platform, account_id")
           .eq("platform", platform)
           .eq("client_id", clientId)
           .gte("date", fromStr)
-          .lte("date", todayStr)
-      );
+          .lte("date", todayStr);
+        const accountIds = getVerticalAccountIds(activeVertical, platform);
+        if (accountIds.length === 1) {
+          q = q.eq("account_id", accountIds[0]);
+        } else if (accountIds.length > 1) {
+          q = q.in("account_id", accountIds);
+        }
+        return q;
+      });
 
       const [callRes, ...campaignResults] = await Promise.all([
         supabase
@@ -107,6 +114,7 @@ export function useFlightsForecast() {
         const platform = adPlatforms[i];
         for (const row of (data || [])) {
           if (!matchesVertical(row.campaign_name, activeVertical, platform)) continue;
+          if (!matchesVerticalAccount((row as any).account_id, activeVertical, platform)) continue;
           const d = row.date;
           const existing = byDate.get(d) || { spend: 0, clicks: 0, impressions: 0, calls: 0, connectedCalls: 0, callRevenue: 0 };
           existing.spend += Number(row.spend || 0);
@@ -125,8 +133,10 @@ export function useFlightsForecast() {
         const d = format(new Date(call.call_date), "yyyy-MM-dd");
         const existing = byDate.get(d) || { spend: 0, clicks: 0, impressions: 0, calls: 0, connectedCalls: 0, callRevenue: 0 };
         existing.calls += 1;
-        if (call.connected) existing.connectedCalls += 1;
-        existing.callRevenue += Number(call.revenue || 0);
+        if (call.connected && Number(call.duration_seconds || 0) > 0) {
+          existing.connectedCalls += 1;
+          existing.callRevenue += Number(call.revenue || 0);
+        }
         byDate.set(d, existing);
       }
 

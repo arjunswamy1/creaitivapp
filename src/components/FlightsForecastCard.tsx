@@ -50,7 +50,7 @@ const FlightsForecastCard = () => {
         <div>
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
-            ✈️ Flights — {fc.month} Profit Forecast
+            {activeVertical.emoji} {activeVertical.label} — {fc.month} Profit Forecast
           </h2>
           <p className="text-xs text-muted-foreground">
             Projecting monthly profit using 4-step funnel: Daily Budget × LP CVR × RPV = Revenue − Spend

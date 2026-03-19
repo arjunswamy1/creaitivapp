@@ -223,7 +223,7 @@ const BillyDashboard = () => {
               {syncing ? "Syncing..." : "Sync Calls"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">Goal: Connect and convert inbound calls from Meta ads</p>
+          <p className="text-xs text-muted-foreground">Goal: Connect and convert inbound calls from ads</p>
         </CardHeader>
         <CardContent>
           {ringbaLoading ? (
