@@ -39,6 +39,7 @@ const BillyDashboardContent = () => {
   const { dashboardConfig, activeClient } = useClient();
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
   const showMeta = platforms.includes("meta");
+  const showGoogle = platforms.includes("google");
 
   return (
     <div className="min-h-screen bg-background px-6 pb-12">
