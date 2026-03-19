@@ -81,7 +81,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id);
+    const daysBack = bodyDaysBack || 30;
+    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id, daysBack);
     results.push(result);
   }
 
