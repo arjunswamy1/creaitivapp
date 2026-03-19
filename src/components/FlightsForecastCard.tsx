@@ -108,7 +108,7 @@ const FlightsForecastCard = () => {
       <Card className="border-primary/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Plane className="w-4 h-4 text-primary" />
+            <BarChart3 className="w-4 h-4 text-primary" />
             Projected Month Totals
           </CardTitle>
         </CardHeader>
