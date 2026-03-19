@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
-import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical } from "@/config/billyVerticals";
 import { format, differenceInDays, subDays } from "date-fns";
@@ -75,7 +74,6 @@ function useBillyVerticalMetaKPIs() {
       const [{ data: curData, error }, { data: prevData }] = await Promise.all([curQ, prevQ]);
       if (error) throw error;
 
-      // Filter by active vertical patterns
       const curVertical = (curData || []).filter(r => matchesVertical(r.campaign_name, activeVertical, "meta"));
       const prevVertical = (prevData || []).filter(r => matchesVertical(r.campaign_name, activeVertical, "meta"));
 
@@ -85,8 +83,7 @@ function useBillyVerticalMetaKPIs() {
 
       const changes = (cur: ReturnType<typeof calcDerived>, prev: ReturnType<typeof calcDerived>) => ({
         spend: pctChange(cur.spend, prev.spend),
-        revenue: pctChange(cur.revenue, prev.revenue),
-        roas: pctChange(cur.roas, prev.roas),
+        conversions: pctChange(cur.conversions, prev.conversions),
         cpc: pctChange(cur.cpc, prev.cpc),
         ctr: pctChange(cur.ctr, prev.ctr),
         cpm: pctChange(cur.cpm, prev.cpm),
@@ -102,49 +99,41 @@ function useBillyVerticalMetaKPIs() {
 
 const BillyMetaDashboard = () => {
   const { data, isLoading } = useBillyVerticalMetaKPIs();
-  const { data: ringba, isLoading: ringbaLoading } = useRingbaByVertical();
   const { activeVertical } = useVertical();
 
   const vertical = data?.vertical;
   const total = data?.total;
-  const activeRingba = ringba?.active;
-  const allRingba = ringba?.all;
 
   const totalSpend = total?.spend ?? 0;
-  const totalRevenue = allRingba?.totalRevenue ?? 0;
-  const totalConversions = allRingba?.convertedCalls ?? 0;
-  const blendedRoas = totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : 0;
+  const totalConversions = total?.conversions ?? 0;
+  const totalCpa = totalConversions > 0 ? Math.round((totalSpend / totalConversions) * 100) / 100 : 0;
 
   const vSpend = vertical?.spend ?? 0;
-  const vRevenue = activeRingba?.totalRevenue ?? 0;
-  const vConversions = activeRingba?.convertedCalls ?? 0;
-  const vRoas = vSpend > 0 ? Math.round((vRevenue / vSpend) * 100) / 100 : 0;
+  const vConversions = vertical?.conversions ?? 0;
   const vCpa = vConversions > 0 ? Math.round((vSpend / vConversions) * 100) / 100 : 0;
-
-  const loading = isLoading || ringbaLoading;
 
   return (
     <>
-      {/* Total Account Spend/Revenue Summary */}
+      {/* Total Account Spend Summary */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
           <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-primary" />
             <CardTitle className="text-base">Meta Account Totals</CardTitle>
           </div>
-          <p className="text-xs text-muted-foreground">All campaigns combined — revenue from Ringba</p>
+          <p className="text-xs text-muted-foreground">All campaigns combined — platform-reported metrics</p>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <KPICard title="Total Meta Spend" value={`$${totalSpend.toLocaleString()}`} />
-              <KPICard title="Ringba Revenue" value={`$${totalRevenue.toLocaleString()}`} subtitle="All verticals" />
-              <KPICard title="Blended ROAS" value={`${blendedRoas}x`} subtitle="Ringba rev ÷ all spend" />
-              <KPICard title="Conversions" value={totalConversions.toLocaleString()} subtitle="Ringba converted" />
+              <KPICard title="Conversions" value={totalConversions.toLocaleString()} subtitle="Platform reported" />
+              <KPICard title="CPA" value={totalConversions > 0 ? `$${totalCpa}` : "–"} subtitle="Spend ÷ conversions" />
+              <KPICard title="Impressions" value={formatImpressions(total?.impressions ?? 0)} />
             </div>
           )}
         </CardContent>
@@ -157,23 +146,23 @@ const BillyMetaDashboard = () => {
             <CardTitle className="text-base">{activeVertical.emoji} {activeVertical.label} — Meta Campaigns</CardTitle>
           </div>
           <p className="text-xs text-muted-foreground">
-            {activeVertical.description} — revenue from Ringba
+            {activeVertical.description} — platform-reported metrics
           </p>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {isLoading ? (
             <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
               {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-7 gap-4">
               <KPICard title="Spend" value={`$${vSpend.toLocaleString()}`} change={vertical?.changes.spend} invertColor />
-              <KPICard title="Revenue" value={`$${vRevenue.toLocaleString()}`} subtitle="Ringba" />
-              <KPICard title="ROAS" value={`${vRoas}x`} subtitle="Ringba rev ÷ spend" />
-              <KPICard title="CPA" value={vConversions > 0 ? `$${vCpa}` : "–"} subtitle={`${vConversions} conv.`} invertColor />
+              <KPICard title="Conversions" value={vConversions.toLocaleString()} change={vertical?.changes.conversions} subtitle="Platform reported" />
+              <KPICard title="CPA" value={vConversions > 0 ? `$${vCpa}` : "–"} subtitle="Spend ÷ conv." invertColor />
               <KPICard title="CPC" value={`$${vertical?.cpc ?? 0}`} change={vertical?.changes.cpc} invertColor />
               <KPICard title="CTR" value={`${vertical?.ctr ?? 0}%`} change={vertical?.changes.ctr} />
               <KPICard title="CPM" value={`$${vertical?.cpm ?? 0}`} change={vertical?.changes.cpm} invertColor />
+              <KPICard title="Impressions" value={formatImpressions(vertical?.impressions ?? 0)} />
             </div>
           )}
         </CardContent>
@@ -191,5 +180,11 @@ const BillyMetaDashboard = () => {
     </>
   );
 };
+
+function formatImpressions(val: number): string {
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
+  return val.toLocaleString();
+}
 
 export default BillyMetaDashboard;
