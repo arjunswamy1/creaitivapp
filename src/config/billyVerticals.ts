@@ -41,7 +41,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Premium & Mixed Flights lead-gen funnel",
     platforms: {
       meta: { patterns: ["Flight"] },
-      google: { patterns: ["Flight"] },
+      google: { patterns: ["Flight"], accountIds: ["1939246766"] },
       ringba: { patterns: ["Flight"] },
     },
   },
