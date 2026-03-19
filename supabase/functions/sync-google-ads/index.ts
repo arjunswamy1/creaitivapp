@@ -666,16 +666,21 @@ async function getAccessibleCustomerIds(customerId: string, accessToken: string,
   return [customerId];
 }
 
-async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string): Promise<any[]> {
+async function queryGoogleAds(customerId: string, accessToken: string, developerToken: string, query: string, loginCustomerId?: string): Promise<any[]> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "developer-token": developerToken,
+    "Content-Type": "application/json",
+  };
+  // When querying a child account under an MCC, set login-customer-id to the MCC
+  if (loginCustomerId && loginCustomerId !== customerId) {
+    headers["login-customer-id"] = loginCustomerId;
+  }
   const res = await fetch(
     `https://googleads.googleapis.com/v23/customers/${customerId}/googleAds:searchStream`,
     {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "developer-token": developerToken,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({ query }),
     }
   );
