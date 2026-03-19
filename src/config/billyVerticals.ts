@@ -65,7 +65,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Pest Control lead-gen funnel",
     platforms: {
       meta: { patterns: ["Pest", "PestControl"], accountIds: ["448669084867269", "1779578786137314"] },
-      google: { patterns: ["Pest"], accountIds: ["1939246766"] },
+      google: { patterns: ["Pest"], accountIds: ["7522495080"] },
       ringba: { patterns: ["Pest Control US Call Flow"], exactMatch: true },
     },
   },

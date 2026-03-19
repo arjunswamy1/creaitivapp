@@ -70,10 +70,20 @@ const DashboardHeader = () => {
     try {
       const clientId = activeClient?.id || null;
 
-      // Run Meta, Google, Subbly, and Shopify syncs in parallel
-      const [metaResult, googleResult, subblyResult, shopifyResult] = await Promise.allSettled([
+      // Google: fan out one call per known child account to avoid timeouts on large MCCs
+      const googleAccounts = ["1939246766", "7522495080", "8232619799"];
+      const googleSyncs = googleAccounts.map(acct =>
+        supabase.functions.invoke("sync-google-ads", {
+          body: { client_id: clientId, days_back: 90, account_id: acct }
+        })
+      );
+
+      // Run Meta, Google (per-account), Subbly, and Shopify syncs in parallel
+      const [metaResult, ...googleResults] = await Promise.allSettled([
         supabase.functions.invoke("sync-meta-ads", { body: { client_id: clientId } }),
-        supabase.functions.invoke("sync-google-ads", { body: { client_id: clientId, days_back: 90 } }),
+        ...googleSyncs,
+      ]);
+      const [subblyResult, shopifyResult] = await Promise.allSettled([
         supabase.functions.invoke("sync-subbly", { body: { client_id: clientId } }),
         supabase.functions.invoke("sync-shopify-orders", { body: { client_id: clientId } }),
       ]);
@@ -87,9 +97,17 @@ const DashboardHeader = () => {
         errors.push("Meta");
       }
 
-      if (googleResult.status === "fulfilled" && !googleResult.value.error) {
-        totalSynced += googleResult.value.data?.records_synced || 0;
-      } else {
+      let googleTotal = 0;
+      let googleErrors = 0;
+      for (const gr of googleResults) {
+        if (gr.status === "fulfilled" && !gr.value.error) {
+          googleTotal += gr.value.data?.records_synced || 0;
+        } else {
+          googleErrors++;
+        }
+      }
+      totalSynced += googleTotal;
+      if (googleErrors === googleResults.length) {
         errors.push("Google");
       }
 

@@ -35,10 +35,12 @@ Deno.serve(async (req) => {
   // Parse optional client_id from request body
   let bodyClientId: string | null = null;
   let bodyDaysBack: number | null = null;
+  let bodyAccountId: string | null = null;
   try {
     const body = await req.json();
     bodyClientId = body?.client_id || body?.clientId || null;
     bodyDaysBack = body?.days_back || null;
+    bodyAccountId = body?.account_id || null;
   } catch { /* no body */ }
 
   if (userId) {
@@ -84,7 +86,7 @@ Deno.serve(async (req) => {
     }
 
     const daysBack = bodyDaysBack || 30;
-    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id, daysBack);
+    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id, daysBack, bodyAccountId);
     results.push(result);
   }
 
@@ -137,7 +139,7 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
   }
 }
 
-async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30) {
+async function syncGoogleForUser(supabase: any, userId: string, accessToken: string, metadata: any, clientId: string | null = null, daysBack: number = 30, targetAccountId: string | null = null) {
   const startTime = Date.now();
   const TIME_BUDGET_MS = 50_000; // 50s budget out of 60s edge function limit
 
@@ -205,9 +207,19 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       if (!hasTimeBudget()) { timedOut = true; break; }
       const customerId = customerResource.replace("customers/", "");
       console.log(`Resolving customer ${customerId}...`);
-      const customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
+      let customerIds = await getAccessibleCustomerIds(customerId, accessToken, developerToken);
       console.log(`Customer ${customerId} resolved to: ${JSON.stringify(customerIds)}`);
 
+      // If a specific account_id was requested, only process that one
+      if (targetAccountId) {
+        if (customerIds.includes(targetAccountId)) {
+          customerIds = [targetAccountId];
+          console.log(`Scoped to target account: ${targetAccountId}`);
+        } else {
+          console.log(`Target account ${targetAccountId} not found under ${customerId}, skipping`);
+          continue;
+        }
+      }
       for (const cid of customerIds) {
         if (!hasTimeBudget()) { timedOut = true; break; }
         for (const { since, until } of chunks) {
