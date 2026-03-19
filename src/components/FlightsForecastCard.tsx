@@ -1,10 +1,11 @@
 import { useFlightsForecast, FlightsDailyData } from "@/hooks/useFlightsForecast";
+import { useVertical } from "@/contexts/VerticalContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   Target, CalendarDays, TrendingUp, TrendingDown, DollarSign,
-  Users, BarChart3, Phone, Plane,
+  Users, BarChart3, Phone,
 } from "lucide-react";
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -13,6 +14,7 @@ import {
 
 const FlightsForecastCard = () => {
   const { data: fc, isLoading, error } = useFlightsForecast();
+  const { activeVertical } = useVertical();
 
   if (error) {
     return (
@@ -48,7 +50,7 @@ const FlightsForecastCard = () => {
         <div>
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             <Target className="w-5 h-5 text-primary" />
-            ✈️ Flights — {fc.month} Profit Forecast
+            {activeVertical.emoji} {activeVertical.label} — {fc.month} Profit Forecast
           </h2>
           <p className="text-xs text-muted-foreground">
             Projecting monthly profit using 4-step funnel: Daily Budget × LP CVR × RPV = Revenue − Spend
@@ -106,7 +108,7 @@ const FlightsForecastCard = () => {
       <Card className="border-primary/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
-            <Plane className="w-4 h-4 text-primary" />
+            <BarChart3 className="w-4 h-4 text-primary" />
             Projected Month Totals
           </CardTitle>
         </CardHeader>

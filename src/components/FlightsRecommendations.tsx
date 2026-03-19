@@ -1,5 +1,5 @@
 import { useBillyKPIs } from "@/hooks/useBillyKPIs";
-import { useRingbaData } from "@/hooks/useRingbaData";
+import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { useFlightsForecast } from "@/hooks/useFlightsForecast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lightbulb, TrendingUp, TrendingDown, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -13,9 +13,10 @@ interface Rec {
 
 const FlightsRecommendations = () => {
   const { data: kpis } = useBillyKPIs();
-  const { data: ringba } = useRingbaData();
+  const { data: ringbaByVertical } = useRingbaByVertical();
   const { data: fc } = useFlightsForecast();
 
+  const ringba = ringbaByVertical?.active;
   if (!kpis || !ringba) return null;
 
   const recs: Rec[] = [];
@@ -25,7 +26,7 @@ const FlightsRecommendations = () => {
   const cpc = Number(kpis.cpc) || 0;
   const lpCvr = totalClicks > 0 ? (ringba.totalCalls / totalClicks) * 100 : 0;
   const callROAS = kpis.totalSpend > 0 ? ringba.totalRevenue / kpis.totalSpend : 0;
-  const costPerCall = ringba.totalCalls > 0 ? kpis.totalSpend / ringba.totalCalls : 0;
+  const connectRate = ringba.totalCalls > 0 ? (ringba.connectedCalls / ringba.totalCalls) * 100 : 0;
 
   // RPV vs CPC
   if (rpv > cpc * 1.5) {
@@ -69,11 +70,11 @@ const FlightsRecommendations = () => {
   }
 
   // Connect rate
-  if (ringba.connectRate < 50) {
+  if (connectRate < 50) {
     recs.push({
       icon: <AlertTriangle className="w-4 h-4" />,
       title: "Low connect rate — check call routing",
-      detail: `Only ${ringba.connectRate.toFixed(0)}% of calls are connecting. Review IVR flow, hold times, and buyer availability windows.`,
+      detail: `Only ${connectRate.toFixed(0)}% of calls are connecting. Review IVR flow, hold times, and buyer availability windows.`,
       type: "danger",
     });
   }
