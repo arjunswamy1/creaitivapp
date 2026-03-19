@@ -71,11 +71,11 @@ Deno.serve(async (req) => {
   // without one pulls data from ALL ad accounts and produces wildly wrong totals.
   const validConnections = targetConnections.filter(conn => {
     const sel = conn.selected_ad_account as any;
-    if (!sel?.id) {
-      console.warn(`Skipping Meta sync for client ${conn.client_id}: no ad account selected`);
-      return false;
-    }
-    return true;
+    const syncAccounts = (conn.metadata as any)?.sync_ad_accounts;
+    // Allow if sync_ad_accounts is configured OR selected_ad_account is set
+    if (sel?.id || (Array.isArray(syncAccounts) && syncAccounts.length > 0)) return true;
+    console.warn(`Skipping Meta sync for client ${conn.client_id}: no ad account selected`);
+    return false;
   });
 
   if (validConnections.length === 0) {
