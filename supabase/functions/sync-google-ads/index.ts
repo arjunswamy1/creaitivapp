@@ -580,8 +580,14 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
       }
     }
 
-    await updateSyncLog(supabase, syncId, "success", totalRecords);
-    return { success: true, records_synced: totalRecords };
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    const status = timedOut ? "success" : "success";
+    const message = timedOut
+      ? `Partial sync (${elapsed}s elapsed, time budget reached). Synced ${totalRecords} records.`
+      : `Full sync complete in ${elapsed}s. Synced ${totalRecords} records.`;
+    console.log(message);
+    await updateSyncLog(supabase, syncId, "success", totalRecords, timedOut ? "Partial: time budget reached" : undefined);
+    return { success: true, records_synced: totalRecords, partial: timedOut, message };
   } catch (err) {
     console.error("Google sync error:", err);
     await updateSyncLog(supabase, syncId, "error", 0, err.message);
