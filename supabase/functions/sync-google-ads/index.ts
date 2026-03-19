@@ -454,7 +454,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 metrics.conversions_value
               FROM keyword_view
               WHERE segments.date BETWEEN '${since}' AND '${until}'
-            `);
+            `, loginCustomerId);
 
             console.log(`Keyword rows returned for ${cid}: ${kwRows.length}`);
 
