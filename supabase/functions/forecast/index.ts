@@ -204,6 +204,39 @@ Deno.serve(async (req) => {
 
   const adjustedDailySubs = projDailySubs * trendMultiplier;
 
+  // --- Compute optimistic / pessimistic scenario inputs ---
+  // Recent 7d averages vs overall month averages for key metrics
+  const recentN = recentDays.length || 1;
+  const overallN = activeSeries.length || 1;
+
+  const recentAvgRevenue = recentDays.reduce((s, d) => s + d.revenue, 0) / recentN;
+  const overallAvgRevenue = activeSeries.reduce((s, d) => s + d.revenue, 0) / overallN;
+  const recentAvgSpend = recentDays.reduce((s, d) => s + d.spend, 0) / recentN;
+  const overallAvgSpend = activeSeries.reduce((s, d) => s + d.spend, 0) / overallN;
+  const recentAvgSubs = recentDays.reduce((s, d) => s + d.subs, 0) / recentN;
+  const overallAvgSubsVal = activeSeries.reduce((s, d) => s + d.subs, 0) / overallN;
+  const recentAvgCOGS = recentDays.reduce((s, d) => s + d.cogs, 0) / recentN;
+  const overallAvgCOGS = activeSeries.reduce((s, d) => s + d.cogs, 0) / overallN;
+  const recentAvgTaxes = recentDays.reduce((s, d) => s + d.taxes, 0) / recentN;
+  const overallAvgTaxes = activeSeries.reduce((s, d) => s + d.taxes, 0) / overallN;
+  const recentAvgDiscounts = recentDays.reduce((s, d) => s + d.discounts, 0) / recentN;
+  const overallAvgDiscounts = activeSeries.reduce((s, d) => s + d.discounts, 0) / overallN;
+
+  // Optimistic = higher revenue/subs daily rate, lower spend rate
+  // Pessimistic = lower revenue/subs daily rate, higher spend rate
+  const optimisticDailyRevenue = Math.max(recentAvgRevenue, overallAvgRevenue);
+  const pessimisticDailyRevenue = Math.min(recentAvgRevenue, overallAvgRevenue);
+  const optimisticDailySpend = Math.min(recentAvgSpend, overallAvgSpend);
+  const pessimisticDailySpend = Math.max(recentAvgSpend, overallAvgSpend);
+  const optimisticDailySubs = Math.max(recentAvgSubs, overallAvgSubsVal);
+  const pessimisticDailySubs = Math.min(recentAvgSubs, overallAvgSubsVal);
+  const optimisticDailyCOGS = Math.min(recentAvgCOGS, overallAvgCOGS);
+  const pessimisticDailyCOGS = Math.max(recentAvgCOGS, overallAvgCOGS);
+  const optimisticDailyTaxes = Math.min(recentAvgTaxes, overallAvgTaxes);
+  const pessimisticDailyTaxes = Math.max(recentAvgTaxes, overallAvgTaxes);
+  const optimisticDailyDiscounts = Math.min(recentAvgDiscounts, overallAvgDiscounts);
+  const pessimisticDailyDiscounts = Math.max(recentAvgDiscounts, overallAvgDiscounts);
+
   let projectedSpend = 0;
   let projectedSubs = 0;
   let projectedRevenue = 0;
@@ -211,6 +244,11 @@ Deno.serve(async (req) => {
   let projectedTaxes = 0;
   let projectedDiscounts = 0;
   const dailyForecast: any[] = [];
+
+  let optProjectedRevenue = 0, optProjectedSpend = 0, optProjectedSubs = 0;
+  let optProjectedCOGS = 0, optProjectedTaxes = 0, optProjectedDiscounts = 0;
+  let pessProjectedRevenue = 0, pessProjectedSpend = 0, pessProjectedSubs = 0;
+  let pessProjectedCOGS = 0, pessProjectedTaxes = 0, pessProjectedDiscounts = 0;
 
   for (let i = 1; i <= remainingDays; i++) {
     const forecastDate = new Date(now);
@@ -224,6 +262,20 @@ Deno.serve(async (req) => {
     projectedCOGS += Math.max(0, projDailyCOGS);
     projectedTaxes += Math.max(0, projDailyTaxes);
     projectedDiscounts += Math.max(0, projDailyDiscounts);
+
+    optProjectedRevenue += Math.max(0, optimisticDailyRevenue);
+    optProjectedSpend += Math.max(0, optimisticDailySpend);
+    optProjectedSubs += Math.max(0, Math.round(optimisticDailySubs));
+    optProjectedCOGS += Math.max(0, optimisticDailyCOGS);
+    optProjectedTaxes += Math.max(0, optimisticDailyTaxes);
+    optProjectedDiscounts += Math.max(0, optimisticDailyDiscounts);
+
+    pessProjectedRevenue += Math.max(0, pessimisticDailyRevenue);
+    pessProjectedSpend += Math.max(0, pessimisticDailySpend);
+    pessProjectedSubs += Math.max(0, Math.round(pessimisticDailySubs));
+    pessProjectedCOGS += Math.max(0, pessimisticDailyCOGS);
+    pessProjectedTaxes += Math.max(0, pessimisticDailyTaxes);
+    pessProjectedDiscounts += Math.max(0, pessimisticDailyDiscounts);
 
     dailyForecast.push({
       date: formatDate(forecastDate),
@@ -252,6 +304,23 @@ Deno.serve(async (req) => {
   const monthTotalProfit = Math.round((monthTotalRevenue - monthTotalSpend - monthTotalCOGS - monthTotalTaxes - monthTotalDiscounts) * 100) / 100;
 
   const ordersLabel = revenueSource === "shopify" ? "customers" : "subscriptions";
+
+  // Scenario totals (actuals + projected)
+  const optRevenue = Math.round((mtdRevenue + optProjectedRevenue) * 100) / 100;
+  const optSpend = Math.round(actualSpend + optProjectedSpend);
+  const optSubs = actualOrders + optProjectedSubs;
+  const optCOGS = mtdCOGS + optProjectedCOGS;
+  const optTaxes = mtdTaxesShipping + optProjectedTaxes;
+  const optDiscounts = mtdDiscounts + optProjectedDiscounts;
+  const optProfit = Math.round((optRevenue - optSpend - optCOGS - optTaxes - optDiscounts) * 100) / 100;
+
+  const pessRevenue = Math.round((mtdRevenue + pessProjectedRevenue) * 100) / 100;
+  const pessSpend = Math.round(actualSpend + pessProjectedSpend);
+  const pessSubs = actualOrders + pessProjectedSubs;
+  const pessCOGS = mtdCOGS + pessProjectedCOGS;
+  const pessTaxes = mtdTaxesShipping + pessProjectedTaxes;
+  const pessDiscounts = mtdDiscounts + pessProjectedDiscounts;
+  const pessProfit = Math.round((pessRevenue - pessSpend - pessCOGS - pessTaxes - pessDiscounts) * 100) / 100;
 
   const stats = {
     month: monthName,
@@ -285,6 +354,29 @@ Deno.serve(async (req) => {
     month_total_discounts: Math.round(monthTotalDiscounts * 100) / 100,
     month_total_profit: monthTotalProfit,
     revenue_source: revenueSource,
+    // Scenario ranges
+    scenarios: {
+      optimistic: {
+        revenue: optRevenue,
+        spend: optSpend,
+        subs: optSubs,
+        profit: optProfit,
+        cac: optSubs > 0 ? Math.round((optSpend / optSubs) * 100) / 100 : 0,
+      },
+      pessimistic: {
+        revenue: pessRevenue,
+        spend: pessSpend,
+        subs: pessSubs,
+        profit: pessProfit,
+        cac: pessSubs > 0 ? Math.round((pessSpend / pessSubs) * 100) / 100 : 0,
+      },
+      basis: {
+        recent_7d_avg_revenue: Math.round(recentAvgRevenue),
+        overall_avg_revenue: Math.round(overallAvgRevenue),
+        recent_7d_avg_subs: Math.round(recentAvgSubs * 10) / 10,
+        overall_avg_subs: Math.round(overallAvgSubsVal * 10) / 10,
+      },
+    },
   };
 
   // AI insight

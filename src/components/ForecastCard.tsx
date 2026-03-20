@@ -1,7 +1,7 @@
 import { useForecast } from "@/hooks/useAdData";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Target, Sparkles, CalendarDays, Users, TrendingUp, TrendingDown } from "lucide-react";
+import { DollarSign, Target, Sparkles, CalendarDays, Users, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 const ForecastCard = () => {
@@ -34,6 +34,7 @@ const ForecastCard = () => {
     : 0;
 
   const profitIsPositive = (forecast.month_total_profit || 0) >= 0;
+  const scenarios = forecast.scenarios;
 
   return (
     <div className="glass-card p-6">
@@ -100,6 +101,50 @@ const ForecastCard = () => {
         </div>
       )}
 
+      {/* Forecast Range — Optimistic / Baseline / Pessimistic */}
+      {scenarios && (
+        <div className="mb-5">
+          <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Forecast Range</h4>
+          <div className="grid grid-cols-3 gap-3">
+            <ScenarioCard
+              label="Pessimistic"
+              icon={<ArrowDownRight className="w-3.5 h-3.5" />}
+              revenue={scenarios.pessimistic.revenue}
+              subs={scenarios.pessimistic.subs}
+              subsLabel={subsLabel}
+              profit={isShopify ? scenarios.pessimistic.profit : undefined}
+              cac={scenarios.pessimistic.cac}
+              variant="pessimistic"
+            />
+            <ScenarioCard
+              label="Baseline"
+              icon={<Target className="w-3.5 h-3.5" />}
+              revenue={forecast.month_total_revenue || 0}
+              subs={forecast.month_total_subs}
+              subsLabel={subsLabel}
+              profit={isShopify ? forecast.month_total_profit : undefined}
+              cac={forecast.month_cac}
+              variant="baseline"
+            />
+            <ScenarioCard
+              label="Optimistic"
+              icon={<ArrowUpRight className="w-3.5 h-3.5" />}
+              revenue={scenarios.optimistic.revenue}
+              subs={scenarios.optimistic.subs}
+              subsLabel={subsLabel}
+              profit={isShopify ? scenarios.optimistic.profit : undefined}
+              cac={scenarios.optimistic.cac}
+              variant="optimistic"
+            />
+          </div>
+          {scenarios.basis && (
+            <p className="text-[10px] text-muted-foreground mt-2 text-center">
+              Based on recent 7-day avg ({scenarios.basis.recent_7d_avg_subs} {subsLabel.toLowerCase()}/day, ${scenarios.basis.recent_7d_avg_revenue}/day rev) vs overall avg ({scenarios.basis.overall_avg_subs} {subsLabel.toLowerCase()}/day, ${scenarios.basis.overall_avg_revenue}/day rev)
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Actuals vs Projected */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <MetricCard
@@ -163,6 +208,59 @@ const ForecastCard = () => {
     </div>
   );
 };
+
+function ScenarioCard({ label, icon, revenue, subs, subsLabel, profit, cac, variant }: {
+  label: string;
+  icon: React.ReactNode;
+  revenue: number;
+  subs: number;
+  subsLabel: string;
+  profit?: number;
+  cac: number;
+  variant: "pessimistic" | "baseline" | "optimistic";
+}) {
+  const styles = {
+    pessimistic: "bg-destructive/5 border border-destructive/20",
+    baseline: "bg-primary/10 border border-primary/30",
+    optimistic: "bg-accent/5 border border-accent/20",
+  };
+  const textStyles = {
+    pessimistic: "text-destructive",
+    baseline: "text-primary",
+    optimistic: "text-accent",
+  };
+
+  return (
+    <div className={`rounded-lg p-3 ${styles[variant]}`}>
+      <div className={`flex items-center gap-1.5 text-xs font-semibold mb-2 ${textStyles[variant]}`}>
+        {icon}
+        {label}
+      </div>
+      <div className="space-y-1.5">
+        <div>
+          <p className="text-[10px] text-muted-foreground">Revenue</p>
+          <p className="text-sm font-bold font-mono">${Math.round(revenue).toLocaleString()}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground">{subsLabel}</p>
+          <p className="text-sm font-bold font-mono">{subs.toLocaleString()}</p>
+        </div>
+        {profit !== undefined && (
+          <div>
+            <p className="text-[10px] text-muted-foreground">Profit</p>
+            <p className={`text-sm font-bold font-mono ${profit >= 0 ? "text-accent" : "text-destructive"}`}>
+              {profit >= 0 ? "" : "−"}${Math.abs(Math.round(profit)).toLocaleString()}
+            </p>
+          </div>
+        )}
+        <div>
+          <p className="text-[10px] text-muted-foreground">CAC</p>
+          <p className="text-sm font-bold font-mono">${cac}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function BreakdownItem({ label, value, positive }: { label: string; value: number; positive?: boolean }) {
   return (
