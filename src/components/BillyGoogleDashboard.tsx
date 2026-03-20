@@ -131,31 +131,6 @@ const BillyGoogleDashboard = () => {
 
   return (
     <>
-      {/* Total Account Spend Summary */}
-      <Card className="mb-6 border-primary/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-primary" />
-            <CardTitle className="text-base">Google Ads Account Totals</CardTitle>
-          </div>
-          <p className="text-xs text-muted-foreground">All campaigns combined — platform-reported metrics</p>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KPICard title="Total Google Spend" value={`$${totalSpend.toLocaleString()}`} />
-              <KPICard title="Conversions" value={totalConversions.toLocaleString()} subtitle="Platform reported" />
-              <KPICard title="CPA" value={totalConversions > 0 ? `$${totalCpa}` : "–"} subtitle="Spend ÷ conversions" />
-              <KPICard title="Impressions" value={formatImpressions(total?.impressions ?? 0)} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Active Vertical */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
