@@ -32,7 +32,7 @@ const DashboardHeader = () => {
       const clientId = activeClient?.id;
       let query = supabase
         .from("platform_connections")
-        .select("platform, token_expires_at");
+        .select("platform, token_expires_at, refresh_token");
 
       if (clientId) {
         query = query.eq("client_id", clientId);
@@ -41,8 +41,8 @@ const DashboardHeader = () => {
       const { data } = await query;
       if (data) {
         const now = new Date();
-        const expired = (data as ExpiredConnection[])
-          .filter((c) => c.token_expires_at && new Date(c.token_expires_at) < now)
+        const expired = (data as (ExpiredConnection & { refresh_token: string | null })[])
+          .filter((c) => c.token_expires_at && new Date(c.token_expires_at) < now && !c.refresh_token)
           .map((c) => c.platform.charAt(0).toUpperCase() + c.platform.slice(1));
         setExpiredPlatforms(expired);
       }
