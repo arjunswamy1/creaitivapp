@@ -9,7 +9,7 @@ import KPICard from "@/components/KPICard";
 import CampaignTable from "@/components/CampaignTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign } from "lucide-react";
+
 
 interface VerticalKPIs {
   spend: number;
@@ -119,11 +119,6 @@ const BillyGoogleDashboard = () => {
   const { activeVertical } = useVertical();
 
   const vertical = data?.vertical;
-  const total = data?.total;
-
-  const totalSpend = total?.spend ?? 0;
-  const totalConversions = total?.conversions ?? 0;
-  const totalCpa = totalConversions > 0 ? Math.round((totalSpend / totalConversions) * 100) / 100 : 0;
 
   const vSpend = vertical?.spend ?? 0;
   const vConversions = vertical?.conversions ?? 0;
@@ -131,31 +126,6 @@ const BillyGoogleDashboard = () => {
 
   return (
     <>
-      {/* Total Account Spend Summary */}
-      <Card className="mb-6 border-primary/20">
-        <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-primary" />
-            <CardTitle className="text-base">Google Ads Account Totals</CardTitle>
-          </div>
-          <p className="text-xs text-muted-foreground">All campaigns combined — platform-reported metrics</p>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KPICard title="Total Google Spend" value={`$${totalSpend.toLocaleString()}`} />
-              <KPICard title="Conversions" value={totalConversions.toLocaleString()} subtitle="Platform reported" />
-              <KPICard title="CPA" value={totalConversions > 0 ? `$${totalCpa}` : "–"} subtitle="Spend ÷ conversions" />
-              <KPICard title="Impressions" value={formatImpressions(total?.impressions ?? 0)} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Active Vertical */}
       <Card className="mb-6 border-primary/20">
         <CardHeader className="pb-2">
@@ -185,9 +155,9 @@ const BillyGoogleDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Campaign Table */}
+      {/* Campaign Table — filtered to active vertical */}
       <div className="mb-6">
-        <CampaignTable platform="google" />
+        <CampaignTable platform="google" verticalFilter={activeVertical} />
       </div>
     </>
   );

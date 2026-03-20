@@ -4,6 +4,7 @@ import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { type VerticalConfig, matchesVertical } from "@/config/billyVerticals";
 
 interface RingbaEnriched {
   ringbaRevenue: number;
@@ -11,9 +12,18 @@ interface RingbaEnriched {
   ringbaRoas: number;
 }
 
-const CampaignTable = ({ platform }: { platform?: string }) => {
-  const { data: campaigns, isLoading } = useTopCampaigns(platform);
+const CampaignTable = ({ platform, verticalFilter }: { platform?: string; verticalFilter?: VerticalConfig }) => {
+  const { data: rawCampaigns, isLoading } = useTopCampaigns(platform);
   const { data: ringba } = useRingbaByVertical();
+
+  // Filter campaigns by vertical if provided
+  const campaigns = useMemo(() => {
+    if (!verticalFilter || !rawCampaigns) return rawCampaigns;
+    return rawCampaigns.filter(c => {
+      const plat = (c.platform || platform || "") as "meta" | "google" | "ringba";
+      return matchesVertical(c.name, verticalFilter, plat);
+    });
+  }, [rawCampaigns, verticalFilter, platform]);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
   const isGoogle = platform === "google";
