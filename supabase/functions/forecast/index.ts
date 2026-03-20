@@ -305,6 +305,23 @@ Deno.serve(async (req) => {
 
   const ordersLabel = revenueSource === "shopify" ? "customers" : "subscriptions";
 
+  // Scenario totals (actuals + projected)
+  const optRevenue = Math.round((mtdRevenue + optProjectedRevenue) * 100) / 100;
+  const optSpend = Math.round(actualSpend + optProjectedSpend);
+  const optSubs = actualOrders + optProjectedSubs;
+  const optCOGS = mtdCOGS + optProjectedCOGS;
+  const optTaxes = mtdTaxesShipping + optProjectedTaxes;
+  const optDiscounts = mtdDiscounts + optProjectedDiscounts;
+  const optProfit = Math.round((optRevenue - optSpend - optCOGS - optTaxes - optDiscounts) * 100) / 100;
+
+  const pessRevenue = Math.round((mtdRevenue + pessProjectedRevenue) * 100) / 100;
+  const pessSpend = Math.round(actualSpend + pessProjectedSpend);
+  const pessSubs = actualOrders + pessProjectedSubs;
+  const pessCOGS = mtdCOGS + pessProjectedCOGS;
+  const pessTaxes = mtdTaxesShipping + pessProjectedTaxes;
+  const pessDiscounts = mtdDiscounts + pessProjectedDiscounts;
+  const pessProfit = Math.round((pessRevenue - pessSpend - pessCOGS - pessTaxes - pessDiscounts) * 100) / 100;
+
   const stats = {
     month: monthName,
     days_elapsed: today,
@@ -337,6 +354,29 @@ Deno.serve(async (req) => {
     month_total_discounts: Math.round(monthTotalDiscounts * 100) / 100,
     month_total_profit: monthTotalProfit,
     revenue_source: revenueSource,
+    // Scenario ranges
+    scenarios: {
+      optimistic: {
+        revenue: optRevenue,
+        spend: optSpend,
+        subs: optSubs,
+        profit: optProfit,
+        cac: optSubs > 0 ? Math.round((optSpend / optSubs) * 100) / 100 : 0,
+      },
+      pessimistic: {
+        revenue: pessRevenue,
+        spend: pessSpend,
+        subs: pessSubs,
+        profit: pessProfit,
+        cac: pessSubs > 0 ? Math.round((pessSpend / pessSubs) * 100) / 100 : 0,
+      },
+      basis: {
+        recent_7d_avg_revenue: Math.round(recentAvgRevenue),
+        overall_avg_revenue: Math.round(overallAvgRevenue),
+        recent_7d_avg_subs: Math.round(recentAvgSubs * 10) / 10,
+        overall_avg_subs: Math.round(overallAvgSubsVal * 10) / 10,
+      },
+    },
   };
 
   // AI insight
