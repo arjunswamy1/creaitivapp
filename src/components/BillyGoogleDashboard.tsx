@@ -9,7 +9,7 @@ import KPICard from "@/components/KPICard";
 import CampaignTable from "@/components/CampaignTable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign } from "lucide-react";
+
 
 interface VerticalKPIs {
   spend: number;
