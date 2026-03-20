@@ -185,9 +185,9 @@ const BillyGoogleDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Campaign Table */}
+      {/* Campaign Table — filtered to active vertical */}
       <div className="mb-6">
-        <CampaignTable platform="google" />
+        <CampaignTable platform="google" verticalFilter={activeVertical} />
       </div>
     </>
   );
