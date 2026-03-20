@@ -72,10 +72,16 @@ async function fetchAllPages(path: string, apiKey: string, extraParams: Record<s
     // Also check pagination metadata
     if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
     page++;
-    await sleep(300);
+    await sleep(100);
   }
   console.log(`fetchAllPages: ${path} total records: ${allData.length}`);
   return allData;
+}
+
+function parseBoundedInt(value: unknown, fallback: number, min: number, max: number) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
 Deno.serve(async (req) => {
@@ -117,6 +123,20 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     console.log("sync-subbly: body", JSON.stringify(body));
     const clientId = body.client_id;
+    const fullSync = Boolean(body.full_sync);
+    const subscriptionPages = parseBoundedInt(
+      body.subscription_pages,
+      fullSync ? 50 : 20,
+      1,
+      200,
+    );
+    const invoicePages = parseBoundedInt(
+      body.invoice_pages,
+      fullSync ? 15 : 5,
+      1,
+      60,
+    );
+
     if (!clientId) {
       return new Response(JSON.stringify({ error: "client_id is required" }), { status: 400, headers: corsHeaders });
     }
@@ -131,10 +151,27 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Sync subscriptions — only fetch recent pages to stay within timeout
-    // 3 pages × 100 = 300 most recent subs (plenty for daily sync)
+    // Sync subscriptions
+    // Default now fetches a deeper window so active subscriber counts stay accurate.
+    // full_sync allows deeper backfill windows when needed.
     console.log("sync-subbly: fetching subscriptions");
-    const subs = await fetchAllPages("/subscriptions", SUBBLY_API_KEY, { "order_by": "created_at", "order_dir": "desc" }, 3);
+    let subs: any[] = [];
+    try {
+      subs = await fetchAllPages(
+        "/subscriptions",
+        SUBBLY_API_KEY,
+        { "order_by": "updated_at", "order_dir": "desc" },
+        subscriptionPages,
+      );
+    } catch (updatedSortErr) {
+      console.warn("sync-subbly: updated_at sort failed, falling back to created_at", updatedSortErr);
+      subs = await fetchAllPages(
+        "/subscriptions",
+        SUBBLY_API_KEY,
+        { "order_by": "created_at", "order_dir": "desc" },
+        subscriptionPages,
+      );
+    }
     console.log("sync-subbly: got", subs.length, "subscriptions");
     let subsUpserted = 0;
 
@@ -166,14 +203,14 @@ Deno.serve(async (req) => {
     }
 
     // Small delay before fetching invoices
-    await sleep(500);
+    await sleep(150);
 
-    // Sync invoices — 5 pages (500 records) covers recent paid invoices
+    // Sync invoices
     const invoices = await fetchAllPages(
       "/invoices",
       SUBBLY_API_KEY,
       { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
-      5
+      invoicePages
     );
     let invoicesUpserted = 0;
 
@@ -205,6 +242,9 @@ Deno.serve(async (req) => {
         success: true,
         subscriptions_synced: subsUpserted,
         invoices_synced: invoicesUpserted,
+        subscription_pages_fetched: subscriptionPages,
+        invoice_pages_fetched: invoicePages,
+        full_sync: fullSync,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
