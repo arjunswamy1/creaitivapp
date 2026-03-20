@@ -119,11 +119,6 @@ const BillyGoogleDashboard = () => {
   const { activeVertical } = useVertical();
 
   const vertical = data?.vertical;
-  const total = data?.total;
-
-  const totalSpend = total?.spend ?? 0;
-  const totalConversions = total?.conversions ?? 0;
-  const totalCpa = totalConversions > 0 ? Math.round((totalSpend / totalConversions) * 100) / 100 : 0;
 
   const vSpend = vertical?.spend ?? 0;
   const vConversions = vertical?.conversions ?? 0;
