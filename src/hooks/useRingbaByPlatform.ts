@@ -10,10 +10,11 @@ export interface RingbaPlatformMetrics {
   conversions: number;
   revenue: number;
   totalCalls: number;
+  hasAttribution: boolean;
 }
 
 function empty(): RingbaPlatformMetrics {
-  return { conversions: 0, revenue: 0, totalCalls: 0 };
+  return { conversions: 0, revenue: 0, totalCalls: 0, hasAttribution: false };
 }
 
 /**
