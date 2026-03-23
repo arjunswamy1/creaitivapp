@@ -42,7 +42,7 @@ const MetaDashboard = () => {
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : showTw ? (
           <>
-            <KPICard title="Meta Spend" value={`$${(twData.metaSpend).toLocaleString()}`} change={twData.changes.metaSpend} invertColor />
+            <KPICard title="Meta Spend" value={`$${(kpis?.totalSpend ?? 0).toLocaleString()}`} change={kpis?.changes.spend} invertColor />
             <KPICard title="TW Revenue" value={`$${(twData.metaTwRevenue).toLocaleString()}`} change={twData.changes.metaTwRevenue} subtitle="Triple Pixel attributed" />
             <KPICard title={`${revenueLabel} Revenue`} value={`$${(revenueData?.subblyRevenue ?? 0).toLocaleString()}`} change={revenueData?.subblyRevenueChange} subtitle="Shopify orders" />
             <KPICard title="TW ROAS" value={`${twData.metaTwRoas}x`} change={twData.changes.metaTwRoas} subtitle="Triple Pixel" />
