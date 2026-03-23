@@ -54,12 +54,20 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
         matchesVertical(c.campaign_name, activeVertical, "ringba")
       );
 
-      // Filter by UTM source for the platform
+      // Filter by referrer URL first, then fallback to UTM source
       const platformCalls = verticalCalls.filter((c) => {
-        const utmSource = ((c.metadata as any)?.utm_source || "").toLowerCase();
+        const meta = (c.metadata as any) || {};
+        const referrer = (meta.referrer || "").toLowerCase();
+        const utmSource = (meta.utm_source || "").toLowerCase();
+        
         if (platform === "meta") {
+          // Check referrer for facebook.com patterns
+          if (referrer.includes("facebook.com") || referrer.includes("fb.com") || referrer.includes("instagram.com")) return true;
+          // Fallback to UTM source
           return utmSource === "fb" || utmSource === "facebook" || utmSource === "meta";
         }
+        // Google
+        if (referrer.includes("google.com") || referrer.includes("google.co")) return true;
         return utmSource === "google" || utmSource === "gads" || utmSource === "google_ads";
       });
 
