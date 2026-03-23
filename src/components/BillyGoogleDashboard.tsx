@@ -125,6 +125,8 @@ const BillyGoogleDashboard = () => {
   const vSpend = vertical?.spend ?? 0;
   const ringbaConversions = ringba?.conversions ?? 0;
   const ringbaRevenue = ringba?.revenue ?? 0;
+  const hasAttribution = ringba?.hasAttribution ?? false;
+  const ringbaSubtitle = hasAttribution ? "UTM: google" : "All vertical calls";
   const vConversions = vertical?.conversions ?? 0;
   const vCpa = ringbaConversions > 0 ? Math.round((vSpend / ringbaConversions) * 100) / 100 : 0;
 
@@ -148,8 +150,8 @@ const BillyGoogleDashboard = () => {
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-8 gap-4">
               <KPICard title="Spend" value={`$${vSpend.toLocaleString()}`} change={vertical?.changes.spend} invertColor />
-              <KPICard title="Ringba Conv." value={ringbaConversions.toLocaleString()} subtitle="UTM: google" />
-              <KPICard title="Ringba Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle="UTM: google" />
+              <KPICard title="Ringba Conv." value={ringbaConversions.toLocaleString()} subtitle={ringbaSubtitle} />
+              <KPICard title="Ringba Revenue" value={`$${ringbaRevenue.toLocaleString()}`} subtitle={ringbaSubtitle} />
               <KPICard title="CPA (Ringba)" value={ringbaConversions > 0 ? `$${vCpa}` : "–"} subtitle="Spend ÷ Ringba conv." invertColor />
               <KPICard title="Platform Conv." value={vConversions.toLocaleString()} change={vertical?.changes.conversions} subtitle="Google reported" />
               <KPICard title="CPC" value={`$${vertical?.cpc ?? 0}`} change={vertical?.changes.cpc} invertColor />

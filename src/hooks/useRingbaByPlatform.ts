@@ -10,10 +10,11 @@ export interface RingbaPlatformMetrics {
   conversions: number;
   revenue: number;
   totalCalls: number;
+  hasAttribution: boolean;
 }
 
 function empty(): RingbaPlatformMetrics {
-  return { conversions: 0, revenue: 0, totalCalls: 0 };
+  return { conversions: 0, revenue: 0, totalCalls: 0, hasAttribution: false };
 }
 
 /**
@@ -61,9 +62,7 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
         const utmSource = (meta.utm_source || "").toLowerCase();
         
         if (platform === "meta") {
-          // Check referrer for facebook.com patterns
           if (referrer.includes("facebook.com") || referrer.includes("fb.com") || referrer.includes("instagram.com")) return true;
-          // Fallback to UTM source
           return utmSource === "fb" || utmSource === "facebook" || utmSource === "meta";
         }
         // Google
@@ -71,15 +70,25 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
         return utmSource === "google" || utmSource === "gads" || utmSource === "google_ads";
       });
 
+      // If no calls have referrer/UTM data at all, fall back to showing all vertical calls
+      // (better than showing 0 when attribution data isn't available)
+      const hasAnyAttribution = verticalCalls.some((c) => {
+        const meta = (c.metadata as any) || {};
+        return (meta.referrer && meta.referrer.trim()) || (meta.utm_source && meta.utm_source.trim());
+      });
+
+      const relevantCalls = hasAnyAttribution ? platformCalls : verticalCalls;
+
       // Only connected calls with duration count as conversions
-      const converted = platformCalls.filter(
+      const converted = relevantCalls.filter(
         (c) => c.connected && Number(c.duration_seconds || 0) > 0 && c.converted
       );
 
       return {
-        totalCalls: platformCalls.length,
+        totalCalls: relevantCalls.length,
         conversions: converted.length,
         revenue: converted.reduce((s: number, c: any) => s + Number(c.revenue || 0), 0),
+        hasAttribution: hasAnyAttribution,
       };
     },
   });
