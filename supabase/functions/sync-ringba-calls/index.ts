@@ -20,6 +20,25 @@ function buildDateChunks(start: Date, end: Date, chunkDays = 2): { from: Date; t
   return chunks;
 }
 
+/** Extract a value from Ringba's tags array (tags can be nested objects with tagType/key/value or flat key/value) */
+function extractTag(call: any, tagName: string): string | null {
+  if (!call.tags) return null;
+  // Tags can be an array of { tagType, key/name, value } objects
+  if (Array.isArray(call.tags)) {
+    for (const tag of call.tags) {
+      const key = (tag.key || tag.name || tag.tagName || "").toLowerCase();
+      if (key === tagName.toLowerCase() && tag.value) return tag.value;
+    }
+  }
+  // Tags can also be a flat object { referrer: "...", utm_source: "..." }
+  if (typeof call.tags === "object") {
+    for (const [k, v] of Object.entries(call.tags)) {
+      if (k.toLowerCase() === tagName.toLowerCase() && v) return String(v);
+    }
+  }
+  return null;
+}
+
 /** Fetch all Premium Flights calls for a single date chunk, paginating fully */
 async function fetchChunk(
   url: string,
@@ -71,13 +90,13 @@ async function fetchChunk(
       }
     );
 
-    // Log revenue-related fields from first few matching calls for diagnostics
+    // Log tag/referrer data from first few matching calls for diagnostics
     if (matching.length > 0 && offset === 0) {
       const sample = matching.slice(0, 3);
       for (const s of sample) {
-        console.log(`REVENUE FIELDS for ${s.inboundCallId}: conversionAmount=${s.conversionAmount}, profitGross=${s.profitGross}, totalCost=${s.totalCost}, payoutAmount=${s.payoutAmount}, revenue=${s.revenue}, buyerCallPrice=${s.buyerCallPrice}, forceBilled=${s.forceBilled}, adjustedPayoutAmount=${s.adjustedPayoutAmount}, adjustedRevenue=${s.adjustedRevenue}, hasPayout=${s.hasPayout}, hasConverted=${s.hasConverted}, endCallSource=${s.endCallSource}`);
+        console.log(`CALL ${s.inboundCallId}: tags=${JSON.stringify(s.tags)}, httpReferrer=${s.httpReferrer}, referrer=${s.referrer}, userHttpReferrer=${s.userHttpReferrer}`);
+        console.log(`  extractTag referrer=${extractTag(s, "referrer")}, http_referrer=${extractTag(s, "http_referrer")}, httpReferrer=${extractTag(s, "httpReferrer")}`);
       }
-      // Also log ALL keys from first record to find any force-billing fields
       console.log(`ALL CALL KEYS: ${JSON.stringify(Object.keys(sample[0]))}`);
     }
 
@@ -185,9 +204,9 @@ Deno.serve(async (req) => {
           connected_duration: call.connectedCallLengthInSeconds || 0,
           is_duplicate: call.isDuplicate || false,
           number: call.number || null,
-          utm_source: call.userUtmSource || call.utmSource || null,
-          utm_campaign: call.userUtmCampaign || call.utmCampaign || null,
-          referrer: call.httpReferrer || call.referrer || call.userHttpReferrer || null,
+          utm_source: call.userUtmSource || call.utmSource || extractTag(call, "utm_source") || extractTag(call, "utmSource") || null,
+          utm_campaign: call.userUtmCampaign || call.utmCampaign || extractTag(call, "utm_campaign") || extractTag(call, "utmCampaign") || null,
+          referrer: call.httpReferrer || call.referrer || call.userHttpReferrer || extractTag(call, "referrer") || extractTag(call, "httpReferrer") || extractTag(call, "http_referrer") || null,
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
