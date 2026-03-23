@@ -187,6 +187,7 @@ Deno.serve(async (req) => {
           number: call.number || null,
           utm_source: call.userUtmSource || call.utmSource || null,
           utm_campaign: call.userUtmCampaign || call.utmCampaign || null,
+          referrer: call.httpReferrer || call.referrer || call.userHttpReferrer || null,
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
