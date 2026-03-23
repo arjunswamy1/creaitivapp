@@ -50,11 +50,24 @@ async function fetchChunk(
   let offset = 0;
 
   while (true) {
-    const requestBody = {
+    const requestBody: any = {
       reportStart: from.toISOString(),
       reportEnd: to.toISOString(),
       size: 1000,
       offset,
+      // Request tag columns so we get referrer/UTM data
+      valueColumns: [
+        { column: "campaignName" },
+        { column: "publisherName" },
+        { column: "targetName" },
+        { column: "targetNumber" },
+        { column: "buyer" },
+        { column: "tag:User:referrer" },
+        { column: "tag:User:utm_source" },
+        { column: "tag:User:utm_campaign" },
+        { column: "tag:User:httpReferrer" },
+        { column: "tag:User:http_referrer" },
+      ],
     };
 
     const response = await fetch(url, {
