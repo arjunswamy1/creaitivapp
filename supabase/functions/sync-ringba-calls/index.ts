@@ -20,26 +20,74 @@ function buildDateChunks(start: Date, end: Date, chunkDays = 2): { from: Date; t
   return chunks;
 }
 
-/** Extract a value from Ringba's tags array (tags can be nested objects with tagType/key/value or flat key/value) */
-function extractTag(call: any, tagName: string): string | null {
-  if (!call.tags) return null;
-  // Tags can be an array of { tagType, key/name, value } objects
-  if (Array.isArray(call.tags)) {
-    for (const tag of call.tags) {
-      const key = (tag.key || tag.name || tag.tagName || "").toLowerCase();
-      if (key === tagName.toLowerCase() && tag.value) return tag.value;
+/** Fetch individual call detail to get tags (referrer, UTM, etc.) */
+async function fetchCallDetail(
+  accountId: string,
+  token: string,
+  callId: string
+): Promise<{ referrer: string | null; utm_source: string | null; utm_campaign: string | null }> {
+  try {
+    const response = await fetch(
+      `https://api.ringba.com/v2/${accountId}/calllogs/${callId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Token ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    if (!response.ok) return { referrer: null, utm_source: null, utm_campaign: null };
+
+    const data = await response.json();
+    const call = data.call || data;
+
+    // Tags can be in call.tags array or call.tagValues
+    const tags = call.tags || call.tagValues || [];
+    let referrer: string | null = null;
+    let utm_source: string | null = null;
+    let utm_campaign: string | null = null;
+
+    // Log all tag keys for debugging
+    if (Array.isArray(tags) && tags.length > 0) {
+      console.log(`Call ${callId} tags: ${JSON.stringify(tags.slice(0, 10))}`);
     }
-  }
-  // Tags can also be a flat object { referrer: "...", utm_source: "..." }
-  if (typeof call.tags === "object") {
-    for (const [k, v] of Object.entries(call.tags)) {
-      if (k.toLowerCase() === tagName.toLowerCase() && v) return String(v);
+
+    // Search through tags array
+    if (Array.isArray(tags)) {
+      for (const tag of tags) {
+        const key = (tag.key || tag.name || tag.tagName || tag.column || "").toLowerCase();
+        const val = tag.value || tag.tagValue || "";
+        if (!val) continue;
+        if (key === "referrer" || key === "httpreferrer" || key === "http_referrer") referrer = val;
+        if (key === "utm_source" || key === "utmsource") utm_source = val;
+        if (key === "utm_campaign" || key === "utmcampaign") utm_campaign = val;
+      }
     }
+
+    // Also check top-level fields that might be in detail but not in report
+    if (!referrer) referrer = call.httpReferrer || call.referrer || call.userHttpReferrer || null;
+    if (!utm_source) utm_source = call.userUtmSource || call.utmSource || null;
+    if (!utm_campaign) utm_campaign = call.userUtmCampaign || call.utmCampaign || null;
+
+    // Log entire call keys if no referrer found (diagnostics)
+    if (!referrer) {
+      const allKeys = Object.keys(call);
+      console.log(`Call ${callId} detail keys (no referrer found): ${JSON.stringify(allKeys)}`);
+      // Check for nested structures
+      if (call.columns) console.log(`Call ${callId} columns keys: ${JSON.stringify(Object.keys(call.columns))}`);
+      if (call.events) console.log(`Call ${callId} has events: ${Array.isArray(call.events) ? call.events.length : typeof call.events}`);
+    }
+
+    return { referrer, utm_source, utm_campaign };
+  } catch (err) {
+    console.error(`Error fetching call detail ${callId}:`, err);
+    return { referrer: null, utm_source: null, utm_campaign: null };
   }
-  return null;
 }
 
-/** Fetch all Premium Flights calls for a single date chunk, paginating fully */
+/** Fetch all calls for a single date chunk, paginating fully */
 async function fetchChunk(
   url: string,
   token: string,
@@ -50,24 +98,11 @@ async function fetchChunk(
   let offset = 0;
 
   while (true) {
-    const requestBody: any = {
+    const requestBody = {
       reportStart: from.toISOString(),
       reportEnd: to.toISOString(),
       size: 1000,
       offset,
-      // Request tag columns so we get referrer/UTM data
-      valueColumns: [
-        { column: "campaignName" },
-        { column: "publisherName" },
-        { column: "targetName" },
-        { column: "targetNumber" },
-        { column: "buyer" },
-        { column: "tag:User:referrer" },
-        { column: "tag:User:utm_source" },
-        { column: "tag:User:utm_campaign" },
-        { column: "tag:User:httpReferrer" },
-        { column: "tag:User:http_referrer" },
-      ],
     };
 
     const response = await fetch(url, {
@@ -88,11 +123,10 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter: only calls from publisher "CPM" (our paid traffic tag)
-    // AND matching Billy verticals: Flights, Bath, Pest Control, Porta Potty
+    // Client-side filter: only calls from publisher "CPM"
+    // AND matching Billy verticals
     const matching = records.filter(
       (c: any) => {
-        // Must be from CPM publisher (our generated traffic)
         const publisher = (c.publisherName || "").toLowerCase();
         if (publisher !== "cpm") return false;
         
@@ -103,21 +137,10 @@ async function fetchChunk(
       }
     );
 
-    // Log tag/referrer data from first few matching calls for diagnostics
-    if (matching.length > 0 && offset === 0) {
-      const sample = matching.slice(0, 3);
-      for (const s of sample) {
-        console.log(`CALL ${s.inboundCallId}: tags=${JSON.stringify(s.tags)}, httpReferrer=${s.httpReferrer}, referrer=${s.referrer}, userHttpReferrer=${s.userHttpReferrer}`);
-        console.log(`  extractTag referrer=${extractTag(s, "referrer")}, http_referrer=${extractTag(s, "http_referrer")}, httpReferrer=${extractTag(s, "httpReferrer")}`);
-      }
-      console.log(`ALL CALL KEYS: ${JSON.stringify(Object.keys(sample[0]))}`);
-    }
-
     allCalls = allCalls.concat(matching);
 
     if (records.length < 1000) break;
     offset += records.length;
-    // Safety: each 2-day chunk shouldn't need more than 5k records
     if (offset > 5000) break;
   }
 
@@ -160,7 +183,6 @@ Deno.serve(async (req) => {
       `Syncing ${daysBack} days in ${chunks.length} chunks from ${startDate.toISOString()} to ${endDate.toISOString()}`
     );
 
-    // Fetch all chunks sequentially (to avoid rate limiting)
     let allCalls: any[] = [];
     for (const chunk of chunks) {
       const calls = await fetchChunk(url, RINGBA_API_TOKEN, chunk.from, chunk.to);
@@ -181,6 +203,33 @@ Deno.serve(async (req) => {
 
     console.log(`Total fetched: ${allCalls.length}, unique: ${uniqueCalls.length}`);
 
+    // Fetch individual call details for connected calls to get tag data (referrer/UTM)
+    const connectedCalls = uniqueCalls.filter(c => c.hasConnected);
+    console.log(`Fetching tag details for ${connectedCalls.length} connected calls...`);
+    
+    const tagMap = new Map<string, { referrer: string | null; utm_source: string | null; utm_campaign: string | null }>();
+    
+    // Fetch in batches of 5 to avoid rate limiting
+    for (let i = 0; i < connectedCalls.length; i += 5) {
+      const batch = connectedCalls.slice(i, i + 5);
+      const results = await Promise.all(
+        batch.map(c => {
+          const callId = c.inboundCallId || c.callId;
+          return fetchCallDetail(RINGBA_ACCOUNT_ID, RINGBA_API_TOKEN, callId)
+            .then(tags => ({ callId, tags }));
+        })
+      );
+      for (const { callId, tags } of results) {
+        tagMap.set(callId, tags);
+      }
+      // Small delay between batches
+      if (i + 5 < connectedCalls.length) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+    }
+
+    console.log(`Tag details fetched. Calls with referrer: ${[...tagMap.values()].filter(t => t.referrer).length}`);
+
     // Upsert in batches
     let upserted = 0;
     const batchSize = 100;
@@ -190,40 +239,42 @@ Deno.serve(async (req) => {
 
       const rows = batch.map((call: any) => {
         const isConnected = call.hasConnected ?? false;
-        // Only count as converted if the call was actually connected
         const isConverted = isConnected && (call.hasConverted ?? false);
-        // Use Ringba's revenue field (matches their UI "Revenue" column), fallback to conversionAmount
         const callRevenue = parseFloat(String(call.revenue ?? call.conversionAmount ?? 0));
+        const callId = call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`;
+
+        // Merge tag data from individual call detail
+        const tags = tagMap.get(callId);
 
         return {
-        client_id: clientId,
-        ringba_call_id: call.inboundCallId || call.callId || `unknown-${Date.now()}-${Math.random()}`,
-        call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
-        duration_seconds: call.callLengthInSeconds || 0,
-        revenue: callRevenue,
-        payout: parseFloat(String(call.payoutAmount || 0)),
-        connected: isConnected,
-        converted: isConverted,
-        caller_number: call.inboundPhoneNumber || null,
-        target_name: call.targetName || null,
-        campaign_name: call.campaignName || "Premium Flights Call Flow",
-        campaign_id: call.campaignId || null,
-        call_status: call.endCallSource || call.callCompletedStatus || null,
-        metadata: {
-          raw_call_id: call.inboundCallId,
-          publisher: call.publisherName || null,
-          buyer: call.buyer || null,
-          target_number: call.targetNumber || null,
-          connected_duration: call.connectedCallLengthInSeconds || 0,
-          is_duplicate: call.isDuplicate || false,
-          number: call.number || null,
-          utm_source: call.userUtmSource || call.utmSource || extractTag(call, "utm_source") || extractTag(call, "utmSource") || null,
-          utm_campaign: call.userUtmCampaign || call.utmCampaign || extractTag(call, "utm_campaign") || extractTag(call, "utmCampaign") || null,
-          referrer: call.httpReferrer || call.referrer || call.userHttpReferrer || extractTag(call, "referrer") || extractTag(call, "httpReferrer") || extractTag(call, "http_referrer") || null,
-        },
-        synced_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+          client_id: clientId,
+          ringba_call_id: callId,
+          call_date: call.callDt ? new Date(call.callDt).toISOString() : new Date().toISOString(),
+          duration_seconds: call.callLengthInSeconds || 0,
+          revenue: callRevenue,
+          payout: parseFloat(String(call.payoutAmount || 0)),
+          connected: isConnected,
+          converted: isConverted,
+          caller_number: call.inboundPhoneNumber || null,
+          target_name: call.targetName || null,
+          campaign_name: call.campaignName || "Premium Flights Call Flow",
+          campaign_id: call.campaignId || null,
+          call_status: call.endCallSource || call.callCompletedStatus || null,
+          metadata: {
+            raw_call_id: call.inboundCallId,
+            publisher: call.publisherName || null,
+            buyer: call.buyer || null,
+            target_number: call.targetNumber || null,
+            connected_duration: call.connectedCallLengthInSeconds || 0,
+            is_duplicate: call.isDuplicate || false,
+            number: call.number || null,
+            utm_source: tags?.utm_source || call.userUtmSource || call.utmSource || null,
+            utm_campaign: tags?.utm_campaign || call.userUtmCampaign || call.utmCampaign || null,
+            referrer: tags?.referrer || call.httpReferrer || call.referrer || call.userHttpReferrer || null,
+          },
+          synced_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
       });
 
       const { error } = await supabase
@@ -238,7 +289,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, total_fetched: allCalls.length, unique: uniqueCalls.length, upserted }),
+      JSON.stringify({ success: true, total_fetched: allCalls.length, unique: uniqueCalls.length, upserted, tag_details_fetched: tagMap.size }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
