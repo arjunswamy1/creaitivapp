@@ -185,6 +185,8 @@ Deno.serve(async (req) => {
           connected_duration: call.connectedCallLengthInSeconds || 0,
           is_duplicate: call.isDuplicate || false,
           number: call.number || null,
+          utm_source: call.userUtmSource || call.utmSource || null,
+          utm_campaign: call.userUtmCampaign || call.utmCampaign || null,
         },
         synced_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
