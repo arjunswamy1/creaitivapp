@@ -41,20 +41,39 @@ async function fetchCallDetail(
     if (!response.ok) return { referrer: null, utm_source: null, utm_campaign: null };
 
     const data = await response.json();
-    const call = data.call || data;
+    
+    // Log the entire response structure for debugging
+    console.log(`Call detail ${callId} response keys: ${JSON.stringify(Object.keys(data))}`);
+    
+    // The detail endpoint might return in various structures
+    const call = data.call || data.callDetail || data;
 
-    // Tags can be in call.tags array or call.tagValues
-    const tags = call.tags || call.tagValues || [];
+    // Log ALL keys at every level
+    console.log(`Call detail ${callId} call keys: ${JSON.stringify(Object.keys(call))}`);
+    
+    // Check for tags in various locations
+    const tags = call.tags || call.tagValues || call.callTags || data.tags || [];
+    
+    // Log raw tags
+    if (tags && (Array.isArray(tags) ? tags.length > 0 : Object.keys(tags).length > 0)) {
+      console.log(`Call ${callId} tags found: ${JSON.stringify(tags).slice(0, 500)}`);
+    } else {
+      console.log(`Call ${callId} NO tags found. Checking nested...`);
+      // Check if there's a nested structure
+      for (const key of Object.keys(call)) {
+        const val = call[key];
+        if (val && typeof val === "object" && !Array.isArray(val)) {
+          console.log(`  ${key} (object): ${JSON.stringify(Object.keys(val))}`);
+        } else if (Array.isArray(val) && val.length > 0) {
+          console.log(`  ${key} (array[${val.length}]): ${JSON.stringify(val[0]).slice(0, 200)}`);
+        }
+      }
+    }
+
     let referrer: string | null = null;
     let utm_source: string | null = null;
     let utm_campaign: string | null = null;
 
-    // Log all tag keys for debugging
-    if (Array.isArray(tags) && tags.length > 0) {
-      console.log(`Call ${callId} tags: ${JSON.stringify(tags.slice(0, 10))}`);
-    }
-
-    // Search through tags array
     if (Array.isArray(tags)) {
       for (const tag of tags) {
         const key = (tag.key || tag.name || tag.tagName || tag.column || "").toLowerCase();
@@ -66,19 +85,9 @@ async function fetchCallDetail(
       }
     }
 
-    // Also check top-level fields that might be in detail but not in report
     if (!referrer) referrer = call.httpReferrer || call.referrer || call.userHttpReferrer || null;
     if (!utm_source) utm_source = call.userUtmSource || call.utmSource || null;
     if (!utm_campaign) utm_campaign = call.userUtmCampaign || call.utmCampaign || null;
-
-    // Log entire call keys if no referrer found (diagnostics)
-    if (!referrer) {
-      const allKeys = Object.keys(call);
-      console.log(`Call ${callId} detail keys (no referrer found): ${JSON.stringify(allKeys)}`);
-      // Check for nested structures
-      if (call.columns) console.log(`Call ${callId} columns keys: ${JSON.stringify(Object.keys(call.columns))}`);
-      if (call.events) console.log(`Call ${callId} has events: ${Array.isArray(call.events) ? call.events.length : typeof call.events}`);
-    }
 
     return { referrer, utm_source, utm_campaign };
   } catch (err) {
