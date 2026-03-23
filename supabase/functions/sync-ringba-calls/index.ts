@@ -38,7 +38,10 @@ async function fetchCallDetail(
       }
     );
 
-    if (!response.ok) return { referrer: null, utm_source: null, utm_campaign: null };
+    if (!response.ok) {
+      console.error(`Call detail API ${callId} returned ${response.status}: ${await response.text().catch(() => 'no body')}`);
+      return { referrer: null, utm_source: null, utm_campaign: null };
+    }
 
     const data = await response.json();
     
