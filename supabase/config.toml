@@ -83,3 +83,6 @@ verify_jwt = false
 
 [functions.sync-triplewhale]
 verify_jwt = false
+
+[functions.ringba-webhook]
+verify_jwt = false
