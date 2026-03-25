@@ -122,7 +122,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                     <td className="py-3 text-xs text-muted-foreground">{c.campaignType || "—"}</td>
                     <td className="py-3">
                       {c.biddingStrategy ? (
-                        <Badge variant="secondary" className="text-xs font-normal">{c.biddingStrategy}</Badge>
+                        <BidStrategyBadge strategy={c.biddingStrategy} details={c.bidStrategyDetails} />
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
