@@ -82,6 +82,9 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">CPA</th>
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Clicks</th>}
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Impr.</th>}
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">CPC</th>}
                 {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">IS%</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Status</th>
               </tr>
@@ -125,6 +128,9 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                     {!isGoogle && <td className="py-3 text-right font-mono">{displayRoas}x</td>}
                     <td className="py-3 text-right font-mono">{displayConversions.toLocaleString()}</td>
                     <td className="py-3 text-right font-mono">{displayCpa != null ? `$${displayCpa}` : "—"}</td>
+                    {isGoogle && <td className="py-3 text-right font-mono">{c.clicks.toLocaleString()}</td>}
+                    {isGoogle && <td className="py-3 text-right font-mono">{c.impressions >= 1000 ? `${(c.impressions / 1000).toFixed(1)}K` : c.impressions.toLocaleString()}</td>}
+                    {isGoogle && <td className="py-3 text-right font-mono">{c.clicks > 0 ? `$${(c.spend / c.clicks).toFixed(2)}` : "—"}</td>}
                     {isGoogle && (
                       <td className="py-3 text-right font-mono">
                         {c.impressionShare != null ? (
