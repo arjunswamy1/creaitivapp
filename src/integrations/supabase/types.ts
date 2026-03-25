@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           account_id: string | null
           add_to_cart: number
+          bid_strategy_details: Json | null
           bidding_strategy_type: string | null
           campaign_name: string
           campaign_type: string | null
@@ -43,6 +44,7 @@ export type Database = {
         Insert: {
           account_id?: string | null
           add_to_cart?: number
+          bid_strategy_details?: Json | null
           bidding_strategy_type?: string | null
           campaign_name: string
           campaign_type?: string | null
@@ -68,6 +70,7 @@ export type Database = {
         Update: {
           account_id?: string | null
           add_to_cart?: number
+          bid_strategy_details?: Json | null
           bidding_strategy_type?: string | null
           campaign_name?: string
           campaign_type?: string | null
