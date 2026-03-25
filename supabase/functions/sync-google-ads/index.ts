@@ -460,6 +460,25 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               }
 
               console.log(`Final bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns with details`);
+
+              // Bulk-update bid_strategy_details on ALL existing rows for this account
+              if (bidStrategyMap.size > 0) {
+                let updatedCount = 0;
+                for (const [campaignId, details] of bidStrategyMap) {
+                  const { error: updateErr, count } = await supabase
+                    .from("ad_campaigns")
+                    .update({ bid_strategy_details: details })
+                    .eq("platform_campaign_id", campaignId)
+                    .eq("account_id", cid)
+                    .eq("platform", "google");
+                  if (updateErr) {
+                    console.error(`Failed to update bid details for campaign ${campaignId}:`, updateErr.message);
+                  } else {
+                    updatedCount++;
+                  }
+                }
+                console.log(`Bulk-updated bid_strategy_details for ${updatedCount}/${bidStrategyMap.size} campaigns on account ${cid}`);
+              }
             } catch (bidErr) {
               console.error(`Bid strategy query error for ${cid} (non-fatal):`, bidErr?.message || bidErr);
             }
