@@ -360,9 +360,11 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
 
               // Step 3: Query portfolio bidding_strategy resource for shared strategies
               if (portfolioStrategyIds.size > 0) {
-                console.log(`Found ${portfolioStrategyIds.size} portfolio bidding strategies, querying bidding_strategy resource...`);
+                console.log(`Found ${portfolioStrategyIds.size} portfolio bidding strategies, querying bidding_strategy resource on MCC ${loginCustomerId}...`);
                 try {
-                  const portfolioRows = await queryGoogleAds(cid, accessToken, developerToken, `
+                  // Portfolio strategies live on the MCC, so query the MCC account directly
+                  const queryAccountId = loginCustomerId || cid;
+                  const portfolioRows = await queryGoogleAds(queryAccountId, accessToken, developerToken, `
                     SELECT
                       bidding_strategy.id,
                       bidding_strategy.name,
@@ -375,7 +377,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                       bidding_strategy.target_roas.target_roas,
                       bidding_strategy.target_spend.cpc_bid_ceiling_micros
                     FROM bidding_strategy
-                  `, loginCustomerId);
+                  `);
                   console.log(`Portfolio bidding_strategy query returned ${portfolioRows.length} rows`);
                   if (portfolioRows.length > 0) {
                     console.log(`Sample portfolio row: ${JSON.stringify(portfolioRows[0]?.biddingStrategy || {})}`);
