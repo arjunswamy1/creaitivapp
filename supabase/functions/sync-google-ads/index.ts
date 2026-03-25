@@ -292,36 +292,47 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
             // Separate query for bid strategy details (no metrics/segments needed)
             let bidStrategyMap = new Map<string, Record<string, any>>();
             try {
+              // Query bid strategy details — separate from metrics query since these are campaign-level attributes
+              // Note: Google Ads returns empty for rows where the specific strategy fields aren't set.
+              // We query without segment so all campaigns are returned regardless of date range.
               const bidRows = await queryGoogleAds(cid, accessToken, developerToken, `
                 SELECT
                   campaign.id,
+                  campaign.name,
                   campaign.bidding_strategy_type,
                   campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
                   campaign.maximize_conversions.target_cpa_micros,
                   campaign.maximize_conversion_value.target_roas,
                   campaign.target_cpa.target_cpa_micros,
                   campaign.target_cpa.cpc_bid_ceiling_micros,
-                  campaign.target_roas.target_roas
+                  campaign.target_roas.target_roas,
+                  campaign.target_cpc.target_cpc_micros
                 FROM campaign
-                WHERE campaign.status != 'REMOVED'
+                WHERE campaign.status IN ('ENABLED', 'PAUSED')
               `, loginCustomerId);
               console.log(`Bid strategy query returned ${bidRows.length} rows for ${cid}`);
+              if (bidRows.length > 0) {
+                console.log(`Sample bid row: ${JSON.stringify(bidRows[0]?.campaign || {}).substring(0, 300)}`);
+              }
               for (const br of bidRows) {
                 const bidDetails: Record<string, any> = {};
-                const maxClicksCeiling = br.campaign?.maximizeClicks?.maxCpcBidCeilingMicros;
-                if (maxClicksCeiling && maxClicksCeiling !== "0") bidDetails.maxCpcBidCeiling = Number(maxClicksCeiling) / 1_000_000;
-                const maxConvTargetCpa = br.campaign?.maximizeConversions?.targetCpaMicros;
-                if (maxConvTargetCpa && maxConvTargetCpa !== "0") bidDetails.targetCpa = Number(maxConvTargetCpa) / 1_000_000;
-                const maxConvValTargetRoas = br.campaign?.maximizeConversionValue?.targetRoas;
-                if (maxConvValTargetRoas && maxConvValTargetRoas !== 0) bidDetails.targetRoas = Number(maxConvValTargetRoas);
-                const tCpaMicros = br.campaign?.targetCpa?.targetCpaMicros;
-                if (tCpaMicros && tCpaMicros !== "0") bidDetails.targetCpa = Number(tCpaMicros) / 1_000_000;
-                const tCpaCeiling = br.campaign?.targetCpa?.cpcBidCeilingMicros;
-                if (tCpaCeiling && tCpaCeiling !== "0") bidDetails.cpcBidCeiling = Number(tCpaCeiling) / 1_000_000;
-                const tRoas = br.campaign?.targetRoas?.targetRoas;
-                if (tRoas && tRoas !== 0) bidDetails.targetRoas = Number(tRoas);
+                const c = br.campaign || {};
+                if (c.maximizeClicks?.maxCpcBidCeilingMicros && c.maximizeClicks.maxCpcBidCeilingMicros !== "0")
+                  bidDetails.maxCpcBidCeiling = Number(c.maximizeClicks.maxCpcBidCeilingMicros) / 1_000_000;
+                if (c.maximizeConversions?.targetCpaMicros && c.maximizeConversions.targetCpaMicros !== "0")
+                  bidDetails.targetCpa = Number(c.maximizeConversions.targetCpaMicros) / 1_000_000;
+                if (c.maximizeConversionValue?.targetRoas && c.maximizeConversionValue.targetRoas !== 0)
+                  bidDetails.targetRoas = Number(c.maximizeConversionValue.targetRoas);
+                if (c.targetCpa?.targetCpaMicros && c.targetCpa.targetCpaMicros !== "0")
+                  bidDetails.targetCpa = Number(c.targetCpa.targetCpaMicros) / 1_000_000;
+                if (c.targetCpa?.cpcBidCeilingMicros && c.targetCpa.cpcBidCeilingMicros !== "0")
+                  bidDetails.cpcBidCeiling = Number(c.targetCpa.cpcBidCeilingMicros) / 1_000_000;
+                if (c.targetRoas?.targetRoas && c.targetRoas.targetRoas !== 0)
+                  bidDetails.targetRoas = Number(c.targetRoas.targetRoas);
+                if (c.targetCpc?.targetCpcMicros && c.targetCpc.targetCpcMicros !== "0")
+                  bidDetails.targetCpc = Number(c.targetCpc.targetCpcMicros) / 1_000_000;
                 if (Object.keys(bidDetails).length > 0) {
-                  bidStrategyMap.set(String(br.campaign?.id), bidDetails);
+                  bidStrategyMap.set(String(c.id), bidDetails);
                 }
               }
               console.log(`Bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns with details`);
