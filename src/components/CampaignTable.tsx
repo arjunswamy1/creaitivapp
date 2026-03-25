@@ -146,7 +146,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                   </tr>
                   {expandedCampaign === c.name && (
                     <tr key={`${c.name}-detail`}>
-                       <td colSpan={isGoogle ? 10 : 11} className="p-0">
+                       <td colSpan={isGoogle ? 13 : 11} className="p-0">
                         <AdSetDetail campaignName={c.name} platform={c.platform} />
                       </td>
                     </tr>
