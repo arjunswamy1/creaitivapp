@@ -1,0 +1,1 @@
+ALTER TABLE public.ad_campaigns ADD COLUMN IF NOT EXISTS bid_strategy_details jsonb DEFAULT NULL;

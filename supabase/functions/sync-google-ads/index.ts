@@ -276,6 +276,10 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 campaign.status,
                 campaign.bidding_strategy_type,
                 campaign.advertising_channel_type,
+                campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
+                campaign.target_cpa.target_cpa_micros,
+                campaign.target_roas.target_roas,
+                campaign.target_spend.target_spend_micros,
                 segments.date,
                 metrics.cost_micros,
                 metrics.impressions,
@@ -296,6 +300,26 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 const revenue = row.metrics?.conversionsValue || 0;
                 const biddingType = row.campaign?.biddingStrategyType || null;
                 const channelType = row.campaign?.advertisingChannelType || null;
+
+                // Build bid strategy details
+                const bidDetails: Record<string, any> = {};
+                const maxClicksCeiling = row.campaign?.maximizeClicks?.maxCpcBidCeilingMicros;
+                if (maxClicksCeiling) {
+                  bidDetails.maxCpcBidCeiling = Number(maxClicksCeiling) / 1_000_000;
+                }
+                const targetCpaMicros = row.campaign?.targetCpa?.targetCpaMicros;
+                if (targetCpaMicros) {
+                  bidDetails.targetCpa = Number(targetCpaMicros) / 1_000_000;
+                }
+                const targetRoas = row.campaign?.targetRoas?.targetRoas;
+                if (targetRoas) {
+                  bidDetails.targetRoas = Number(targetRoas);
+                }
+                const targetSpendMicros = row.campaign?.targetSpend?.targetSpendMicros;
+                if (targetSpendMicros) {
+                  bidDetails.targetSpend = Number(targetSpendMicros) / 1_000_000;
+                }
+
                 return {
                   user_id: userId,
                   client_id: clientId,
@@ -315,6 +339,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   lost_is_rank: row.metrics?.searchRankLostImpressionShare ?? null,
                   bidding_strategy_type: biddingType ? formatBiddingStrategy(biddingType) : null,
                   campaign_type: channelType ? formatChannelType(channelType) : null,
+                  bid_strategy_details: Object.keys(bidDetails).length > 0 ? bidDetails : null,
                 };
               });
               await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
