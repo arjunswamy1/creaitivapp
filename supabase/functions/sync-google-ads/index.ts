@@ -292,14 +292,13 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
             // Separate query for bid strategy details (no metrics/segments needed)
             let bidStrategyMap = new Map<string, Record<string, any>>();
             try {
-              // Query bid strategy details — separate from metrics query since these are campaign-level attributes
-              // Note: Google Ads returns empty for rows where the specific strategy fields aren't set.
-              // We query without segment so all campaigns are returned regardless of date range.
+              // 1) Query campaign-level bid strategy attributes
               const bidRows = await queryGoogleAds(cid, accessToken, developerToken, `
                 SELECT
                   campaign.id,
                   campaign.name,
                   campaign.bidding_strategy_type,
+                  campaign.bidding_strategy,
                   campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
                   campaign.maximize_conversions.target_cpa_micros,
                   campaign.maximize_conversion_value.target_roas,
@@ -310,12 +309,22 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 WHERE campaign.status IN ('ENABLED', 'PAUSED')
               `, loginCustomerId);
               console.log(`Bid strategy query returned ${bidRows.length} rows for ${cid}`);
-              if (bidRows.length > 0) {
-                console.log(`Sample bid row: ${JSON.stringify(bidRows[0]?.campaign || {}).substring(0, 300)}`);
-              }
+
+              // Collect portfolio bidding strategy resource names for a second lookup
+              const portfolioStrategyIds = new Set<string>();
+              const campaignToPortfolio = new Map<string, string>(); // campaignId -> biddingStrategy resource name
+
               for (const br of bidRows) {
                 const bidDetails: Record<string, any> = {};
                 const c = br.campaign || {};
+                const campaignId = String(c.id);
+
+                // Check for portfolio bidding strategy (resource name like "customers/123/biddingStrategies/456")
+                if (c.biddingStrategy) {
+                  portfolioStrategyIds.add(c.biddingStrategy);
+                  campaignToPortfolio.set(campaignId, c.biddingStrategy);
+                }
+
                 if (c.maximizeClicks?.maxCpcBidCeilingMicros && c.maximizeClicks.maxCpcBidCeilingMicros !== "0")
                   bidDetails.maxCpcBidCeiling = Number(c.maximizeClicks.maxCpcBidCeilingMicros) / 1_000_000;
                 if (c.maximizeConversions?.targetCpaMicros && c.maximizeConversions.targetCpaMicros !== "0")
@@ -329,9 +338,69 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 if (c.targetRoas?.targetRoas && c.targetRoas.targetRoas !== 0)
                   bidDetails.targetRoas = Number(c.targetRoas.targetRoas);
                 if (Object.keys(bidDetails).length > 0) {
-                  bidStrategyMap.set(String(c.id), bidDetails);
+                  bidStrategyMap.set(campaignId, bidDetails);
                 }
               }
+
+              // 2) Query portfolio bidding_strategy resource for shared strategies
+              if (portfolioStrategyIds.size > 0) {
+                console.log(`Found ${portfolioStrategyIds.size} portfolio bidding strategies, querying details...`);
+                try {
+                  const portfolioRows = await queryGoogleAds(cid, accessToken, developerToken, `
+                    SELECT
+                      bidding_strategy.id,
+                      bidding_strategy.name,
+                      bidding_strategy.type,
+                      bidding_strategy.maximize_clicks.max_cpc_bid_micros,
+                      bidding_strategy.maximize_conversions.target_cpa_micros,
+                      bidding_strategy.maximize_conversion_value.target_roas,
+                      bidding_strategy.target_cpa.target_cpa_micros,
+                      bidding_strategy.target_cpa.cpc_bid_ceiling_micros,
+                      bidding_strategy.target_roas.target_roas,
+                      bidding_strategy.target_spend.cpc_bid_ceiling_micros
+                    FROM bidding_strategy
+                  `, loginCustomerId);
+                  console.log(`Portfolio bidding strategy query returned ${portfolioRows.length} rows`);
+
+                  // Build a map from resource name to details
+                  const portfolioMap = new Map<string, Record<string, any>>();
+                  for (const pr of portfolioRows) {
+                    const bs = pr.biddingStrategy || {};
+                    const resourceName = `customers/${cid}/biddingStrategies/${bs.id}`;
+                    const details: Record<string, any> = { portfolioName: bs.name, portfolioType: bs.type };
+
+                    if (bs.maximizeClicks?.maxCpcBidMicros && bs.maximizeClicks.maxCpcBidMicros !== "0")
+                      details.maxCpcBidCeiling = Number(bs.maximizeClicks.maxCpcBidMicros) / 1_000_000;
+                    if (bs.maximizeConversions?.targetCpaMicros && bs.maximizeConversions.targetCpaMicros !== "0")
+                      details.targetCpa = Number(bs.maximizeConversions.targetCpaMicros) / 1_000_000;
+                    if (bs.maximizeConversionValue?.targetRoas && bs.maximizeConversionValue.targetRoas !== 0)
+                      details.targetRoas = Number(bs.maximizeConversionValue.targetRoas);
+                    if (bs.targetCpa?.targetCpaMicros && bs.targetCpa.targetCpaMicros !== "0")
+                      details.targetCpa = Number(bs.targetCpa.targetCpaMicros) / 1_000_000;
+                    if (bs.targetCpa?.cpcBidCeilingMicros && bs.targetCpa.cpcBidCeilingMicros !== "0")
+                      details.cpcBidCeiling = Number(bs.targetCpa.cpcBidCeilingMicros) / 1_000_000;
+                    if (bs.targetRoas?.targetRoas && bs.targetRoas.targetRoas !== 0)
+                      details.targetRoas = Number(bs.targetRoas.targetRoas);
+                    if (bs.targetSpend?.cpcBidCeilingMicros && bs.targetSpend.cpcBidCeilingMicros !== "0")
+                      details.maxCpcBidCeiling = Number(bs.targetSpend.cpcBidCeilingMicros) / 1_000_000;
+
+                    portfolioMap.set(resourceName, details);
+                  }
+
+                  // Merge portfolio details into campaigns that use them
+                  for (const [campaignId, resourceName] of campaignToPortfolio) {
+                    const portfolioDetails = portfolioMap.get(resourceName);
+                    if (portfolioDetails) {
+                      const existing = bidStrategyMap.get(campaignId) || {};
+                      bidStrategyMap.set(campaignId, { ...existing, ...portfolioDetails });
+                    }
+                  }
+                  console.log(`Portfolio details merged. Total campaigns with bid details: ${bidStrategyMap.size}`);
+                } catch (portfolioErr) {
+                  console.error(`Portfolio bidding strategy query error for ${cid} (non-fatal):`, portfolioErr);
+                }
+              }
+
               console.log(`Bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns with details`);
             } catch (bidErr) {
               console.error(`Bid strategy query error for ${cid} (non-fatal):`, bidErr);
