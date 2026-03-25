@@ -305,8 +305,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   campaign.maximize_conversion_value.target_roas,
                   campaign.target_cpa.target_cpa_micros,
                   campaign.target_cpa.cpc_bid_ceiling_micros,
-                  campaign.target_roas.target_roas,
-                  campaign.target_cpc.target_cpc_micros
+                  campaign.target_roas.target_roas
                 FROM campaign
                 WHERE campaign.status IN ('ENABLED', 'PAUSED')
               `, loginCustomerId);
