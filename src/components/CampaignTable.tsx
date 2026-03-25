@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { type VerticalConfig, matchesVertical } from "@/config/billyVerticals";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { BidStrategyDetails } from "@/hooks/useAdData";
 
 interface RingbaEnriched {
   ringbaRevenue: number;
