@@ -297,27 +297,34 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   campaign.id,
                   campaign.bidding_strategy_type,
                   campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
+                  campaign.maximize_conversions.target_cpa_micros,
+                  campaign.maximize_conversion_value.target_roas,
                   campaign.target_cpa.target_cpa_micros,
-                  campaign.target_roas.target_roas,
-                  campaign.target_spend.target_spend_micros
+                  campaign.target_cpa.cpc_bid_ceiling_micros,
+                  campaign.target_roas.target_roas
                 FROM campaign
                 WHERE campaign.status != 'REMOVED'
               `, loginCustomerId);
+              console.log(`Bid strategy query returned ${bidRows.length} rows for ${cid}`);
               for (const br of bidRows) {
                 const bidDetails: Record<string, any> = {};
                 const maxClicksCeiling = br.campaign?.maximizeClicks?.maxCpcBidCeilingMicros;
-                if (maxClicksCeiling) bidDetails.maxCpcBidCeiling = Number(maxClicksCeiling) / 1_000_000;
-                const targetCpaMicros = br.campaign?.targetCpa?.targetCpaMicros;
-                if (targetCpaMicros) bidDetails.targetCpa = Number(targetCpaMicros) / 1_000_000;
-                const targetRoas = br.campaign?.targetRoas?.targetRoas;
-                if (targetRoas) bidDetails.targetRoas = Number(targetRoas);
-                const targetSpendMicros = br.campaign?.targetSpend?.targetSpendMicros;
-                if (targetSpendMicros) bidDetails.targetSpend = Number(targetSpendMicros) / 1_000_000;
+                if (maxClicksCeiling && maxClicksCeiling !== "0") bidDetails.maxCpcBidCeiling = Number(maxClicksCeiling) / 1_000_000;
+                const maxConvTargetCpa = br.campaign?.maximizeConversions?.targetCpaMicros;
+                if (maxConvTargetCpa && maxConvTargetCpa !== "0") bidDetails.targetCpa = Number(maxConvTargetCpa) / 1_000_000;
+                const maxConvValTargetRoas = br.campaign?.maximizeConversionValue?.targetRoas;
+                if (maxConvValTargetRoas && maxConvValTargetRoas !== 0) bidDetails.targetRoas = Number(maxConvValTargetRoas);
+                const tCpaMicros = br.campaign?.targetCpa?.targetCpaMicros;
+                if (tCpaMicros && tCpaMicros !== "0") bidDetails.targetCpa = Number(tCpaMicros) / 1_000_000;
+                const tCpaCeiling = br.campaign?.targetCpa?.cpcBidCeilingMicros;
+                if (tCpaCeiling && tCpaCeiling !== "0") bidDetails.cpcBidCeiling = Number(tCpaCeiling) / 1_000_000;
+                const tRoas = br.campaign?.targetRoas?.targetRoas;
+                if (tRoas && tRoas !== 0) bidDetails.targetRoas = Number(tRoas);
                 if (Object.keys(bidDetails).length > 0) {
                   bidStrategyMap.set(String(br.campaign?.id), bidDetails);
                 }
               }
-              console.log(`Bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns`);
+              console.log(`Bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns with details`);
             } catch (bidErr) {
               console.error(`Bid strategy query error for ${cid} (non-fatal):`, bidErr);
             }
