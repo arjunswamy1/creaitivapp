@@ -328,8 +328,6 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   bidDetails.cpcBidCeiling = Number(c.targetCpa.cpcBidCeilingMicros) / 1_000_000;
                 if (c.targetRoas?.targetRoas && c.targetRoas.targetRoas !== 0)
                   bidDetails.targetRoas = Number(c.targetRoas.targetRoas);
-                if (c.targetCpc?.targetCpcMicros && c.targetCpc.targetCpcMicros !== "0")
-                  bidDetails.targetCpc = Number(c.targetCpc.targetCpcMicros) / 1_000_000;
                 if (Object.keys(bidDetails).length > 0) {
                   bidStrategyMap.set(String(c.id), bidDetails);
                 }
