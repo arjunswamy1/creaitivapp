@@ -14,6 +14,57 @@ interface RingbaEnriched {
   ringbaRoas: number;
 }
 
+function BidStrategyBadge({ strategy, details }: { strategy: string; details: BidStrategyDetails | null }) {
+  const hasDetails = details && Object.keys(details).length > 0;
+
+  if (!hasDetails) {
+    return <Badge variant="secondary" className="text-xs font-normal">{strategy}</Badge>;
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Badge variant="secondary" className="text-xs font-normal cursor-pointer hover:bg-secondary/80 transition-colors border border-dashed border-primary/30">
+          {strategy} ▾
+        </Badge>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-4" align="start" onClick={(e) => e.stopPropagation()}>
+        <h4 className="font-semibold text-sm mb-3">Bid Strategy Details</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Strategy</span>
+            <span className="font-medium">{strategy}</span>
+          </div>
+          {details.maxCpcBidCeiling != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Max CPC Bid</span>
+              <span className="font-mono font-medium">${details.maxCpcBidCeiling.toFixed(2)}</span>
+            </div>
+          )}
+          {details.targetCpa != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Target CPA</span>
+              <span className="font-mono font-medium">${details.targetCpa.toFixed(2)}</span>
+            </div>
+          )}
+          {details.targetRoas != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Target ROAS</span>
+              <span className="font-mono font-medium">{details.targetRoas.toFixed(2)}x</span>
+            </div>
+          )}
+          {details.targetSpend != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Target Spend</span>
+              <span className="font-mono font-medium">${details.targetSpend.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const CampaignTable = ({ platform, verticalFilter }: { platform?: string; verticalFilter?: VerticalConfig }) => {
   const { data: rawCampaigns, isLoading } = useTopCampaigns(platform);
   const { data: ringba } = useRingbaByVertical();
