@@ -276,10 +276,6 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 campaign.status,
                 campaign.bidding_strategy_type,
                 campaign.advertising_channel_type,
-                campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
-                campaign.target_cpa.target_cpa_micros,
-                campaign.target_roas.target_roas,
-                campaign.target_spend.target_spend_micros,
                 segments.date,
                 metrics.cost_micros,
                 metrics.impressions,
@@ -293,6 +289,54 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               WHERE segments.date BETWEEN '${since}' AND '${until}'
             `, loginCustomerId);
 
+            // Separate query for bid strategy details (no metrics/segments needed)
+            let bidStrategyMap = new Map<string, Record<string, any>>();
+            try {
+              // Query bid strategy details — separate from metrics query since these are campaign-level attributes
+              // Note: Google Ads returns empty for rows where the specific strategy fields aren't set.
+              // We query without segment so all campaigns are returned regardless of date range.
+              const bidRows = await queryGoogleAds(cid, accessToken, developerToken, `
+                SELECT
+                  campaign.id,
+                  campaign.name,
+                  campaign.bidding_strategy_type,
+                  campaign.maximize_clicks.max_cpc_bid_ceiling_micros,
+                  campaign.maximize_conversions.target_cpa_micros,
+                  campaign.maximize_conversion_value.target_roas,
+                  campaign.target_cpa.target_cpa_micros,
+                  campaign.target_cpa.cpc_bid_ceiling_micros,
+                  campaign.target_roas.target_roas
+                FROM campaign
+                WHERE campaign.status IN ('ENABLED', 'PAUSED')
+              `, loginCustomerId);
+              console.log(`Bid strategy query returned ${bidRows.length} rows for ${cid}`);
+              if (bidRows.length > 0) {
+                console.log(`Sample bid row: ${JSON.stringify(bidRows[0]?.campaign || {}).substring(0, 300)}`);
+              }
+              for (const br of bidRows) {
+                const bidDetails: Record<string, any> = {};
+                const c = br.campaign || {};
+                if (c.maximizeClicks?.maxCpcBidCeilingMicros && c.maximizeClicks.maxCpcBidCeilingMicros !== "0")
+                  bidDetails.maxCpcBidCeiling = Number(c.maximizeClicks.maxCpcBidCeilingMicros) / 1_000_000;
+                if (c.maximizeConversions?.targetCpaMicros && c.maximizeConversions.targetCpaMicros !== "0")
+                  bidDetails.targetCpa = Number(c.maximizeConversions.targetCpaMicros) / 1_000_000;
+                if (c.maximizeConversionValue?.targetRoas && c.maximizeConversionValue.targetRoas !== 0)
+                  bidDetails.targetRoas = Number(c.maximizeConversionValue.targetRoas);
+                if (c.targetCpa?.targetCpaMicros && c.targetCpa.targetCpaMicros !== "0")
+                  bidDetails.targetCpa = Number(c.targetCpa.targetCpaMicros) / 1_000_000;
+                if (c.targetCpa?.cpcBidCeilingMicros && c.targetCpa.cpcBidCeilingMicros !== "0")
+                  bidDetails.cpcBidCeiling = Number(c.targetCpa.cpcBidCeilingMicros) / 1_000_000;
+                if (c.targetRoas?.targetRoas && c.targetRoas.targetRoas !== 0)
+                  bidDetails.targetRoas = Number(c.targetRoas.targetRoas);
+                if (Object.keys(bidDetails).length > 0) {
+                  bidStrategyMap.set(String(c.id), bidDetails);
+                }
+              }
+              console.log(`Bid strategy details for ${cid}: ${bidStrategyMap.size} campaigns with details`);
+            } catch (bidErr) {
+              console.error(`Bid strategy query error for ${cid} (non-fatal):`, bidErr);
+            }
+
             console.log(`Campaign rows for ${cid} (${since}-${until}): ${campaignRows.length}`);
             if (campaignRows.length > 0) {
               const batch = campaignRows.map((row: any) => {
@@ -300,32 +344,15 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 const revenue = row.metrics?.conversionsValue || 0;
                 const biddingType = row.campaign?.biddingStrategyType || null;
                 const channelType = row.campaign?.advertisingChannelType || null;
-
-                // Build bid strategy details
-                const bidDetails: Record<string, any> = {};
-                const maxClicksCeiling = row.campaign?.maximizeClicks?.maxCpcBidCeilingMicros;
-                if (maxClicksCeiling) {
-                  bidDetails.maxCpcBidCeiling = Number(maxClicksCeiling) / 1_000_000;
-                }
-                const targetCpaMicros = row.campaign?.targetCpa?.targetCpaMicros;
-                if (targetCpaMicros) {
-                  bidDetails.targetCpa = Number(targetCpaMicros) / 1_000_000;
-                }
-                const targetRoas = row.campaign?.targetRoas?.targetRoas;
-                if (targetRoas) {
-                  bidDetails.targetRoas = Number(targetRoas);
-                }
-                const targetSpendMicros = row.campaign?.targetSpend?.targetSpendMicros;
-                if (targetSpendMicros) {
-                  bidDetails.targetSpend = Number(targetSpendMicros) / 1_000_000;
-                }
+                const campaignId = String(row.campaign?.id);
+                const bidDetails = bidStrategyMap.get(campaignId) || null;
 
                 return {
                   user_id: userId,
                   client_id: clientId,
                   account_id: cid,
                   platform: "google",
-                  platform_campaign_id: String(row.campaign?.id),
+                  platform_campaign_id: campaignId,
                   campaign_name: row.campaign?.name || "Unknown",
                   status: (row.campaign?.status || "UNKNOWN").toLowerCase(),
                   date: row.segments?.date,
@@ -339,7 +366,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   lost_is_rank: row.metrics?.searchRankLostImpressionShare ?? null,
                   bidding_strategy_type: biddingType ? formatBiddingStrategy(biddingType) : null,
                   campaign_type: channelType ? formatChannelType(channelType) : null,
-                  bid_strategy_details: Object.keys(bidDetails).length > 0 ? bidDetails : null,
+                  bid_strategy_details: bidDetails,
                 };
               });
               await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
