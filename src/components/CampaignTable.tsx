@@ -322,6 +322,62 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
   );
 }
 
+function AdSetSearchTermsDetail({ adsetId }: { adsetId: string }) {
+  const { data: searchTerms, isLoading } = useAdSetSearchTerms(adsetId);
+
+  if (isLoading) {
+    return <div className="p-4 pl-16"><Skeleton className="h-16 rounded-lg" /></div>;
+  }
+
+  if (!searchTerms || searchTerms.length === 0) {
+    return (
+      <div className="px-16 py-3 bg-primary/5 text-xs text-muted-foreground border-l-2 border-primary/30">
+        No search term data available for this ad group.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-primary/5 border-t border-primary/20 border-l-2 border-l-primary/30">
+      <div className="px-10 py-2 text-xs font-semibold text-primary flex items-center gap-1.5">
+        <Search className="w-3.5 h-3.5" /> All Search Terms ({searchTerms.length})
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/20">
+            <th className="w-8"></th>
+            <th className="text-left py-1.5 pl-10 text-muted-foreground font-medium">Search Term</th>
+            <th className="text-left py-1.5 text-muted-foreground font-medium">Keyword</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Spend</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Clicks</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Impr.</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CTR</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CPC</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Conv.</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CPA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {searchTerms.map((st) => (
+            <tr key={st.searchTerm} className="border-b border-border/5 hover:bg-primary/10 transition-colors">
+              <td className="w-8"></td>
+              <td className="py-1.5 pl-10 font-medium max-w-[220px] truncate">{st.searchTerm}</td>
+              <td className="py-1.5 text-muted-foreground max-w-[160px] truncate">{st.keyword}</td>
+              <td className="py-1.5 text-right font-mono">${st.spend.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.clicks.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.impressions.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.ctr}%</td>
+              <td className="py-1.5 text-right font-mono">{st.cpc != null ? `$${st.cpc.toFixed(2)}` : "—"}</td>
+              <td className="py-1.5 text-right font-mono">{st.conversions.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.cpa != null ? `$${st.cpa}` : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function KeywordDetail({ adsetId }: { adsetId: string }) {
   const { data: keywords, isLoading } = useAdGroupKeywords(adsetId);
   const [expandedKeyword, setExpandedKeyword] = useState<string | null>(null);
