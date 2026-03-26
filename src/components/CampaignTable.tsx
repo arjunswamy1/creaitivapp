@@ -178,6 +178,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
+                    {isGoogle && <td className="py-3 text-right font-mono">{c.dailyBudget != null ? `$${c.dailyBudget.toLocaleString()}` : "—"}</td>}
                     {!isGoogle && <td className="py-3 text-right font-mono">${displayRevenue.toLocaleString()}</td>}
                     {!isGoogle && <td className="py-3 text-right font-mono">{displayRoas}x</td>}
                     <td className="py-3 text-right font-mono">{displayConversions.toLocaleString()}</td>
