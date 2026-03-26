@@ -322,6 +322,7 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
             <th className="text-right py-1.5 text-muted-foreground font-medium">Spend</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">Conv.</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">CTR</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CPC</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">CPA</th>
             <th className="text-right py-1.5 text-muted-foreground font-medium">QS</th>
           </tr>
@@ -350,6 +351,7 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
                   <td className="py-1.5 text-right font-mono">${kw.spend.toLocaleString()}</td>
                   <td className="py-1.5 text-right font-mono">{kw.conversions.toLocaleString()}</td>
                   <td className="py-1.5 text-right font-mono">{kw.ctr}%</td>
+                  <td className="py-1.5 text-right font-mono">{kw.cpc != null ? `$${kw.cpc.toFixed(2)}` : "—"}</td>
                   <td className="py-1.5 text-right font-mono">{kw.cpa != null ? `$${kw.cpa}` : "—"}</td>
                   <td className="py-1.5 text-right font-mono">
                     {kw.qualityScore != null ? (
