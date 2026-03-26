@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import BudgetPlanner from "./pages/BudgetPlanner";
 import OptimizationEngine from "./pages/OptimizationEngine";
 import ClientManagementHub from "./pages/ClientManagementHub";
+import AdminPortal from "./pages/AdminPortal";
 import ResetPassword from "./pages/ResetPassword";
 import NotionRedirect from "./pages/NotionRedirect";
 import NotFound from "./pages/NotFound";
@@ -68,6 +69,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <ClientManagementHub />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminPortal />
                     </ProtectedRoute>
                   }
                 />

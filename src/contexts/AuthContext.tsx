@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,12 +21,28 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const loggedRef = useRef(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setLoading(false);
+
+        // Log login event on SIGNED_IN
+        if (event === "SIGNED_IN" && session?.user && !loggedRef.current) {
+          loggedRef.current = true;
+          // Use setTimeout to avoid blocking auth flow
+          setTimeout(() => {
+            supabase.from("login_events" as any).insert({
+              user_id: session.user.id,
+              email: session.user.email,
+            } as any).then(() => {});
+          }, 0);
+        }
+        if (event === "SIGNED_OUT") {
+          loggedRef.current = false;
+        }
       }
     );
 
