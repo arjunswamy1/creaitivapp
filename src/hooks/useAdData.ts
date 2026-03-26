@@ -473,6 +473,7 @@ export function useAdGroupKeywords(adsetId: string | null) {
           clicks: vals.clicks,
           conversions: vals.conversions,
           ctr: vals.impressions > 0 ? Math.round((vals.clicks / vals.impressions) * 10000) / 100 : 0,
+          cpc: vals.clicks > 0 ? Math.round((vals.spend / vals.clicks) * 100) / 100 : null,
           cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
           qualityScore: vals.qualityScore,
           status: vals.status,
@@ -527,6 +528,7 @@ export function useKeywordSearchTerms(adsetId: string | null, keywordText: strin
           clicks: vals.clicks,
           conversions: vals.conversions,
           ctr: vals.impressions > 0 ? Math.round((vals.clicks / vals.impressions) * 10000) / 100 : 0,
+          cpc: vals.clicks > 0 ? Math.round((vals.spend / vals.clicks) * 100) / 100 : null,
           cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
         }))
         .sort((a, b) => b.spend - a.spend);
