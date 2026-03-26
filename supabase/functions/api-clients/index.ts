@@ -35,14 +35,22 @@ Deno.serve(async (req) => {
 
     let userId: string | null = null;
 
+    let scopedClientId: string | null = null;
+
     if (apiKey) {
-      const expected = Deno.env.get("OPENCLAW_API_KEY");
-      if (!expected || apiKey !== expected) {
+      const openclawKey = Deno.env.get("OPENCLAW_API_KEY");
+      const billyKey = Deno.env.get("BILLY_API_KEY");
+      const BILLY_CLIENT_ID = "b1013915-13a0-4688-b41c-e84e8623506e";
+
+      if (billyKey && apiKey === billyKey) {
+        scopedClientId = BILLY_CLIENT_ID;
+      } else if (openclawKey && apiKey === openclawKey) {
+        // Full access — userId stays null
+      } else {
         return new Response(JSON.stringify({ error: "Invalid API key" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      // API key gets access to all clients — userId stays null
     } else if (authHeader?.startsWith("Bearer ")) {
       const supabaseUser = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -62,7 +70,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const cacheKey = `clients:${userId || "all"}`;
+    const cacheKey = `clients:${scopedClientId || userId || "all"}`;
     const cached = getCached(cacheKey);
     if (cached) {
       return new Response(JSON.stringify(cached), {
@@ -72,7 +80,9 @@ Deno.serve(async (req) => {
 
     // Get clients the user has access to
     let clientIds: string[] = [];
-    if (userId) {
+    if (scopedClientId) {
+      clientIds = [scopedClientId];
+    } else if (userId) {
       const { data: memberRows } = await supabaseAdmin
         .from("client_members")
         .select("client_id")
@@ -81,9 +91,9 @@ Deno.serve(async (req) => {
     }
 
     let clientsQuery = supabaseAdmin.from("clients").select("id, name, slug, logo_url, brand_colors");
-    if (userId && clientIds.length > 0) {
+    if ((scopedClientId || userId) && clientIds.length > 0) {
       clientsQuery = clientsQuery.in("id", clientIds);
-    } else if (userId) {
+    } else if (scopedClientId || userId) {
       return new Response(JSON.stringify({ clients: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

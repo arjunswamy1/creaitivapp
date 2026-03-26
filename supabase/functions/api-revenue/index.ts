@@ -14,9 +14,17 @@ function setCache(key: string, data: any) { cache.set(key, { data, expires: Date
 async function authenticate(req: Request, supabaseAdmin: any, clientId: string): Promise<{ ok: boolean; error?: Response }> {
   const apiKey = req.headers.get("x-api-key");
   if (apiKey) {
-    const expected = Deno.env.get("OPENCLAW_API_KEY");
-    if (!expected || apiKey !== expected) return { ok: false, error: new Response(JSON.stringify({ error: "Invalid API key" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }) };
-    return { ok: true };
+    const openclawKey = Deno.env.get("OPENCLAW_API_KEY");
+    const billyKey = Deno.env.get("BILLY_API_KEY");
+    const BILLY_CLIENT_ID = "b1013915-13a0-4688-b41c-e84e8623506e";
+
+    if (billyKey && apiKey === billyKey) {
+      if (clientId !== BILLY_CLIENT_ID) return { ok: false, error: new Response(JSON.stringify({ error: "Forbidden: API key does not have access to this client" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }) };
+      return { ok: true };
+    } else if (openclawKey && apiKey === openclawKey) {
+      return { ok: true };
+    }
+    return { ok: false, error: new Response(JSON.stringify({ error: "Invalid API key" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }) };
   }
   const authHeader = req.headers.get("Authorization");
   if (authHeader?.startsWith("Bearer ")) {
