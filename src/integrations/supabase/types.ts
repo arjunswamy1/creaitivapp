@@ -26,6 +26,7 @@ export type Database = {
           client_id: string | null
           conversions: number
           created_at: string
+          daily_budget: number | null
           date: string
           id: string
           impression_share: number | null
@@ -52,6 +53,7 @@ export type Database = {
           client_id?: string | null
           conversions?: number
           created_at?: string
+          daily_budget?: number | null
           date: string
           id?: string
           impression_share?: number | null
@@ -78,6 +80,7 @@ export type Database = {
           client_id?: string | null
           conversions?: number
           created_at?: string
+          daily_budget?: number | null
           date?: string
           id?: string
           impression_share?: number | null

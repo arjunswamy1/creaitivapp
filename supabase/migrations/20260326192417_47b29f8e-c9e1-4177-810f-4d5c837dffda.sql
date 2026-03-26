@@ -1,0 +1,1 @@
+ALTER TABLE public.ad_campaigns ADD COLUMN IF NOT EXISTS daily_budget numeric DEFAULT NULL;
