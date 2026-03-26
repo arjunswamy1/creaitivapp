@@ -363,7 +363,7 @@ function KeywordDetail({ adsetId }: { adsetId: string }) {
                 </tr>
                 {expandedKeyword === kwKey && (
                   <tr key={`${kwKey}-st`}>
-                    <td colSpan={8} className="p-0">
+                    <td colSpan={9} className="p-0">
                       <SearchTermDetail adsetId={adsetId} keywordText={kw.keyword} />
                     </td>
                   </tr>
@@ -403,6 +403,7 @@ function SearchTermDetail({ adsetId, keywordText }: { adsetId: string; keywordTe
             <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Clicks</th>
             <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Impr.</th>
             <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">CTR</th>
+            <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">CPC</th>
             <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">Conv.</th>
             <th className="text-right py-1 text-muted-foreground font-medium text-[10px]">CPA</th>
           </tr>
@@ -416,6 +417,7 @@ function SearchTermDetail({ adsetId, keywordText }: { adsetId: string; keywordTe
               <td className="py-1 text-right font-mono">{st.clicks.toLocaleString()}</td>
               <td className="py-1 text-right font-mono">{st.impressions.toLocaleString()}</td>
               <td className="py-1 text-right font-mono">{st.ctr}%</td>
+              <td className="py-1 text-right font-mono">{st.cpc != null ? `$${st.cpc.toFixed(2)}` : "—"}</td>
               <td className="py-1 text-right font-mono">{st.conversions.toLocaleString()}</td>
               <td className="py-1 text-right font-mono">{st.cpa != null ? `$${st.cpa}` : "—"}</td>
             </tr>
