@@ -48,14 +48,19 @@ const AdminPortal = () => {
       const { data: events, error } = await supabase
         .from("login_events" as any)
         .select("user_id, email, logged_in_at")
-        .order("logged_in_at", { ascending: false });
+        .order("logged_in_at", { ascending: false }) as any;
 
       if (error) throw error;
 
       // Fetch client memberships to show which client each user belongs to
       const { data: members } = await supabase
         .from("client_members")
-        .select("user_id, client_id, clients(name)") as any;
+        .select("user_id, client_id") as any;
+
+      // Fetch client names separately
+      const { data: clients } = await supabase
+        .from("clients")
+        .select("id, name") as any;
 
       const memberMap = new Map<string, string[]>();
       for (const m of members || []) {
