@@ -1,4 +1,4 @@
-import { RefreshCw, Settings, Target, Cpu, AlertTriangle } from "lucide-react";
+import { RefreshCw, Settings, Target, Cpu, AlertTriangle, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -203,6 +203,14 @@ const DashboardHeader = () => {
             <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
               <Target className="w-3.5 h-3.5" />
               Budget Planner
+            </Button>
+          </Link>
+        )}
+        {isAgencyAdmin && (
+          <Link to="/admin">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
+              <Shield className="w-3.5 h-3.5" />
+              Admin
             </Button>
           </Link>
         )}
