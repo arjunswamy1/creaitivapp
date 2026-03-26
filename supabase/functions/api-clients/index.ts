@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const cacheKey = `clients:${userId || "all"}`;
+    const cacheKey = `clients:${scopedClientId || userId || "all"}`;
     const cached = getCached(cacheKey);
     if (cached) {
       return new Response(JSON.stringify(cached), {
@@ -80,7 +80,9 @@ Deno.serve(async (req) => {
 
     // Get clients the user has access to
     let clientIds: string[] = [];
-    if (userId) {
+    if (scopedClientId) {
+      clientIds = [scopedClientId];
+    } else if (userId) {
       const { data: memberRows } = await supabaseAdmin
         .from("client_members")
         .select("client_id")
@@ -89,9 +91,9 @@ Deno.serve(async (req) => {
     }
 
     let clientsQuery = supabaseAdmin.from("clients").select("id, name, slug, logo_url, brand_colors");
-    if (userId && clientIds.length > 0) {
+    if ((scopedClientId || userId) && clientIds.length > 0) {
       clientsQuery = clientsQuery.in("id", clientIds);
-    } else if (userId) {
+    } else if (scopedClientId || userId) {
       return new Response(JSON.stringify({ clients: [] }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
