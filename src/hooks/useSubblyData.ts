@@ -43,10 +43,10 @@ export function useSubblyKPIs() {
 
       if (newSubErr) throw newSubErr;
 
-      // 2. Active subscriptions — current snapshot (no date filter)
-      const { data: activeSubs, error: activeErr } = await supabase
+      // 2. Active subscriptions — use count query for accuracy (avoids 1000-row limit)
+      const { count: activeSubCount, error: activeErr } = await supabase
         .from("subbly_subscriptions")
-        .select("id, quantity, subscription_id:subbly_id")
+        .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
         .eq("status", "active");
 
