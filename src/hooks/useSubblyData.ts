@@ -77,7 +77,7 @@ export function useSubblyKPIs() {
       if (mrrErr) throw mrrErr;
 
       const newSubCount = (newSubs || []).length;
-      const activeSubCount = (activeSubs || []).length;
+      const activeCount = activeSubCount ?? 0;
       const cancelledInRange = (newSubs || []).filter((s) => s.status === "cancelled").length;
 
       // Subbly amounts are in cents, convert to dollars
