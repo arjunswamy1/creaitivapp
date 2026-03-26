@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms } from "@/hooks/useAdData";
+import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms, useAdSetSearchTerms } from "@/hooks/useAdData";
 import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { type VerticalConfig, matchesVertical } from "@/config/billyVerticals";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { BidStrategyDetails } from "@/hooks/useAdData";
