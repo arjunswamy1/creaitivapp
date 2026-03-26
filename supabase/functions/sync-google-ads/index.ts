@@ -276,6 +276,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                 campaign.status,
                 campaign.bidding_strategy_type,
                 campaign.advertising_channel_type,
+                campaign.campaign_budget,
                 segments.date,
                 metrics.cost_micros,
                 metrics.impressions,
@@ -288,6 +289,28 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
               FROM campaign
               WHERE segments.date BETWEEN '${since}' AND '${until}'
             `, loginCustomerId);
+
+            // Fetch budget amounts in a separate query (no segments)
+            let budgetMap = new Map<string, number>();
+            try {
+              const budgetRows = await queryGoogleAds(cid, accessToken, developerToken, `
+                SELECT
+                  campaign.id,
+                  campaign_budget.amount_micros
+                FROM campaign
+                WHERE campaign.status IN ('ENABLED', 'PAUSED')
+              `, loginCustomerId);
+              for (const br of budgetRows) {
+                const campId = String(br.campaign?.id);
+                const amountMicros = br.campaignBudget?.amountMicros;
+                if (amountMicros && amountMicros !== "0") {
+                  budgetMap.set(campId, Number(amountMicros) / 1_000_000);
+                }
+              }
+              console.log(`Budget data fetched for ${budgetMap.size} campaigns on ${cid}`);
+            } catch (budgetErr) {
+              console.error(`Budget query error for ${cid} (non-fatal):`, budgetErr?.message || budgetErr);
+            }
 
             // Separate query for bid strategy details (no metrics/segments needed)
             let bidStrategyMap = new Map<string, Record<string, any>>();
@@ -513,6 +536,7 @@ async function syncGoogleForUser(supabase: any, userId: string, accessToken: str
                   bidding_strategy_type: biddingType ? formatBiddingStrategy(biddingType) : null,
                   campaign_type: channelType ? formatChannelType(channelType) : null,
                   bid_strategy_details: bidDetails,
+                  daily_budget: budgetMap.get(campaignId) ?? null,
                 };
               });
               await supabase.from("ad_campaigns").upsert(batch, { onConflict: "user_id,platform,platform_campaign_id,date" });
