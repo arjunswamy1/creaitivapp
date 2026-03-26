@@ -72,6 +72,7 @@ export interface CampaignRow {
   biddingStrategy: string | null;
   campaignType: string | null;
   bidStrategyDetails: BidStrategyDetails | null;
+  dailyBudget: number | null;
 }
 
 function calcKPIs(data: any[]): KPIData {
