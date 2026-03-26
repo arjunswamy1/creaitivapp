@@ -62,10 +62,15 @@ const AdminPortal = () => {
         .from("clients")
         .select("id, name") as any;
 
+      const clientNameMap = new Map<string, string>();
+      for (const c of clients || []) {
+        clientNameMap.set(c.id, c.name);
+      }
+
       const memberMap = new Map<string, string[]>();
       for (const m of members || []) {
         const uid = m.user_id;
-        const clientName = m.clients?.name || "Unknown";
+        const clientName = clientNameMap.get(m.client_id) || "Unknown";
         if (!memberMap.has(uid)) memberMap.set(uid, []);
         const arr = memberMap.get(uid)!;
         if (!arr.includes(clientName)) arr.push(clientName);
