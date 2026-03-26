@@ -98,9 +98,11 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const isCron =
       (cronSecret && token === cronSecret) ||
-      (serviceRoleKey && token === serviceRoleKey);
+      (serviceRoleKey && token === serviceRoleKey) ||
+      (anonKey && token === anonKey);
 
     if (!isCron) {
       // Normal user auth flow
