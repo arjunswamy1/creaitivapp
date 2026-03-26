@@ -72,6 +72,7 @@ export interface CampaignRow {
   biddingStrategy: string | null;
   campaignType: string | null;
   bidStrategyDetails: BidStrategyDetails | null;
+  dailyBudget: number | null;
 }
 
 function calcKPIs(data: any[]): KPIData {
@@ -267,7 +268,7 @@ export function useTopCampaigns(platform?: string) {
     queryFn: async (): Promise<CampaignRow[]> => {
       let query = supabase
         .from("ad_campaigns")
-        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type, bid_strategy_details")
+        .select("campaign_name, platform, spend, revenue, roas, status, impressions, clicks, conversions, impression_share, bidding_strategy_type, campaign_type, bid_strategy_details, daily_budget")
         .gte("date", fromStr).lte("date", toStr);
 
       if (clientId) query = query.eq("client_id", clientId);
@@ -278,9 +279,9 @@ export function useTopCampaigns(platform?: string) {
       if (error) throw error;
       if (!data) return [];
 
-      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number; biddingStrategy: string | null; campaignType: string | null; bidStrategyDetails: BidStrategyDetails | null }>();
+      const byCampaign = new Map<string, { platform: string; spend: number; revenue: number; status: string; impressions: number; clicks: number; conversions: number; impressionShareSum: number; impressionShareCount: number; biddingStrategy: string | null; campaignType: string | null; bidStrategyDetails: BidStrategyDetails | null; dailyBudget: number | null }>();
       for (const row of data) {
-        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0, biddingStrategy: (row as any).bidding_strategy_type || null, campaignType: (row as any).campaign_type || null, bidStrategyDetails: (row as any).bid_strategy_details || null };
+        const existing = byCampaign.get(row.campaign_name) || { platform: row.platform, spend: 0, revenue: 0, status: row.status || "unknown", impressions: 0, clicks: 0, conversions: 0, impressionShareSum: 0, impressionShareCount: 0, biddingStrategy: (row as any).bidding_strategy_type || null, campaignType: (row as any).campaign_type || null, bidStrategyDetails: (row as any).bid_strategy_details || null, dailyBudget: (row as any).daily_budget != null ? Number((row as any).daily_budget) : null };
         existing.spend += Number(row.spend);
         existing.revenue += Number(row.revenue);
         existing.impressions += Number(row.impressions);
@@ -312,6 +313,7 @@ export function useTopCampaigns(platform?: string) {
           biddingStrategy: vals.biddingStrategy,
           campaignType: vals.campaignType,
           bidStrategyDetails: vals.bidStrategyDetails,
+          dailyBudget: vals.dailyBudget,
         }))
         .sort((a, b) => b.spend - a.spend)
         .slice(0, 15);
@@ -477,6 +479,60 @@ export function useAdGroupKeywords(adsetId: string | null) {
           cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
           qualityScore: vals.qualityScore,
           status: vals.status,
+        }))
+        .sort((a, b) => b.spend - a.spend);
+    },
+  });
+}
+
+export function useAdSetSearchTerms(adsetId: string | null) {
+  const { fromStr, toStr } = useDateStrings();
+  const { activeClient } = useClient();
+  const clientId = activeClient?.id;
+
+  return useQuery({
+    queryKey: ["adset-search-terms", adsetId, fromStr, toStr, clientId],
+    enabled: !!adsetId,
+    queryFn: async () => {
+      if (!adsetId) return [];
+
+      let query = supabase
+        .from("search_terms" as any)
+        .select("search_term, keyword_text, match_type, spend, revenue, impressions, clicks, conversions, roas, date")
+        .eq("platform_adset_id", adsetId)
+        .gte("date", fromStr).lte("date", toStr);
+
+      if (clientId) query = query.eq("client_id", clientId);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      if (!data) return [];
+
+      const byST = new Map<string, { keyword: string; matchType: string; spend: number; revenue: number; impressions: number; clicks: number; conversions: number }>();
+      for (const row of data as any[]) {
+        const existing = byST.get(row.search_term) || { keyword: row.keyword_text, matchType: row.match_type || "unknown", spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0 };
+        existing.spend += Number(row.spend);
+        existing.revenue += Number(row.revenue);
+        existing.impressions += Number(row.impressions);
+        existing.clicks += Number(row.clicks);
+        existing.conversions += Number(row.conversions);
+        byST.set(row.search_term, existing);
+      }
+
+      return Array.from(byST.entries())
+        .map(([term, vals]) => ({
+          searchTerm: term,
+          keyword: vals.keyword,
+          matchType: vals.matchType,
+          spend: Math.round(vals.spend),
+          revenue: Math.round(vals.revenue),
+          impressions: vals.impressions,
+          clicks: vals.clicks,
+          conversions: vals.conversions,
+          ctr: vals.impressions > 0 ? Math.round((vals.clicks / vals.impressions) * 10000) / 100 : 0,
+          cpc: vals.clicks > 0 ? Math.round((vals.spend / vals.clicks) * 100) / 100 : null,
+          cpa: vals.conversions > 0 ? Math.round(vals.spend / vals.conversions) : null,
         }))
         .sort((a, b) => b.spend - a.spend);
     },

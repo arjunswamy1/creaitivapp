@@ -123,7 +123,7 @@ Deno.serve(async (req) => {
     // Fetch campaign data for primary period
     const { data: campaigns } = await supabaseAdmin
       .from("ad_campaigns")
-      .select("platform_campaign_id, campaign_name, status, campaign_type, bidding_strategy_type, bid_strategy_details, spend, clicks, impressions, conversions, revenue, roas, add_to_cart, date")
+      .select("platform_campaign_id, campaign_name, status, campaign_type, bidding_strategy_type, bid_strategy_details, daily_budget, spend, clicks, impressions, conversions, revenue, roas, add_to_cart, date")
       .eq("client_id", clientId)
       .eq("platform", platform)
       .gte("date", startDate)
@@ -141,6 +141,7 @@ Deno.serve(async (req) => {
           type: row.campaign_type,
           biddingStrategy: row.bidding_strategy_type,
           bidStrategyDetails: (row as any).bid_strategy_details || null,
+          dailyBudget: (row as any).daily_budget != null ? Number((row as any).daily_budget) : null,
           spend: 0, clicks: 0, impressions: 0, conversions: 0, revenue: 0, addToCart: 0,
         });
       }
@@ -188,7 +189,7 @@ Deno.serve(async (req) => {
       comparisonRange: compareStartDate && compareEndDate ? { startDate: compareStartDate, endDate: compareEndDate } : null,
       campaigns: Array.from(campaignMap.values()).map((c) => {
         const metrics = calcMetrics(c);
-        const entry: any = { id: c.id, name: c.name, status: c.status, type: c.type, biddingStrategy: c.biddingStrategy, bidStrategyDetails: c.bidStrategyDetails, metrics };
+        const entry: any = { id: c.id, name: c.name, status: c.status, type: c.type, biddingStrategy: c.biddingStrategy, bidStrategyDetails: c.bidStrategyDetails, dailyBudget: c.dailyBudget, metrics };
 
         if (comparisonMap) {
           const comp = comparisonMap.get(c.id);

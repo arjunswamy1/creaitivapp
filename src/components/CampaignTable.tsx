@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms } from "@/hooks/useAdData";
+import { useTopCampaigns, useCampaignAdSets, useAdSetAds, useAdGroupKeywords, useKeywordSearchTerms, useAdSetSearchTerms } from "@/hooks/useAdData";
 import { useRingbaByVertical } from "@/hooks/useRingbaByVertical";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { type VerticalConfig, matchesVertical } from "@/config/billyVerticals";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { BidStrategyDetails } from "@/hooks/useAdData";
@@ -131,6 +131,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                 <th className="text-left py-3 text-muted-foreground font-medium">Type</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Bid Strategy</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Budget/Day</th>}
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue{isMeta ? " (Ringba)" : ""}</th>}
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
@@ -177,6 +178,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                       ) : "—"}
                     </td>
                     <td className="py-3 text-right font-mono">${c.spend.toLocaleString()}</td>
+                    {isGoogle && <td className="py-3 text-right font-mono">{c.dailyBudget != null ? `$${c.dailyBudget.toLocaleString()}` : "—"}</td>}
                     {!isGoogle && <td className="py-3 text-right font-mono">${displayRevenue.toLocaleString()}</td>}
                     {!isGoogle && <td className="py-3 text-right font-mono">{displayRoas}x</td>}
                     <td className="py-3 text-right font-mono">{displayConversions.toLocaleString()}</td>
@@ -199,7 +201,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                   </tr>
                   {expandedCampaign === c.name && (
                     <tr key={`${c.name}-detail`}>
-                       <td colSpan={isGoogle ? 13 : 11} className="p-0">
+                       <td colSpan={isGoogle ? 14 : 11} className="p-0">
                         <AdSetDetail campaignName={c.name} platform={c.platform} />
                       </td>
                     </tr>
@@ -218,6 +220,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
 function AdSetDetail({ campaignName, platform }: { campaignName: string; platform: string }) {
   const { data: adSets, isLoading } = useCampaignAdSets(campaignName, platform);
   const [expandedAdSet, setExpandedAdSet] = useState<{ name: string; id: string } | null>(null);
+  const [searchTermsAdSetId, setSearchTermsAdSetId] = useState<string | null>(null);
   const isGoogle = platform === "google";
 
   if (isLoading) {
@@ -238,15 +241,19 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
         <thead>
           <tr className="border-b border-border/30">
             <th className="w-8"></th>
-            <th className="text-left py-2 pl-10 text-muted-foreground font-medium text-xs">Ad Set</th>
-            <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
+            <th className="text-left py-2 pl-10 text-muted-foreground font-medium text-xs">Ad Group</th>
+            {isGoogle && <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>}
             <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
             <th className="text-left py-2 text-muted-foreground font-medium text-xs"></th>
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Spend</th>
+            {isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">Clicks</th>}
+            {isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">Impr.</th>}
+            {isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">CPC</th>}
             {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">Revenue</th>}
             {!isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs">ROAS</th>}
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Conv.</th>
             <th className="text-right py-2 text-muted-foreground font-medium text-xs">Status</th>
+            {isGoogle && <th className="text-right py-2 text-muted-foreground font-medium text-xs"></th>}
           </tr>
         </thead>
         <tbody>
@@ -265,20 +272,40 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
                   )}
                 </td>
                 <td className="py-2 pl-10 font-medium text-xs max-w-[260px] truncate">{as.name}</td>
-                <td></td>
+                {isGoogle && <td></td>}
                 <td></td>
                 <td></td>
                 <td className="py-2 text-right font-mono text-xs">${as.spend.toLocaleString()}</td>
+                {isGoogle && <td className="py-2 text-right font-mono text-xs">{as.clicks.toLocaleString()}</td>}
+                {isGoogle && <td className="py-2 text-right font-mono text-xs">{as.impressions >= 1000 ? `${(as.impressions / 1000).toFixed(1)}K` : as.impressions.toLocaleString()}</td>}
+                {isGoogle && <td className="py-2 text-right font-mono text-xs">{as.clicks > 0 ? `$${(as.spend / as.clicks).toFixed(2)}` : "—"}</td>}
                 {!isGoogle && <td className="py-2 text-right font-mono text-xs">${as.revenue.toLocaleString()}</td>}
                 {!isGoogle && <td className="py-2 text-right font-mono text-xs">{as.roas}x</td>}
                 <td className="py-2 text-right font-mono text-xs">{as.conversions.toLocaleString()}</td>
                 <td className="py-2 text-right">
                   <Badge variant="secondary" className="text-xs">{as.status}</Badge>
                 </td>
+                {isGoogle && (
+                  <td className="py-2 text-right">
+                    <button
+                      className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors px-1.5 py-0.5 rounded border border-primary/20 hover:border-primary/40 bg-primary/5"
+                      onClick={(e) => { e.stopPropagation(); setSearchTermsAdSetId(searchTermsAdSetId === as.adsetId ? null : as.adsetId); }}
+                    >
+                      <Search className="w-3 h-3" /> Search Terms
+                    </button>
+                  </td>
+                )}
               </tr>
+              {searchTermsAdSetId === as.adsetId && (
+                <tr key={`${as.name}-st`}>
+                  <td colSpan={isGoogle ? 12 : 10} className="p-0">
+                    <AdSetSearchTermsDetail adsetId={as.adsetId} />
+                  </td>
+                </tr>
+              )}
               {expandedAdSet?.name === as.name && (
                 <tr key={`${as.name}-detail`}>
-                  <td colSpan={isGoogle ? 8 : 10} className="p-0">
+                  <td colSpan={isGoogle ? 12 : 10} className="p-0">
                     {platform === "google" ? (
                       <KeywordDetail adsetId={expandedAdSet.id} />
                     ) : (
@@ -288,6 +315,62 @@ function AdSetDetail({ campaignName, platform }: { campaignName: string; platfor
                 </tr>
               )}
             </>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AdSetSearchTermsDetail({ adsetId }: { adsetId: string }) {
+  const { data: searchTerms, isLoading } = useAdSetSearchTerms(adsetId);
+
+  if (isLoading) {
+    return <div className="p-4 pl-16"><Skeleton className="h-16 rounded-lg" /></div>;
+  }
+
+  if (!searchTerms || searchTerms.length === 0) {
+    return (
+      <div className="px-16 py-3 bg-primary/5 text-xs text-muted-foreground border-l-2 border-primary/30">
+        No search term data available for this ad group.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-primary/5 border-t border-primary/20 border-l-2 border-l-primary/30">
+      <div className="px-10 py-2 text-xs font-semibold text-primary flex items-center gap-1.5">
+        <Search className="w-3.5 h-3.5" /> All Search Terms ({searchTerms.length})
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-border/20">
+            <th className="w-8"></th>
+            <th className="text-left py-1.5 pl-10 text-muted-foreground font-medium">Search Term</th>
+            <th className="text-left py-1.5 text-muted-foreground font-medium">Keyword</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Spend</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Clicks</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Impr.</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CTR</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CPC</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">Conv.</th>
+            <th className="text-right py-1.5 text-muted-foreground font-medium">CPA</th>
+          </tr>
+        </thead>
+        <tbody>
+          {searchTerms.map((st) => (
+            <tr key={st.searchTerm} className="border-b border-border/5 hover:bg-primary/10 transition-colors">
+              <td className="w-8"></td>
+              <td className="py-1.5 pl-10 font-medium max-w-[220px] truncate">{st.searchTerm}</td>
+              <td className="py-1.5 text-muted-foreground max-w-[160px] truncate">{st.keyword}</td>
+              <td className="py-1.5 text-right font-mono">${st.spend.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.clicks.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.impressions.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.ctr}%</td>
+              <td className="py-1.5 text-right font-mono">{st.cpc != null ? `$${st.cpc.toFixed(2)}` : "—"}</td>
+              <td className="py-1.5 text-right font-mono">{st.conversions.toLocaleString()}</td>
+              <td className="py-1.5 text-right font-mono">{st.cpa != null ? `$${st.cpa}` : "—"}</td>
+            </tr>
           ))}
         </tbody>
       </table>
