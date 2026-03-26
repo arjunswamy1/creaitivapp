@@ -43,10 +43,10 @@ export function useSubblyKPIs() {
 
       if (newSubErr) throw newSubErr;
 
-      // 2. Active subscriptions — current snapshot (no date filter)
-      const { data: activeSubs, error: activeErr } = await supabase
+      // 2. Active subscriptions — use count query for accuracy (avoids 1000-row limit)
+      const { count: activeSubCount, error: activeErr } = await supabase
         .from("subbly_subscriptions")
-        .select("id, quantity, subscription_id:subbly_id")
+        .select("id", { count: "exact", head: true })
         .eq("client_id", clientId)
         .eq("status", "active");
 
@@ -77,7 +77,7 @@ export function useSubblyKPIs() {
       if (mrrErr) throw mrrErr;
 
       const newSubCount = (newSubs || []).length;
-      const activeSubCount = (activeSubs || []).length;
+      const activeCount = activeSubCount ?? 0;
       const cancelledInRange = (newSubs || []).filter((s) => s.status === "cancelled").length;
 
       // Subbly amounts are in cents, convert to dollars
@@ -86,11 +86,11 @@ export function useSubblyKPIs() {
       // MRR = sum of paid invoices in last 30 days (already ~1 month window)
       const mrr = Math.round((mrrInvoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100);
 
-      const avgRevenuePerSub = activeSubCount > 0 ? mrr / activeSubCount : 0;
+      const avgRevenuePerSub = activeCount > 0 ? mrr / activeCount : 0;
 
       return {
         newSubscriptions: newSubCount,
-        activeSubscriptions: activeSubCount,
+        activeSubscriptions: activeCount,
         mrr,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         churnedCount: cancelledInRange,
