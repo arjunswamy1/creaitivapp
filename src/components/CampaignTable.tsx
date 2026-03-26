@@ -131,6 +131,7 @@ const CampaignTable = ({ platform, verticalFilter }: { platform?: string; vertic
                 <th className="text-left py-3 text-muted-foreground font-medium">Type</th>
                 <th className="text-left py-3 text-muted-foreground font-medium">Bid Strategy</th>
                 <th className="text-right py-3 text-muted-foreground font-medium">Spend</th>
+                {isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Budget/Day</th>}
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">Revenue{isMeta ? " (Ringba)" : ""}</th>}
                 {!isGoogle && <th className="text-right py-3 text-muted-foreground font-medium">ROAS</th>}
                 <th className="text-right py-3 text-muted-foreground font-medium">Conv.</th>
