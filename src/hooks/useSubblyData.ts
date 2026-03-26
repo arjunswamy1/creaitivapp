@@ -86,11 +86,11 @@ export function useSubblyKPIs() {
       // MRR = sum of paid invoices in last 30 days (already ~1 month window)
       const mrr = Math.round((mrrInvoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100);
 
-      const avgRevenuePerSub = activeSubCount > 0 ? mrr / activeSubCount : 0;
+      const avgRevenuePerSub = activeCount > 0 ? mrr / activeCount : 0;
 
       return {
         newSubscriptions: newSubCount,
-        activeSubscriptions: activeSubCount,
+        activeSubscriptions: activeCount,
         mrr,
         totalRevenue: Math.round(totalRevenue * 100) / 100,
         churnedCount: cancelledInRange,
