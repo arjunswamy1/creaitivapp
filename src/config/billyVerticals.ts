@@ -64,8 +64,8 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     emoji: "🐛",
     description: "Pest Control lead-gen funnel",
     platforms: {
-      meta: { patterns: ["Pest", "PestControl"], accountIds: ["448669084867269", "1779578786137314"] },
-      google: { patterns: ["Pest"], accountIds: ["1939246766"] },
+      meta: { patterns: ["Pest", "PestControl", "Bed Bug", "BedBug"], accountIds: ["448669084867269", "1779578786137314"] },
+      google: { patterns: ["Pest", "Bed Bug", "BedBug"], accountIds: ["1939246766"] },
       ringba: { patterns: ["Pest Control US Call Flow"], exactMatch: true },
     },
   },
