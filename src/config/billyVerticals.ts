@@ -54,7 +54,7 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
     description: "Porta Potty rental lead-gen funnel",
     platforms: {
       meta: { patterns: ["Porta", "Potty"] },
-      google: { patterns: ["Porta", "Potty"] },
+      google: { patterns: ["Porta", "Potty"], accountIds: ["1939246766"] },
       ringba: { patterns: ["Porta", "Potty", "Portapotty"] },
     },
   },
