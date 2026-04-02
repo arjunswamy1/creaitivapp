@@ -101,6 +101,9 @@ const BillyDashboardContent = () => {
               <BillyMetaDashboard />
             </TabsContent>
           )}
+          <TabsContent value="cro-tests">
+            <CROTestsTab />
+          </TabsContent>
         </Tabs>
       </div>
     </div>

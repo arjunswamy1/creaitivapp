@@ -13,14 +13,7 @@ export function useStellarExperiments(
       if (statusFilter !== "all") params.status = statusFilter;
 
       const queryStr = new URLSearchParams(params).toString();
-      const { data, error } = await supabase.functions.invoke("api-stellar", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        body: undefined,
-      });
-
-      // supabase.functions.invoke doesn't support query params well,
-      // so call via fetch directly
+      // Use fetch directly since supabase.functions.invoke doesn't support query params
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const res = await fetch(

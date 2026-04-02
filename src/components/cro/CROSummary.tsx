@@ -1,5 +1,4 @@
 import type { StellarExperiment } from "@/types/stellar";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { FlaskConical, CheckCircle, TrendingUp, BarChart3 } from "lucide-react";
 
