@@ -140,7 +140,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       {v.isControl ? "✓" : ""}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {v.trafficSplit != null ? `${(v.trafficSplit * 100).toFixed(0)}%` : "—"}
+                      {v.trafficSplit != null ? `${v.trafficSplit}%` : "—"}
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {v.uniqueVisitors.toLocaleString()}
