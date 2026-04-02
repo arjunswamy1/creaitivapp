@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.ringba-webhook]
 verify_jwt = false
+
+[functions.api-stellar]
+verify_jwt = false

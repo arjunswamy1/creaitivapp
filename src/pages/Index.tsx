@@ -7,11 +7,12 @@ import BillyMetaDashboard from "@/components/BillyMetaDashboard";
 import BillyGoogleDashboard from "@/components/BillyGoogleDashboard";
 import BillyDailyTrends from "@/components/BillyDailyTrends";
 import BillyTrendAnalysis from "@/components/BillyTrendAnalysis";
+import CROTestsTab from "@/components/cro/CROTestsTab";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { VerticalProvider, useVertical } from "@/contexts/VerticalContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook, Zap, TrendingUp, LineChart } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap, TrendingUp, LineChart, FlaskConical } from "lucide-react";
 
 const VerticalSelector = () => {
   const { activeVertical, setActiveVertical, verticals } = useVertical();
@@ -76,6 +77,10 @@ const BillyDashboardContent = () => {
                 Meta Ads
               </TabsTrigger>
             )}
+            <TabsTrigger value="cro-tests" className="gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5" />
+              CRO Tests
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="revenue-engine">
             <BillyDashboard />
@@ -96,6 +101,9 @@ const BillyDashboardContent = () => {
               <BillyMetaDashboard />
             </TabsContent>
           )}
+          <TabsContent value="cro-tests">
+            <CROTestsTab />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
