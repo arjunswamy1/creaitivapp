@@ -149,7 +149,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       {v.conversions.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-sm font-medium">
-                      {(v.conversionRate * 100).toFixed(2)}%
+                      {v.conversionRate.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {v.squashedConversions.toLocaleString()}
