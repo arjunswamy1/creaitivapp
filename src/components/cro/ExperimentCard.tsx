@@ -155,7 +155,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       {v.squashedConversions.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {(v.squashedConversionRate * 100).toFixed(2)}%
+                      {v.squashedConversionRate.toFixed(2)}%
                     </TableCell>
                   </TableRow>
                 ))}
