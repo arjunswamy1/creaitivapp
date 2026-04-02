@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import type { StellarResponse, StellarStatusFilter } from "@/types/stellar";
 
 export function useStellarExperiments(
