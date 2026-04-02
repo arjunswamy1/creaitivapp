@@ -45,7 +45,7 @@ export default function CROSummary({ experiments, lastSynced }: Props) {
     },
     {
       label: "Top Conv. Rate",
-      value: `${(highestCR * 100).toFixed(2)}%`,
+      value: `${highestCR.toFixed(2)}%`,
       icon: TrendingUp,
       color: "text-amber-500",
     },

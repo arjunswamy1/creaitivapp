@@ -63,7 +63,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       : "bg-muted text-muted-foreground border-border"
                   }
                 >
-                  {(exp.statisticalSignificance * 100).toFixed(1)}% sig.
+                  {exp.statisticalSignificance != null ? `${exp.statisticalSignificance.toFixed(1)}% sig.` : ""}
                 </Badge>
               )}
               {exp.inferredWinner && (
