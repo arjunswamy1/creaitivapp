@@ -58,12 +58,12 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                 <Badge
                   variant="outline"
                   className={
-                    exp.statisticalSignificance >= 0.95
+                    exp.statisticalSignificance != null && exp.statisticalSignificance >= 95
                       ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                       : "bg-muted text-muted-foreground border-border"
                   }
                 >
-                  {(exp.statisticalSignificance * 100).toFixed(1)}% sig.
+                  {exp.statisticalSignificance != null ? `${exp.statisticalSignificance.toFixed(1)}% sig.` : ""}
                 </Badge>
               )}
               {exp.inferredWinner && (
@@ -140,7 +140,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       {v.isControl ? "✓" : ""}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {v.trafficSplit != null ? `${(v.trafficSplit * 100).toFixed(0)}%` : "—"}
+                      {v.trafficSplit != null ? `${v.trafficSplit}%` : "—"}
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {v.uniqueVisitors.toLocaleString()}
@@ -149,13 +149,13 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                       {v.conversions.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-sm font-medium">
-                      {(v.conversionRate * 100).toFixed(2)}%
+                      {v.conversionRate.toFixed(2)}%
                     </TableCell>
                     <TableCell className="text-right text-sm">
                       {v.squashedConversions.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {(v.squashedConversionRate * 100).toFixed(2)}%
+                      {v.squashedConversionRate.toFixed(2)}%
                     </TableCell>
                   </TableRow>
                 ))}
