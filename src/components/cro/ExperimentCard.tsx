@@ -58,7 +58,7 @@ export default function ExperimentCard({ experiment: exp }: Props) {
                 <Badge
                   variant="outline"
                   className={
-                    exp.statisticalSignificance >= 0.95
+                    exp.statisticalSignificance != null && exp.statisticalSignificance >= 95
                       ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
                       : "bg-muted text-muted-foreground border-border"
                   }
