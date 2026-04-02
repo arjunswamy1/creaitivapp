@@ -77,6 +77,10 @@ const BillyDashboardContent = () => {
                 Meta Ads
               </TabsTrigger>
             )}
+            <TabsTrigger value="cro-tests" className="gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5" />
+              CRO Tests
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="revenue-engine">
             <BillyDashboard />
