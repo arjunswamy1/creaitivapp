@@ -99,10 +99,13 @@ Deno.serve(async (req) => {
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    // Also check the apikey header which Supabase gateway injects
+    const apikeyHeader = req.headers.get("apikey");
     const isCron =
       (cronSecret && token === cronSecret) ||
       (serviceRoleKey && token === serviceRoleKey) ||
-      (anonKey && token === anonKey);
+      (anonKey && token === anonKey) ||
+      (anonKey && apikeyHeader === anonKey);
 
     if (!isCron) {
       // Normal user auth flow
@@ -119,7 +122,7 @@ Deno.serve(async (req) => {
       }
       console.log("sync-subbly: user verified", user.id);
     } else {
-      console.log("sync-subbly: cron invocation");
+      console.log("sync-subbly: cron/service invocation");
     }
 
     const body = await req.json().catch(() => ({}));
