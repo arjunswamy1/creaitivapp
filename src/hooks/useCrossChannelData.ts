@@ -217,7 +217,8 @@ export function useSpendSubsDaily() {
         if (subsErr) throw subsErr;
         for (const row of subsData || []) {
           if (!row.subbly_created_at) continue;
-          const day = row.subbly_created_at.split("T")[0];
+          // Supabase returns timestamps with space separator, not "T"
+          const day = row.subbly_created_at.substring(0, 10);
           ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       }
