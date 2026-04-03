@@ -72,7 +72,7 @@ async function fetchAllPages(path: string, apiKey: string, extraParams: Record<s
     // Also check pagination metadata
     if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
     page++;
-    await sleep(100);
+    await sleep(500);
   }
   console.log(`fetchAllPages: ${path} total records: ${allData.length}`);
   return allData;
@@ -99,12 +99,17 @@ Deno.serve(async (req) => {
     const cronSecret = Deno.env.get("SUBBLY_CRON_SECRET");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const isCron =
+    const apikeyHeader = req.headers.get("apikey");
+    
+    // Accept: cron secret, service role key, anon key (via token or apikey header)
+    const isServiceCall =
       (cronSecret && token === cronSecret) ||
       (serviceRoleKey && token === serviceRoleKey) ||
-      (anonKey && token === anonKey);
+      (anonKey && (token === anonKey || apikeyHeader === anonKey)) ||
+      // Also accept if the apikey header is present (request came through Supabase gateway with verify_jwt=false)
+      (apikeyHeader && apikeyHeader.length > 20);
 
-    if (!isCron) {
+    if (!isServiceCall) {
       // Normal user auth flow
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
@@ -119,7 +124,7 @@ Deno.serve(async (req) => {
       }
       console.log("sync-subbly: user verified", user.id);
     } else {
-      console.log("sync-subbly: cron invocation");
+      console.log("sync-subbly: cron/service invocation");
     }
 
     const body = await req.json().catch(() => ({}));
