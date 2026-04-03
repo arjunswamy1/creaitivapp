@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       // Also accept if the apikey header is present (request came through Supabase gateway with verify_jwt=false)
       (apikeyHeader && apikeyHeader.length > 20);
 
-    if (!isCron) {
+    if (!isServiceCall) {
       // Normal user auth flow
       const supabase = createClient(
         Deno.env.get("SUPABASE_URL")!,
