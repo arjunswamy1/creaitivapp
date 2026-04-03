@@ -72,7 +72,7 @@ async function fetchAllPages(path: string, apiKey: string, extraParams: Record<s
     // Also check pagination metadata
     if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
     page++;
-    await sleep(100);
+    await sleep(500);
   }
   console.log(`fetchAllPages: ${path} total records: ${allData.length}`);
   return allData;
