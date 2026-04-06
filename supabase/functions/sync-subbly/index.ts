@@ -89,10 +89,81 @@ type SyncClientResult = {
   success: boolean;
   subscriptions_synced: number;
   invoices_synced: number;
-  subscription_pages_fetched: number;
-  invoice_pages_fetched: number;
+  subscription_pages_fetched?: number;
+  invoice_pages_fetched?: number;
   error?: string;
 };
+
+/** Get the most recent synced_at for a client's table, or null if empty. */
+async function getLastSyncTimestamp(admin: any, table: string, clientId: string): Promise<string | null> {
+  const { data, error } = await admin
+    .from(table)
+    .select("synced_at")
+    .eq("client_id", clientId)
+    .order("synced_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.warn(`getLastSyncTimestamp: ${table} error for ${clientId}:`, error.message);
+    return null;
+  }
+  return data?.[0]?.synced_at ?? null;
+}
+
+/**
+ * Fetch pages from Subbly until we've covered all records updated/created
+ * since `sinceTimestamp`. Falls back to a hard page cap as a safety net.
+ * Returns all fetched records.
+ */
+async function fetchUntilCovered(
+  path: string,
+  apiKey: string,
+  extraParams: Record<string, string>,
+  sinceTimestamp: string | null,
+  dateField: string,
+  hardMaxPages: number,
+): Promise<any[]> {
+  const allData: any[] = [];
+  let page = 1;
+  let coveredGap = false;
+
+  while (page <= hardMaxPages) {
+    console.log(`fetchUntilCovered: ${path} page ${page} (sinceTs=${sinceTimestamp ?? "none"})`);
+    const result = await subblyFetch(path, apiKey, { ...extraParams, page: String(page), per_page: "100" });
+    const pageData = result?.data;
+    if (!pageData || !Array.isArray(pageData) || pageData.length === 0) {
+      console.log(`fetchUntilCovered: ${path} no more data at page ${page}`);
+      break;
+    }
+    allData.push(...pageData);
+
+    // Check if the oldest record on this page is older than our sync checkpoint
+    if (sinceTimestamp) {
+      const oldestOnPage = pageData.reduce((oldest: string | null, rec: any) => {
+        const d = rec[dateField] ?? rec.created_at;
+        if (!d) return oldest;
+        if (!oldest) return d;
+        return d < oldest ? d : oldest;
+      }, null as string | null);
+
+      if (oldestOnPage && oldestOnPage < sinceTimestamp) {
+        console.log(`fetchUntilCovered: ${path} covered gap (oldest=${oldestOnPage} < since=${sinceTimestamp})`);
+        coveredGap = true;
+      }
+    }
+
+    // If we got fewer items than requested, we've hit the last page
+    if (pageData.length < 100) break;
+    if (result?.pagination?.last_page && page >= result.pagination.last_page) break;
+
+    // If we've covered the gap AND fetched at least 2 full pages, stop
+    if (coveredGap && page >= 2) break;
+
+    page++;
+    await sleep(500);
+  }
+  console.log(`fetchUntilCovered: ${path} total records: ${allData.length} pages: ${page}`);
+  return allData;
+}
 
 async function resolveClientIds(admin: any, requestedClientId?: string) {
   if (requestedClientId) return [requestedClientId];
@@ -143,20 +214,31 @@ async function syncClientData(
 ): Promise<SyncClientResult> {
   console.log(`sync-subbly: syncing client ${clientId}`);
 
+  // Determine last sync timestamps so we know how far back to paginate
+  const [lastSubSync, lastInvSync] = await Promise.all([
+    getLastSyncTimestamp(admin, "subbly_subscriptions", clientId),
+    getLastSyncTimestamp(admin, "subbly_invoices", clientId),
+  ]);
+  console.log(`sync-subbly: last sub sync=${lastSubSync}, last inv sync=${lastInvSync} for ${clientId}`);
+
   let subs: any[] = [];
   try {
-    subs = await fetchAllPages(
+    subs = await fetchUntilCovered(
       "/subscriptions",
       apiKey,
       { "order_by": "updated_at", "order_dir": "desc" },
-      subscriptionPages,
+      lastSubSync,
+      "updated_at",
+      subscriptionPages,  // hard cap safety net
     );
   } catch (updatedSortErr) {
     console.warn(`sync-subbly: updated_at sort failed for ${clientId}, falling back to created_at`, updatedSortErr);
-    subs = await fetchAllPages(
+    subs = await fetchUntilCovered(
       "/subscriptions",
       apiKey,
       { "order_by": "created_at", "order_dir": "desc" },
+      lastSubSync,
+      "created_at",
       subscriptionPages,
     );
   }
@@ -194,10 +276,12 @@ async function syncClientData(
 
   await sleep(150);
 
-  const invoices = await fetchAllPages(
+  const invoices = await fetchUntilCovered(
     "/invoices",
     apiKey,
     { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
+    lastInvSync,
+    "created_at",
     invoicePages,
   );
   let invoicesUpserted = 0;
