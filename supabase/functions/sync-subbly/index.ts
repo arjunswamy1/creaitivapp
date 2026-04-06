@@ -84,6 +84,157 @@ function parseBoundedInt(value: unknown, fallback: number, min: number, max: num
   return Math.min(max, Math.max(min, Math.floor(n)));
 }
 
+type SyncClientResult = {
+  client_id: string;
+  success: boolean;
+  subscriptions_synced: number;
+  invoices_synced: number;
+  subscription_pages_fetched: number;
+  invoice_pages_fetched: number;
+  error?: string;
+};
+
+async function resolveClientIds(admin: any, requestedClientId?: string) {
+  if (requestedClientId) return [requestedClientId];
+
+  const clientIds = new Set<string>();
+
+  const { data: configs, error: configErr } = await admin
+    .from("client_dashboard_config")
+    .select("client_id, revenue_source, enabled_platforms");
+
+  if (configErr) throw new Error(`Failed to load dashboard config: ${configErr.message}`);
+
+  for (const config of configs ?? []) {
+    const enabledPlatforms = Array.isArray(config.enabled_platforms) ? config.enabled_platforms : [];
+    if (config.revenue_source === "subbly" || enabledPlatforms.includes("subbly")) {
+      clientIds.add(config.client_id);
+    }
+  }
+
+  const { data: clients, error: clientsErr } = await admin.from("clients").select("id");
+  if (clientsErr) throw new Error(`Failed to load clients: ${clientsErr.message}`);
+
+  for (const client of clients ?? []) {
+    if (clientIds.has(client.id)) continue;
+
+    const [{ count: subCount, error: subErr }, { count: invCount, error: invErr }] = await Promise.all([
+      admin.from("subbly_subscriptions").select("id", { count: "exact", head: true }).eq("client_id", client.id),
+      admin.from("subbly_invoices").select("id", { count: "exact", head: true }).eq("client_id", client.id),
+    ]);
+
+    if (subErr) throw new Error(`Failed to inspect subscription history for ${client.id}: ${subErr.message}`);
+    if (invErr) throw new Error(`Failed to inspect invoice history for ${client.id}: ${invErr.message}`);
+
+    if ((subCount ?? 0) > 0 || (invCount ?? 0) > 0) {
+      clientIds.add(client.id);
+    }
+  }
+
+  return Array.from(clientIds);
+}
+
+async function syncClientData(
+  admin: any,
+  clientId: string,
+  apiKey: string,
+  subscriptionPages: number,
+  invoicePages: number,
+): Promise<SyncClientResult> {
+  console.log(`sync-subbly: syncing client ${clientId}`);
+
+  let subs: any[] = [];
+  try {
+    subs = await fetchAllPages(
+      "/subscriptions",
+      apiKey,
+      { "order_by": "updated_at", "order_dir": "desc" },
+      subscriptionPages,
+    );
+  } catch (updatedSortErr) {
+    console.warn(`sync-subbly: updated_at sort failed for ${clientId}, falling back to created_at`, updatedSortErr);
+    subs = await fetchAllPages(
+      "/subscriptions",
+      apiKey,
+      { "order_by": "created_at", "order_dir": "desc" },
+      subscriptionPages,
+    );
+  }
+
+  console.log(`sync-subbly: got ${subs.length} subscriptions for ${clientId}`);
+  let subsUpserted = 0;
+  const syncedAt = new Date().toISOString();
+
+  if (subs.length > 0) {
+    const subRows = subs.map((s: any) => ({
+      client_id: clientId,
+      subbly_id: s.id,
+      customer_id: s.customer_id,
+      product_id: s.product_id,
+      quantity: s.quantity ?? 1,
+      currency_code: s.currency_code ?? null,
+      status: s.status,
+      next_payment_date: s.next_payment_date ?? null,
+      last_payment_at: s.last_payment_at ?? null,
+      successful_charges_count: s.successful_charges_count ?? 0,
+      past_due: s.past_due ?? false,
+      subbly_created_at: s.created_at ?? null,
+      synced_at: syncedAt,
+    }));
+
+    for (let i = 0; i < subRows.length; i += 500) {
+      const chunk = subRows.slice(i, i + 500);
+      const { error } = await admin.from("subbly_subscriptions").upsert(chunk, {
+        onConflict: "client_id,subbly_id",
+      });
+      if (error) console.error(`Sub upsert error for ${clientId}:`, error.message);
+      else subsUpserted += chunk.length;
+    }
+  }
+
+  await sleep(150);
+
+  const invoices = await fetchAllPages(
+    "/invoices",
+    apiKey,
+    { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
+    invoicePages,
+  );
+  let invoicesUpserted = 0;
+
+  if (invoices.length > 0) {
+    const invRows = invoices.map((inv: any) => ({
+      client_id: clientId,
+      subbly_id: inv.id,
+      customer_id: inv.customer_id,
+      subscription_id: inv.subscription_id ?? null,
+      status: inv.status,
+      amount: inv.total ?? inv.amount ?? 0,
+      currency_code: inv.currency_code ?? null,
+      invoice_date: inv.created_at ?? null,
+      synced_at: syncedAt,
+    }));
+
+    for (let i = 0; i < invRows.length; i += 500) {
+      const chunk = invRows.slice(i, i + 500);
+      const { error } = await admin.from("subbly_invoices").upsert(chunk, {
+        onConflict: "client_id,subbly_id",
+      });
+      if (error) console.error(`Invoice upsert error for ${clientId}:`, error.message);
+      else invoicesUpserted += chunk.length;
+    }
+  }
+
+  return {
+    client_id: clientId,
+    success: true,
+    subscriptions_synced: subsUpserted,
+    invoices_synced: invoicesUpserted,
+    subscription_pages_fetched: subscriptionPages,
+    invoice_pages_fetched: invoicePages,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -131,6 +282,7 @@ Deno.serve(async (req) => {
     console.log("sync-subbly: body", JSON.stringify(body));
     const clientId = body.client_id;
     const fullSync = Boolean(body.full_sync);
+    const syncAllEligibleClients = !clientId;
     const subscriptionPages = parseBoundedInt(
       body.subscription_pages,
       fullSync ? 50 : 20,
@@ -144,10 +296,6 @@ Deno.serve(async (req) => {
       60,
     );
 
-    if (!clientId) {
-      return new Response(JSON.stringify({ error: "client_id is required" }), { status: 400, headers: corsHeaders });
-    }
-
     const SUBBLY_API_KEY = Deno.env.get("SUBBLY_API_KEY");
     if (!SUBBLY_API_KEY) {
       return new Response(JSON.stringify({ error: "SUBBLY_API_KEY not configured" }), { status: 500, headers: corsHeaders });
@@ -158,97 +306,62 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Sync subscriptions
-    // Default now fetches a deeper window so active subscriber counts stay accurate.
-    // full_sync allows deeper backfill windows when needed.
-    console.log("sync-subbly: fetching subscriptions");
-    let subs: any[] = [];
-    try {
-      subs = await fetchAllPages(
-        "/subscriptions",
-        SUBBLY_API_KEY,
-        { "order_by": "updated_at", "order_dir": "desc" },
-        subscriptionPages,
-      );
-    } catch (updatedSortErr) {
-      console.warn("sync-subbly: updated_at sort failed, falling back to created_at", updatedSortErr);
-      subs = await fetchAllPages(
-        "/subscriptions",
-        SUBBLY_API_KEY,
-        { "order_by": "created_at", "order_dir": "desc" },
-        subscriptionPages,
+    const targetClientIds = await resolveClientIds(admin, clientId);
+    if (targetClientIds.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "No eligible clients found for Subbly sync" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    console.log("sync-subbly: got", subs.length, "subscriptions");
-    let subsUpserted = 0;
 
-    if (subs.length > 0) {
-      const subRows = subs.map((s: any) => ({
-        client_id: clientId,
-        subbly_id: s.id,
-        customer_id: s.customer_id,
-        product_id: s.product_id,
-        quantity: s.quantity ?? 1,
-        currency_code: s.currency_code ?? null,
-        status: s.status,
-        next_payment_date: s.next_payment_date ?? null,
-        last_payment_at: s.last_payment_at ?? null,
-        successful_charges_count: s.successful_charges_count ?? 0,
-        past_due: s.past_due ?? false,
-        subbly_created_at: s.created_at ?? null,
-        synced_at: new Date().toISOString(),
-      }));
+    console.log("sync-subbly: target clients", JSON.stringify(targetClientIds));
 
-      for (let i = 0; i < subRows.length; i += 500) {
-        const chunk = subRows.slice(i, i + 500);
-        const { error } = await admin.from("subbly_subscriptions").upsert(chunk, {
-          onConflict: "client_id,subbly_id",
+    const results: SyncClientResult[] = [];
+    for (const targetClientId of targetClientIds) {
+      try {
+        const result = await syncClientData(
+          admin,
+          targetClientId,
+          SUBBLY_API_KEY,
+          subscriptionPages,
+          invoicePages,
+        );
+        results.push(result);
+      } catch (clientErr: any) {
+        console.error(`sync-subbly: client ${targetClientId} failed`, clientErr);
+        if (!syncAllEligibleClients) throw clientErr;
+
+        results.push({
+          client_id: targetClientId,
+          success: false,
+          subscriptions_synced: 0,
+          invoices_synced: 0,
+          subscription_pages_fetched: subscriptionPages,
+          invoice_pages_fetched: invoicePages,
+          error: clientErr?.message ?? "Unknown error",
         });
-        if (error) console.error("Sub upsert error:", error.message);
-        else subsUpserted += chunk.length;
+      }
+
+      if (syncAllEligibleClients && targetClientIds.length > 1) {
+        await sleep(250);
       }
     }
 
-    // Small delay before fetching invoices
-    await sleep(150);
-
-    // Sync invoices
-    const invoices = await fetchAllPages(
-      "/invoices",
-      SUBBLY_API_KEY,
-      { "statuses[]": "paid", "order_by": "created_at", "order_dir": "desc" },
-      invoicePages
-    );
-    let invoicesUpserted = 0;
-
-    if (invoices.length > 0) {
-      const invRows = invoices.map((inv: any) => ({
-        client_id: clientId,
-        subbly_id: inv.id,
-        customer_id: inv.customer_id,
-        subscription_id: inv.subscription_id ?? null,
-        status: inv.status,
-        amount: inv.total ?? inv.amount ?? 0,
-        currency_code: inv.currency_code ?? null,
-        invoice_date: inv.created_at ?? null,
-        synced_at: new Date().toISOString(),
-      }));
-
-      for (let i = 0; i < invRows.length; i += 500) {
-        const chunk = invRows.slice(i, i + 500);
-        const { error } = await admin.from("subbly_invoices").upsert(chunk, {
-          onConflict: "client_id,subbly_id",
-        });
-        if (error) console.error("Invoice upsert error:", error.message);
-        else invoicesUpserted += chunk.length;
-      }
-    }
+    const subscriptionsSynced = results.reduce((sum, result) => sum + result.subscriptions_synced, 0);
+    const invoicesSynced = results.reduce((sum, result) => sum + result.invoices_synced, 0);
+    const failedClients = results.filter((result) => !result.success);
 
     return new Response(
       JSON.stringify({
-        success: true,
-        subscriptions_synced: subsUpserted,
-        invoices_synced: invoicesUpserted,
+        success: failedClients.length === 0,
+        mode: syncAllEligibleClients ? "all_clients" : "single_client",
+        requested_client_id: clientId ?? null,
+        clients_processed: results.length,
+        clients_failed: failedClients.length,
+        failed_client_ids: failedClients.map((result) => result.client_id),
+        client_results: results,
+        subscriptions_synced: subscriptionsSynced,
+        invoices_synced: invoicesSynced,
         subscription_pages_fetched: subscriptionPages,
         invoice_pages_fetched: invoicePages,
         full_sync: fullSync,
