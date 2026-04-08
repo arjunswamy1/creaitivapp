@@ -37,7 +37,7 @@ const MetaDashboard = () => {
       )}
 
       {/* Meta KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         {isLoading || revenueLoading || (twEnabled && twLoading) ? (
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : showTw ? (
@@ -47,6 +47,7 @@ const MetaDashboard = () => {
             <KPICard title={`${revenueLabel} Revenue`} value={`$${(revenueData?.subblyRevenue ?? 0).toLocaleString()}`} change={revenueData?.subblyRevenueChange} subtitle="Shopify orders" />
             <KPICard title="TW ROAS" value={`${twData.metaTwRoas}x`} change={twData.changes.metaTwRoas} subtitle="Triple Pixel" />
             <KPICard title="TW Purchases" value={(twData.metaTwPurchases).toLocaleString()} change={twData.changes.metaTwPurchases} subtitle="TW-attributed" />
+            <KPICard title="Conv. Rate" value={`${(kpis?.impressions ?? 0) > 0 ? ((twData.metaTwPurchases / (kpis?.impressions ?? 1)) * 100).toFixed(3) : 0}%`} subtitle="TW Sales ÷ Impressions" />
           </>
         ) : (
           <>
