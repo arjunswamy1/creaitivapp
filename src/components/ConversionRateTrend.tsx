@@ -31,7 +31,7 @@ function useConversionRateTrend() {
 
       const { data, error } = await supabase
         .from("triplewhale_summary")
-        .select("date, meta_tw_purchases, meta_impressions, meta_spend, meta_tw_revenue")
+        .select("date, meta_tw_purchases, meta_clicks, meta_impressions, meta_spend, meta_tw_revenue")
         .eq("client_id", clientId)
         .gte("date", fromStr)
         .lte("date", toStr)
@@ -40,15 +40,15 @@ function useConversionRateTrend() {
       if (error) throw error;
 
       return (data || []).map((row: any) => {
-        const impressions = Number(row.meta_impressions || 0);
+        const clicks = Number(row.meta_clicks || 0);
         const purchases = Number(row.meta_tw_purchases || 0);
-        const convRate = impressions > 0 ? (purchases / impressions) * 100 : 0;
+        const convRate = clicks > 0 ? (purchases / clicks) * 100 : 0;
         return {
           date: row.date,
           label: format(new Date(row.date + "T00:00:00"), "MMM d"),
           convRate: Math.round(convRate * 1000) / 1000,
           purchases,
-          impressions,
+          clicks,
           spend: Math.round(Number(row.meta_spend || 0)),
           revenue: Math.round(Number(row.meta_tw_revenue || 0)),
         };
@@ -78,7 +78,7 @@ const ConversionRateTrend = () => {
           Site Conversion Rate Trend
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          TW Purchases ÷ Meta Impressions — daily conversion rate (%)
+          TW Purchases ÷ Meta Clicks — daily conversion rate (%)
         </p>
       </CardHeader>
       <CardContent>
@@ -106,7 +106,7 @@ const ConversionRateTrend = () => {
                       <p className="font-medium text-foreground mb-1">{d.label}</p>
                       <p className="text-primary">Conv. Rate: {d.convRate}%</p>
                       <p className="text-muted-foreground">Purchases: {d.purchases}</p>
-                      <p className="text-muted-foreground">Impressions: {d.impressions.toLocaleString()}</p>
+                      <p className="text-muted-foreground">Clicks: {d.clicks.toLocaleString()}</p>
                       <p className="text-muted-foreground">Spend: ${d.spend.toLocaleString()}</p>
                       <p className="text-muted-foreground">TW Revenue: ${d.revenue.toLocaleString()}</p>
                     </div>

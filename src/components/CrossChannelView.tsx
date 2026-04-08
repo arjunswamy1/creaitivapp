@@ -25,10 +25,10 @@ const CrossChannelView = () => {
   const { data: twData } = useTripleWhaleSummary();
   const { data: metaKpis } = useKPIs("meta");
 
-  // Conversion rate: TW purchases / Meta impressions
+  // Conversion rate: TW purchases / Meta clicks
   const twPurchases = twData?.metaTwPurchases ?? 0;
-  const metaImpressions = metaKpis?.impressions ?? 0;
-  const convRate = metaImpressions > 0 ? Math.round((twPurchases / metaImpressions) * 100000) / 1000 : 0;
+  const metaClicks = twData?.metaClicks ?? metaKpis?.impressions ?? 0;
+  const convRate = metaClicks > 0 ? Math.round((twPurchases / metaClicks) * 100000) / 1000 : 0;
 
   // Determine how many primary KPI cards to show
   const primaryCards = [
@@ -68,7 +68,7 @@ const CrossChannelView = () => {
               />
             )}
             {twEnabled && (
-              <KPICard title="Conv. Rate" value={`${convRate}%`} subtitle="TW Sales ÷ Impressions" />
+              <KPICard title="Conv. Rate" value={`${convRate}%`} subtitle="TW Sales ÷ Clicks" />
             )}
           </>
         )}
