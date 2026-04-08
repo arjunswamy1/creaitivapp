@@ -47,7 +47,7 @@ const MetaDashboard = () => {
             <KPICard title={`${revenueLabel} Revenue`} value={`$${(revenueData?.subblyRevenue ?? 0).toLocaleString()}`} change={revenueData?.subblyRevenueChange} subtitle="Shopify orders" />
             <KPICard title="TW ROAS" value={`${twData.metaTwRoas}x`} change={twData.changes.metaTwRoas} subtitle="Triple Pixel" />
             <KPICard title="TW Purchases" value={(twData.metaTwPurchases).toLocaleString()} change={twData.changes.metaTwPurchases} subtitle="TW-attributed" />
-            <KPICard title="Conv. Rate" value={`${(kpis?.impressions ?? 0) > 0 ? ((twData.metaTwPurchases / (kpis?.impressions ?? 1)) * 100).toFixed(3) : 0}%`} subtitle="TW Sales ÷ Impressions" />
+            <KPICard title="Conv. Rate" value={`${(twData.metaClicks ?? 0) > 0 ? ((twData.metaTwPurchases / twData.metaClicks) * 100).toFixed(2) : 0}%`} subtitle="TW Sales ÷ Clicks" />
           </>
         ) : (
           <>
