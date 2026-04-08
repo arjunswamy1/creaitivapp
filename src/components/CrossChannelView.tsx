@@ -21,6 +21,14 @@ const CrossChannelView = () => {
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
   const showGoogle = platforms.includes("google");
   const ordersLabel = revenueSource === "shopify" ? "New Customers" : "New Subscriptions";
+  const twEnabled = useTripleWhaleEnabled();
+  const { data: twData } = useTripleWhaleSummary();
+  const { data: metaKpis } = useKPIs("meta");
+
+  // Conversion rate: TW purchases / Meta impressions
+  const twPurchases = twData?.metaTwPurchases ?? 0;
+  const metaImpressions = metaKpis?.impressions ?? 0;
+  const convRate = metaImpressions > 0 ? Math.round((twPurchases / metaImpressions) * 100000) / 1000 : 0;
 
   // Determine how many primary KPI cards to show
   const primaryCards = [
