@@ -37,7 +37,7 @@ const MetaDashboard = () => {
       )}
 
       {/* Meta KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         {isLoading || revenueLoading || (twEnabled && twLoading) ? (
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : showTw ? (
