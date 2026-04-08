@@ -67,9 +67,19 @@ const CrossChannelView = () => {
                 change={kpis?.changes.profit}
               />
             )}
+            {twEnabled && (
+              <KPICard title="Conv. Rate" value={`${convRate}%`} subtitle="TW Sales ÷ Impressions" />
+            )}
           </>
         )}
       </div>
+
+      {/* Conversion Rate Trend (TW-enabled clients only) */}
+      {twEnabled && (
+        <div className="mb-6">
+          <ConversionRateTrend />
+        </div>
+      )}
 
       {/* Subscription Metrics (only for Subbly clients) */}
       {revenueSource === "subbly" && <SubblyKPIRow />}
