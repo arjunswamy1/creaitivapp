@@ -4,9 +4,12 @@ import ChannelBreakdown from "@/components/ChannelBreakdown";
 import ForecastCard from "@/components/ForecastCard";
 import BaselineForecastCard from "@/components/optimization/BaselineForecastCard";
 import SubblyKPIRow from "@/components/SubblyKPIRow";
+import ConversionRateTrend from "@/components/ConversionRateTrend";
 
 import { useCrossChannelKPIs } from "@/hooks/useCrossChannelData";
 import { useOptimizationEngine } from "@/hooks/useOptimizationEngine";
+import { useTripleWhaleEnabled, useTripleWhaleSummary } from "@/hooks/useTripleWhaleData";
+import { useKPIs } from "@/hooks/useAdData";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
