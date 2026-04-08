@@ -4,9 +4,12 @@ import ChannelBreakdown from "@/components/ChannelBreakdown";
 import ForecastCard from "@/components/ForecastCard";
 import BaselineForecastCard from "@/components/optimization/BaselineForecastCard";
 import SubblyKPIRow from "@/components/SubblyKPIRow";
+import ConversionRateTrend from "@/components/ConversionRateTrend";
 
 import { useCrossChannelKPIs } from "@/hooks/useCrossChannelData";
 import { useOptimizationEngine } from "@/hooks/useOptimizationEngine";
+import { useTripleWhaleEnabled, useTripleWhaleSummary } from "@/hooks/useTripleWhaleData";
+import { useKPIs } from "@/hooks/useAdData";
 import { useClient } from "@/contexts/ClientContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -18,6 +21,14 @@ const CrossChannelView = () => {
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
   const showGoogle = platforms.includes("google");
   const ordersLabel = revenueSource === "shopify" ? "New Customers" : "New Subscriptions";
+  const twEnabled = useTripleWhaleEnabled();
+  const { data: twData } = useTripleWhaleSummary();
+  const { data: metaKpis } = useKPIs("meta");
+
+  // Conversion rate: TW purchases / Meta impressions
+  const twPurchases = twData?.metaTwPurchases ?? 0;
+  const metaImpressions = metaKpis?.impressions ?? 0;
+  const convRate = metaImpressions > 0 ? Math.round((twPurchases / metaImpressions) * 100000) / 1000 : 0;
 
   // Determine how many primary KPI cards to show
   const primaryCards = [
@@ -56,9 +67,19 @@ const CrossChannelView = () => {
                 change={kpis?.changes.profit}
               />
             )}
+            {twEnabled && (
+              <KPICard title="Conv. Rate" value={`${convRate}%`} subtitle="TW Sales ÷ Impressions" />
+            )}
           </>
         )}
       </div>
+
+      {/* Conversion Rate Trend (TW-enabled clients only) */}
+      {twEnabled && (
+        <div className="mb-6">
+          <ConversionRateTrend />
+        </div>
+      )}
 
       {/* Subscription Metrics (only for Subbly clients) */}
       {revenueSource === "subbly" && <SubblyKPIRow />}
