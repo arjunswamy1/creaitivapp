@@ -29,18 +29,34 @@ function useConversionRateTrend() {
     queryFn: async () => {
       if (!clientId) return [];
 
-      const { data, error } = await supabase
-        .from("triplewhale_summary")
-        .select("date, meta_tw_purchases, meta_clicks, meta_impressions, meta_spend, meta_tw_revenue")
-        .eq("client_id", clientId)
-        .gte("date", fromStr)
-        .lte("date", toStr)
-        .order("date", { ascending: true });
+      const [{ data: twData, error }, { data: adData }] = await Promise.all([
+        supabase
+          .from("triplewhale_summary")
+          .select("date, meta_tw_purchases, meta_spend, meta_tw_revenue")
+          .eq("client_id", clientId)
+          .gte("date", fromStr)
+          .lte("date", toStr)
+          .order("date", { ascending: true }),
+        supabase
+          .from("ad_daily_metrics")
+          .select("date, clicks")
+          .eq("platform", "meta")
+          .eq("client_id", clientId)
+          .gte("date", fromStr)
+          .lte("date", toStr),
+      ]);
 
       if (error) throw error;
 
-      return (data || []).map((row: any) => {
-        const clicks = Number(row.meta_clicks || 0);
+      // Sum clicks by date from ad platform
+      const clicksByDate = new Map<string, number>();
+      for (const row of (adData || [])) {
+        const d = row.date;
+        clicksByDate.set(d, (clicksByDate.get(d) || 0) + Number(row.clicks || 0));
+      }
+
+      return (twData || []).map((row: any) => {
+        const clicks = clicksByDate.get(row.date) || 0;
         const purchases = Number(row.meta_tw_purchases || 0);
         const convRate = clicks > 0 ? (purchases / clicks) * 100 : 0;
         return {
