@@ -10,6 +10,7 @@ export interface KPIData {
   totalRevenue: number;
   blendedROAS: number;
   totalConversions: number;
+  clicks: number;
   cpc: number;
   ctr: number;
   cpm: number;
@@ -77,7 +78,7 @@ export interface CampaignRow {
 
 function calcKPIs(data: any[]): KPIData {
   if (!data || data.length === 0) {
-    return { totalSpend: 0, totalRevenue: 0, blendedROAS: 0, totalConversions: 0, cpc: 0, ctr: 0, cpm: 0, impressions: 0, addToCart: 0, atcRate: 0 };
+    return { totalSpend: 0, totalRevenue: 0, blendedROAS: 0, totalConversions: 0, clicks: 0, cpc: 0, ctr: 0, cpm: 0, impressions: 0, addToCart: 0, atcRate: 0 };
   }
   const totalSpend = data.reduce((s, r) => s + Number(r.spend), 0);
   const totalRevenue = data.reduce((s, r) => s + Number(r.revenue), 0);
@@ -91,6 +92,7 @@ function calcKPIs(data: any[]): KPIData {
     totalRevenue: Math.round(totalRevenue),
     blendedROAS: totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 100) / 100 : 0,
     totalConversions,
+    clicks: totalClicks,
     cpc: totalClicks > 0 ? Math.round((totalSpend / totalClicks) * 100) / 100 : 0,
     ctr: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 10000) / 100 : 0,
     cpm: totalImpressions > 0 ? Math.round((totalSpend / totalImpressions) * 1000 * 100) / 100 : 0,
@@ -651,6 +653,7 @@ export function useGoogleKPIsWithSubblyRevenue() {
         totalRevenue: Math.round(curRevenue),
         blendedROAS: curSpend > 0 ? Math.round((curRevenue / curSpend) * 100) / 100 : 0,
         totalConversions: curConversions,
+        clicks: curClicks,
         cpc: curClicks > 0 ? Math.round((curSpend / curClicks) * 100) / 100 : 0,
         ctr: curImpressions > 0 ? Math.round((curClicks / curImpressions) * 10000) / 100 : 0,
         cpm: curImpressions > 0 ? Math.round((curSpend / curImpressions) * 1000 * 100) / 100 : 0,
@@ -664,6 +667,7 @@ export function useGoogleKPIsWithSubblyRevenue() {
         totalRevenue: Math.round(prevRevenue),
         blendedROAS: prevSpend > 0 ? Math.round((prevRevenue / prevSpend) * 100) / 100 : 0,
         totalConversions: prevConversions,
+        clicks: prevClicks,
         cpc: prevClicks > 0 ? Math.round((prevSpend / prevClicks) * 100) / 100 : 0,
         ctr: prevImpressions > 0 ? Math.round((prevClicks / prevImpressions) * 10000) / 100 : 0,
         cpm: prevImpressions > 0 ? Math.round((prevSpend / prevImpressions) * 1000 * 100) / 100 : 0,

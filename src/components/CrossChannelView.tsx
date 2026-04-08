@@ -25,9 +25,9 @@ const CrossChannelView = () => {
   const { data: twData } = useTripleWhaleSummary();
   const { data: metaKpis } = useKPIs("meta");
 
-  // Conversion rate: TW purchases / Meta clicks
+  // Conversion rate: TW purchases / Meta clicks (from ad platform)
   const twPurchases = twData?.metaTwPurchases ?? 0;
-  const metaClicks = twData?.metaClicks ?? metaKpis?.impressions ?? 0;
+  const metaClicks = metaKpis?.clicks ?? 0;
   const convRate = metaClicks > 0 ? Math.round((twPurchases / metaClicks) * 100000) / 1000 : 0;
 
   // Determine how many primary KPI cards to show
