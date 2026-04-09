@@ -158,7 +158,7 @@ const BillyMetaDashboard = () => {
 
       {/* Campaign Table */}
       <div className="mb-6">
-        <CampaignTable platform="meta" />
+        <CampaignTable platform="meta" verticalFilter={activeVertical} statusFilter="active" />
       </div>
     </>
   );

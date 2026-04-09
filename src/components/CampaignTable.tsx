@@ -65,18 +65,25 @@ function BidStrategyBadge({ strategy, details }: { strategy: string; details: Bi
   );
 }
 
-const CampaignTable = ({ platform, verticalFilter }: { platform?: string; verticalFilter?: VerticalConfig }) => {
+const CampaignTable = ({ platform, verticalFilter, statusFilter }: { platform?: string; verticalFilter?: VerticalConfig; statusFilter?: string }) => {
   const { data: rawCampaigns, isLoading } = useTopCampaigns(platform);
   const { data: ringba } = useRingbaByVertical();
 
-  // Filter campaigns by vertical if provided
+  // Filter campaigns by vertical and/or status if provided
   const campaigns = useMemo(() => {
-    if (!verticalFilter || !rawCampaigns) return rawCampaigns;
-    return rawCampaigns.filter(c => {
-      const plat = (c.platform || platform || "") as "meta" | "google" | "ringba";
-      return matchesVertical(c.name, verticalFilter, plat);
-    });
-  }, [rawCampaigns, verticalFilter, platform]);
+    if (!rawCampaigns) return rawCampaigns;
+    let filtered = rawCampaigns;
+    if (verticalFilter) {
+      filtered = filtered.filter(c => {
+        const plat = (c.platform || platform || "") as "meta" | "google" | "ringba";
+        return matchesVertical(c.name, verticalFilter, plat);
+      });
+    }
+    if (statusFilter) {
+      filtered = filtered.filter(c => c.status === statusFilter);
+    }
+    return filtered;
+  }, [rawCampaigns, verticalFilter, statusFilter, platform]);
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null);
   const [expandedPlatform, setExpandedPlatform] = useState<string | null>(null);
   const isGoogle = platform === "google";
