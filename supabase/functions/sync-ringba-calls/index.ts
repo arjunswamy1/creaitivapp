@@ -145,7 +145,8 @@ async function fetchChunk(
         if (!c.campaignName) return false;
         const name = c.campaignName.toLowerCase();
         return name.includes("flights") || name.includes("bath") || name.includes("bathroom") ||
-               name.includes("pest") || name.includes("porta") || name.includes("potty") || name.includes("portapotty");
+               name.includes("pest") || name.includes("porta") || name.includes("potty") || name.includes("portapotty") ||
+               name.includes("remodel");
       }
     );
 
