@@ -164,7 +164,7 @@ const BillyGoogleDashboard = () => {
 
       {/* Campaign Table — filtered to active vertical */}
       <div className="mb-6">
-        <CampaignTable platform="google" verticalFilter={activeVertical} />
+        <CampaignTable platform="google" verticalFilter={activeVertical} statusFilter={activeVertical.id === "bathroom-remodel" ? undefined : undefined} />
       </div>
     </>
   );
