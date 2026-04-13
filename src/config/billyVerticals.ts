@@ -69,6 +69,17 @@ export const BILLY_VERTICALS: VerticalConfig[] = [
       ringba: { patterns: ["Pest Control US Call Flow"], exactMatch: true },
     },
   },
+  {
+    id: "bathroom-remodel",
+    label: "Bathroom Remodel",
+    emoji: "🛁",
+    description: "Bathroom Remodeling lead-gen funnel",
+    platforms: {
+      meta: { patterns: ["Bath"] },
+      google: { patterns: ["Bath"] },
+      ringba: { patterns: ["Bathroom Remodeling US Call Flow"], exactMatch: true },
+    },
+  },
 ];
 
 /** Check if a campaign name matches any pattern for a given platform */
