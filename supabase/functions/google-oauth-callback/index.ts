@@ -77,9 +77,11 @@ Deno.serve(async (req) => {
           }
         );
         const responseText = await customersRes.text();
+        console.log(`[google-oauth-callback] listAccessibleCustomers status=${customersRes.status} body=${responseText.substring(0, 500)}`);
         try {
           const customersData = JSON.parse(responseText);
           customers = customersData.resourceNames || [];
+          console.log(`[google-oauth-callback] Found ${customers.length} accessible customers for user ${state.user_id} client ${state.client_id}`);
           if (customers.length > 0) {
             const firstCustomerId = customers[0].replace("customers/", "");
             accountName = `Google Ads (${firstCustomerId})`;
