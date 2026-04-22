@@ -64,6 +64,8 @@ Deno.serve(async (req) => {
     const developerToken = Deno.env.get("GOOGLE_DEVELOPER_TOKEN");
     let customers: any[] = [];
     let accountName = "Google Ads";
+    let validationError: string | null = null;
+    let validationDetail: string | null = null;
 
     if (developerToken) {
       try {
@@ -80,20 +82,56 @@ Deno.serve(async (req) => {
         console.log(`[google-oauth-callback] listAccessibleCustomers status=${customersRes.status} body=${responseText.substring(0, 500)}`);
         try {
           const customersData = JSON.parse(responseText);
-          customers = customersData.resourceNames || [];
-          console.log(`[google-oauth-callback] Found ${customers.length} accessible customers for user ${state.user_id} client ${state.client_id}`);
-          if (customers.length > 0) {
-            const firstCustomerId = customers[0].replace("customers/", "");
-            accountName = `Google Ads (${firstCustomerId})`;
+          if (!customersRes.ok || customersData.error) {
+            const gErr = customersData.error || {};
+            const inner = gErr.details?.[0]?.errors?.[0];
+            const code = inner?.errorCode?.authorizationError
+              || inner?.errorCode?.authenticationError
+              || gErr.status
+              || `http_${customersRes.status}`;
+            validationDetail = inner?.message || gErr.message || "Google Ads API rejected the request";
+
+            if (code === "DEVELOPER_TOKEN_PROHIBITED") {
+              // Extract the OAuth client project number from the error message if present
+              const projMatch = /project '(\d+)'/.exec(validationDetail || "");
+              const projectNum = projMatch?.[1];
+              validationError = "developer_token_project_mismatch";
+              console.error(
+                `[google-oauth-callback] Developer token is not authorized for OAuth client project ${projectNum ?? "unknown"}. ` +
+                `Either (a) re-apply for Google Ads API access on that Google Cloud project, or ` +
+                `(b) set GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET to credentials from the project where the developer token was approved.`
+              );
+            } else if (
+              code === "DEVELOPER_TOKEN_NOT_APPROVED" ||
+              code === "DEVELOPER_TOKEN_NOT_ALLOWLISTED_FOR_PROJECT_IN_TEST_MODE"
+            ) {
+              validationError = "developer_token_not_approved";
+            } else {
+              validationError = `google_ads_${String(code).toLowerCase()}`;
+            }
+          } else {
+            customers = customersData.resourceNames || [];
+            console.log(`[google-oauth-callback] Found ${customers.length} accessible customers for user ${state.user_id} client ${state.client_id}`);
+            if (customers.length > 0) {
+              const firstCustomerId = customers[0].replace("customers/", "");
+              accountName = `Google Ads (${firstCustomerId})`;
+            } else {
+              validationError = "no_accessible_customers";
+              validationDetail =
+                "The Google account you authorized has no directly accessible Google Ads customer accounts. If access is via a Manager (MCC), invite this account directly or add MCC support.";
+            }
           }
         } catch {
           console.error("Google Ads API returned non-JSON:", responseText.substring(0, 200));
+          validationError = "google_ads_invalid_response";
         }
       } catch (err) {
         console.error("Failed to fetch Google Ads customers:", err);
+        validationError = "google_ads_fetch_failed";
       }
     } else {
       console.warn("GOOGLE_DEVELOPER_TOKEN not set, skipping customer discovery");
+      validationError = "missing_developer_token";
     }
 
     // Store connection
@@ -116,7 +154,12 @@ Deno.serve(async (req) => {
           refresh_token: refreshToken || null,
           account_name: accountName,
           token_expires_at: tokenExpiresAt,
-          metadata: { customers },
+          metadata: {
+            customers,
+            validation_error: validationError,
+            validation_detail: validationDetail,
+            validated_at: new Date().toISOString(),
+          },
           client_id: state.client_id || null,
         },
         { onConflict: "user_id,platform,client_id" }
@@ -128,6 +171,14 @@ Deno.serve(async (req) => {
     }
 
     const clientParam = state.client_id ? `&client_id=${state.client_id}` : "";
+    if (validationError) {
+      const detailParam = validationDetail
+        ? `&detail=${encodeURIComponent(validationDetail.substring(0, 240))}`
+        : "";
+      return redirect(
+        `/settings?connected=google&warning=${encodeURIComponent(validationError)}${detailParam}${clientParam}`
+      );
+    }
     return redirect(`/settings?connected=google${clientParam}`);
   } catch (err) {
     console.error("Callback error:", err);
