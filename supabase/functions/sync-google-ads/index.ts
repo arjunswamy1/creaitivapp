@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   if (userId) {
     let query = supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id")
+        .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id, selected_ad_account")
       .eq("user_id", userId)
       .eq("platform", "google");
     if (bodyClientId) {
@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     // Cron mode
     const { data: connections } = await supabaseAdmin
       .from("platform_connections")
-      .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id")
+      .select("user_id, access_token, refresh_token, metadata, token_expires_at, client_id, selected_ad_account")
       .eq("platform", "google");
     if (!connections || connections.length === 0) {
       return new Response(JSON.stringify({ message: "No google connections found" }), {
@@ -91,8 +91,21 @@ Deno.serve(async (req) => {
       accessToken = refreshResult.access_token;
     }
 
-    const daysBack = bodyDaysBack || 30;
-    const result = await syncGoogleForUser(supabaseAdmin, conn.user_id, accessToken, conn.metadata, conn.client_id, daysBack, bodyAccountId);
+      const daysBack = bodyDaysBack || 30;
+      const selectedAccountId = conn.selected_ad_account?.id || conn.selected_ad_account?.account_id || null;
+      const preferredHistoricalAccountId = !bodyAccountId && !selectedAccountId
+        ? await resolvePreferredGoogleAccountId(supabaseAdmin, conn.user_id, conn.client_id)
+        : null;
+      const effectiveAccountId = bodyAccountId || selectedAccountId || preferredHistoricalAccountId;
+      const result = await syncGoogleForUser(
+        supabaseAdmin,
+        conn.user_id,
+        accessToken,
+        conn.metadata,
+        conn.client_id,
+        daysBack,
+        effectiveAccountId
+      );
     results.push(result);
   }
 
@@ -880,7 +893,36 @@ function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: st
     current = new Date(chunkEnd);
     current.setDate(current.getDate() + 1);
   }
-  return chunks;
+  return chunks.reverse();
+}
+
+async function resolvePreferredGoogleAccountId(
+  supabase: any,
+  userId: string,
+  clientId: string | null,
+): Promise<string | null> {
+  if (!clientId) return null;
+
+  const { data, error } = await supabase
+    .from("ad_campaigns")
+    .select("account_id, date")
+    .eq("user_id", userId)
+    .eq("client_id", clientId)
+    .eq("platform", "google")
+    .not("account_id", "is", null)
+    .order("date", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.warn(`[resolvePreferredGoogleAccountId] ${error.message}`);
+    return null;
+  }
+
+  const accountId = data?.find((row: any) => row.account_id)?.account_id ?? null;
+  if (accountId) {
+    console.log(`[resolvePreferredGoogleAccountId] Using historical account ${accountId} for client ${clientId}`);
+  }
+  return accountId;
 }
 
 interface ResolvedAccounts {
@@ -968,7 +1010,7 @@ async function queryGoogleAds(customerId: string, accessToken: string, developer
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  return d.toISOString().substring(0, 10);
 }
 
 async function updateSyncLog(supabase: any, syncId: string, status: string, records: number, error?: string) {
