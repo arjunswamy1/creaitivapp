@@ -107,8 +107,13 @@ Deno.serve(async (req) => {
   });
 });
 
-async function refreshGoogleToken(supabase: any, userId: string, refreshToken: string, clientId: string | null = null): Promise<string | null> {
-  if (!refreshToken) return null;
+async function refreshGoogleToken(
+  supabase: any,
+  userId: string,
+  refreshToken: string,
+  clientId: string | null = null,
+): Promise<{ access_token: string | null; error?: string; error_description?: string; needs_reauth?: boolean }> {
+  if (!refreshToken) return { access_token: null, error: "no_refresh_token", needs_reauth: true };
   try {
     const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
@@ -125,7 +130,6 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
       const tokenExpiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : null;
-      // Update token scoped to the specific connection (user + platform + client)
       let updateQuery = supabase
         .from("platform_connections")
         .update({ access_token: data.access_token, token_expires_at: tokenExpiresAt })
@@ -135,13 +139,41 @@ async function refreshGoogleToken(supabase: any, userId: string, refreshToken: s
         updateQuery = updateQuery.eq("client_id", clientId);
       }
       await updateQuery;
-      return data.access_token;
+      return { access_token: data.access_token };
     }
+
     console.error("Token refresh failed:", data);
-    return null;
+
+    // For permanent failures, clear refresh_token so UI surfaces a re-auth prompt
+    const permanentErrors = ["invalid_grant", "unauthorized_client", "invalid_client"];
+    const needsReauth = permanentErrors.includes(data.error);
+    if (needsReauth) {
+      let clearQuery = supabase
+        .from("platform_connections")
+        .update({
+          refresh_token: null,
+          metadata: {
+            validation_error: `refresh_${data.error}`,
+            validation_detail: data.error_description || data.error,
+            validated_at: new Date().toISOString(),
+          },
+        })
+        .eq("user_id", userId)
+        .eq("platform", "google");
+      if (clientId) clearQuery = clearQuery.eq("client_id", clientId);
+      await clearQuery;
+      console.warn(`[refreshGoogleToken] Cleared refresh_token for user ${userId} client ${clientId} due to ${data.error}`);
+    }
+
+    return {
+      access_token: null,
+      error: data.error,
+      error_description: data.error_description,
+      needs_reauth: needsReauth,
+    };
   } catch (err) {
     console.error("Token refresh error:", err);
-    return null;
+    return { access_token: null, error: "network_error", error_description: String(err) };
   }
 }
 
