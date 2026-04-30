@@ -78,11 +78,17 @@ Deno.serve(async (req) => {
     // Refresh token if expired
     let accessToken = conn.access_token;
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
-      accessToken = await refreshGoogleToken(supabaseAdmin, conn.user_id, conn.refresh_token, conn.client_id);
-      if (!accessToken) {
-        results.push({ user_id: conn.user_id, error: "Token refresh failed" });
+      const refreshResult = await refreshGoogleToken(supabaseAdmin, conn.user_id, conn.refresh_token, conn.client_id);
+      if (!refreshResult.access_token) {
+        results.push({
+          user_id: conn.user_id,
+          client_id: conn.client_id,
+          error: `Token refresh failed: ${refreshResult.error || "unknown"}${refreshResult.error_description ? " - " + refreshResult.error_description : ""}`,
+          needs_reauth: refreshResult.needs_reauth,
+        });
         continue;
       }
+      accessToken = refreshResult.access_token;
     }
 
     const daysBack = bodyDaysBack || 30;
