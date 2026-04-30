@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
   const totalSynced = results.reduce((sum: number, r: any) => sum + (r.records_synced || 0), 0);
   const errors = results.filter((r: any) => r.error);
   const responseBody = errors.length === results.length
-    ? { error: errors[0]?.error || "All connections failed" }
+    ? { error: errors[0]?.error || "All connections failed", results }
     : { success: true, records_synced: totalSynced, connections: results.length, results };
   return new Response(JSON.stringify(responseBody), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
