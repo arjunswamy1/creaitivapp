@@ -93,7 +93,10 @@ Deno.serve(async (req) => {
 
       const daysBack = bodyDaysBack || 30;
       const selectedAccountId = conn.selected_ad_account?.id || conn.selected_ad_account?.account_id || null;
-      const effectiveAccountId = bodyAccountId || selectedAccountId;
+      const preferredHistoricalAccountId = !bodyAccountId && !selectedAccountId
+        ? await resolvePreferredGoogleAccountId(supabaseAdmin, conn.user_id, conn.client_id)
+        : null;
+      const effectiveAccountId = bodyAccountId || selectedAccountId || preferredHistoricalAccountId;
       const result = await syncGoogleForUser(
         supabaseAdmin,
         conn.user_id,
@@ -893,6 +896,35 @@ function buildDateChunks(start: Date, end: Date, chunkDays: number): { since: st
   return chunks.reverse();
 }
 
+async function resolvePreferredGoogleAccountId(
+  supabase: any,
+  userId: string,
+  clientId: string | null,
+): Promise<string | null> {
+  if (!clientId) return null;
+
+  const { data, error } = await supabase
+    .from("ad_campaigns")
+    .select("account_id, date")
+    .eq("user_id", userId)
+    .eq("client_id", clientId)
+    .eq("platform", "google")
+    .not("account_id", "is", null)
+    .order("date", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.warn(`[resolvePreferredGoogleAccountId] ${error.message}`);
+    return null;
+  }
+
+  const accountId = data?.find((row: any) => row.account_id)?.account_id ?? null;
+  if (accountId) {
+    console.log(`[resolvePreferredGoogleAccountId] Using historical account ${accountId} for client ${clientId}`);
+  }
+  return accountId;
+}
+
 interface ResolvedAccounts {
   mccId: string | null; // The MCC parent ID to use as login-customer-id, or null if direct account
   childIds: string[];   // The actual accounts to query
@@ -978,7 +1010,7 @@ async function queryGoogleAds(customerId: string, accessToken: string, developer
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split("T")[0];
+  return d.toISOString().substring(0, 10);
 }
 
 async function updateSyncLog(supabase: any, syncId: string, status: string, records: number, error?: string) {
