@@ -5,6 +5,7 @@ import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount } from "@/config/billyVerticals";
 import { format, eachDayOfInterval } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
 
 export interface DailyFunnelRow {
   date: string;
