@@ -96,8 +96,8 @@ export function useFlightsForecast() {
           .from("ringba_calls" as any)
           .select("call_date, revenue, connected, converted, duration_seconds, campaign_name")
           .eq("client_id", clientId)
-          .gte("call_date", fromStr + "T00:00:00.000Z")
-          .lte("call_date", toStr + "T23:59:59.999Z"),
+          .gte("call_date", ringbaDayStartUTC(new Date(fromStr)))
+          .lte("call_date", ringbaDayEndUTC(new Date(toStr))),
         ...campaignQueries,
       ]);
 
