@@ -5,6 +5,7 @@ import { useDateRange } from "@/contexts/DateRangeContext";
 import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical } from "@/config/billyVerticals";
 import { format } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
 
 export interface RingbaPlatformMetrics {
   conversions: number;
