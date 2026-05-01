@@ -30,3 +30,16 @@ export function ringbaDayEndUTC(date: Date): string {
   const nextStr = format(next, "yyyy-MM-dd");
   return `${nextStr}T0${RINGBA_OFFSET_HOURS - 1}:59:59.999Z`;
 }
+
+/**
+ * Given a UTC ISO timestamp from `ringba_calls.call_date`, return the
+ * YYYY-MM-DD date string in Ringba's Eastern Time (fixed UTC-5).
+ *
+ * This makes daily-grouping match Ringba's report exactly.
+ */
+export function ringbaDateKey(utcIso: string): string {
+  const d = new Date(utcIso);
+  // Shift back by 5 hours to get ET local time, then take YYYY-MM-DD
+  const shifted = new Date(d.getTime() - RINGBA_OFFSET_HOURS * 3600 * 1000);
+  return shifted.toISOString().substring(0, 10);
+}
