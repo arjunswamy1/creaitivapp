@@ -56,8 +56,8 @@ export function useRingbaByVertical() {
         .from("ringba_calls")
         .select("duration_seconds, revenue, payout, connected, converted, campaign_name")
         .eq("client_id", clientId)
-        .gte("call_date", fromStr + "T00:00:00.000Z")
-        .lte("call_date", toStr + "T23:59:59.999Z");
+        .gte("call_date", ringbaDayStartUTC(dateRange.from))
+        .lte("call_date", ringbaDayEndUTC(dateRange.to));
 
       if (error) {
         console.error("Ringba vertical fetch error:", error);
