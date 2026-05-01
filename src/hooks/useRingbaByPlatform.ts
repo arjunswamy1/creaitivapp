@@ -45,8 +45,8 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
           .from("ringba_calls")
           .select("duration_seconds, revenue, connected, converted, campaign_name, metadata")
           .eq("client_id", clientId)
-          .gte("call_date", fromStr + "T00:00:00.000Z")
-          .lte("call_date", toStr + "T23:59:59.999Z"),
+          .gte("call_date", ringbaDayStartUTC(dateRange.from))
+          .lte("call_date", ringbaDayEndUTC(dateRange.to)),
         supabase
           .from("ad_daily_metrics")
           .select("platform, spend")
