@@ -131,7 +131,7 @@ export function useFlightsForecast() {
       );
 
       for (const call of verticalCalls) {
-        const d = format(new Date(call.call_date), "yyyy-MM-dd");
+        const d = ringbaDateKey(call.call_date);
         const existing = byDate.get(d) || { spend: 0, clicks: 0, impressions: 0, calls: 0, connectedCalls: 0, callRevenue: 0 };
         existing.calls += 1;
         if (call.connected && Number(call.duration_seconds || 0) > 0) {
