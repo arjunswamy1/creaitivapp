@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
 
 export interface RingbaMetrics {
   totalCalls: number;
@@ -34,8 +35,8 @@ export function useRingbaData() {
         .from("ringba_calls" as any)
         .select("duration_seconds, revenue, payout, connected, converted")
         .eq("client_id", clientId)
-        .gte("call_date", fromStr + "T00:00:00.000Z")
-        .lte("call_date", toStr + "T23:59:59.999Z");
+        .gte("call_date", ringbaDayStartUTC(dateRange.from))
+        .lte("call_date", ringbaDayEndUTC(dateRange.to));
 
       if (error) {
         console.error("Ringba data fetch error:", error);

@@ -4,6 +4,7 @@ import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, matchesVerticalAccount, getAdPlatforms, getVerticalAccountIds } from "@/config/billyVerticals";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
 
 export interface FlightsDailyData {
   date: string;
@@ -95,8 +96,8 @@ export function useFlightsForecast() {
           .from("ringba_calls" as any)
           .select("call_date, revenue, connected, converted, duration_seconds, campaign_name")
           .eq("client_id", clientId)
-          .gte("call_date", fromStr + "T00:00:00.000Z")
-          .lte("call_date", toStr + "T23:59:59.999Z"),
+          .gte("call_date", ringbaDayStartUTC(monthStart))
+          .lte("call_date", ringbaDayEndUTC(monthEnd)),
         ...campaignQueries,
       ]);
 
@@ -130,7 +131,7 @@ export function useFlightsForecast() {
       );
 
       for (const call of verticalCalls) {
-        const d = format(new Date(call.call_date), "yyyy-MM-dd");
+        const d = ringbaDateKey(call.call_date);
         const existing = byDate.get(d) || { spend: 0, clicks: 0, impressions: 0, calls: 0, connectedCalls: 0, callRevenue: 0 };
         existing.calls += 1;
         if (call.connected && Number(call.duration_seconds || 0) > 0) {

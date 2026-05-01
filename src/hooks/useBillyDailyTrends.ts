@@ -5,6 +5,7 @@ import { useClient } from "@/contexts/ClientContext";
 import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount } from "@/config/billyVerticals";
 import { format, eachDayOfInterval } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
 
 export interface DailyFunnelRow {
   date: string;
@@ -82,8 +83,8 @@ export function useBillyDailyTrends() {
           .from("ringba_calls")
           .select("call_date, duration_seconds, revenue, connected, converted, campaign_name")
           .eq("client_id", clientId)
-          .gte("call_date", fromStr + "T00:00:00.000Z")
-          .lte("call_date", toStr + "T23:59:59.999Z"),
+          .gte("call_date", ringbaDayStartUTC(dateRange.from))
+          .lte("call_date", ringbaDayEndUTC(dateRange.to)),
         ...campaignQueries,
       ]);
 
@@ -112,7 +113,7 @@ export function useBillyDailyTrends() {
 
       const ringbaByDate = new Map<string, { totalCalls: number; connected: number; converted: number; revenue: number; totalDuration: number }>();
       for (const c of verticalCalls) {
-        const dateKey = c.call_date.split("T")[0];
+        const dateKey = ringbaDateKey(c.call_date);
         const d = ringbaByDate.get(dateKey) || { totalCalls: 0, connected: 0, converted: 0, revenue: 0, totalDuration: 0 };
         d.totalCalls++;
         const dur = Number(c.duration_seconds || 0);
