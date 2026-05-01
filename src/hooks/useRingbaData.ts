@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format } from "date-fns";
+import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
 
 export interface RingbaMetrics {
   totalCalls: number;
