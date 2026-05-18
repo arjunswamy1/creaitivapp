@@ -106,7 +106,6 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
       }
 
       // No attribution data — split proportionally by ad spend
-      const spendData = (spendResult.data || []) as any[];
       let metaSpend = 0;
       let googleSpend = 0;
       for (const row of spendData) {
