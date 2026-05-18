@@ -5,6 +5,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, matchesVerticalAccount, getAdPlatforms, getVerticalAccountIds } from "@/config/billyVerticals";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface FlightsDailyData {
   date: string;
