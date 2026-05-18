@@ -135,13 +135,9 @@ async function fetchChunk(
     const data = await response.json();
     const records = data.report?.records || [];
 
-    // Client-side filter: only calls from publisher "CPM"
-    // AND matching Billy verticals
+    // Client-side filter: matching Billy verticals (all publishers)
     const matching = records.filter(
       (c: any) => {
-        const publisher = (c.publisherName || "").toLowerCase();
-        if (publisher !== "cpm") return false;
-        
         if (!c.campaignName) return false;
         const name = c.campaignName.toLowerCase();
         return name.includes("flights") || name.includes("bath") || name.includes("bathroom") ||
