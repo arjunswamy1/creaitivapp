@@ -5,6 +5,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, matchesVerticalAccount, getAdPlatforms, getVerticalAccountIds } from "@/config/billyVerticals";
 import { format, startOfMonth, endOfMonth, differenceInDays, getDaysInMonth } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface FlightsDailyData {
   date: string;
@@ -91,15 +92,16 @@ export function useFlightsForecast() {
         return q;
       });
 
-      const [callRes, ...campaignResults] = await Promise.all([
-        supabase
-          .from("ringba_calls" as any)
-          .select("call_date, revenue, connected, converted, duration_seconds, campaign_name")
-          .eq("client_id", clientId)
-          .gte("call_date", ringbaDayStartUTC(monthStart))
-          .lte("call_date", ringbaDayEndUTC(monthEnd)),
+      const [ringbaCalls, ...campaignResults] = await Promise.all([
+        fetchAllRingbaCalls(
+          clientId,
+          ringbaDayStartUTC(monthStart),
+          ringbaDayEndUTC(monthEnd),
+          "call_date, revenue, connected, converted, duration_seconds, campaign_name"
+        ),
         ...campaignQueries,
       ]);
+      const callRes = { data: ringbaCalls, error: null as any };
 
       if (callRes.error) throw callRes.error;
 

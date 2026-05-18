@@ -6,6 +6,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical } from "@/config/billyVerticals";
 import { format } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface VerticalRingbaMetrics {
   totalCalls: number;
@@ -52,19 +53,19 @@ export function useRingbaByVertical() {
     queryFn: async (): Promise<RingbaByVertical> => {
       if (!clientId) return { active: emptyVertical(), all: emptyVertical() };
 
-      const { data, error } = await supabase
-        .from("ringba_calls")
-        .select("duration_seconds, revenue, payout, connected, converted, campaign_name")
-        .eq("client_id", clientId)
-        .gte("call_date", ringbaDayStartUTC(dateRange.from))
-        .lte("call_date", ringbaDayEndUTC(dateRange.to));
-
-      if (error) {
+      let calls: any[] = [];
+      try {
+        calls = await fetchAllRingbaCalls(
+          clientId,
+          ringbaDayStartUTC(dateRange.from),
+          ringbaDayEndUTC(dateRange.to),
+          "duration_seconds, revenue, payout, connected, converted, campaign_name"
+        );
+      } catch (error) {
         console.error("Ringba vertical fetch error:", error);
         return { active: emptyVertical(), all: emptyVertical() };
       }
 
-      const calls = (data || []) as any[];
       const verticalCalls = calls.filter((c) =>
         matchesVertical(c.campaign_name, activeVertical, "ringba")
       );

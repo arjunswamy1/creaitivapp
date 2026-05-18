@@ -6,6 +6,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical } from "@/config/billyVerticals";
 import { format } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface RingbaPlatformMetrics {
   conversions: number;
@@ -39,28 +40,31 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
     queryFn: async (): Promise<RingbaPlatformMetrics> => {
       if (!clientId) return empty();
 
-      // Fetch Ringba calls and platform spend in parallel
-      const [ringbaResult, spendResult] = await Promise.all([
-        supabase
-          .from("ringba_calls")
-          .select("duration_seconds, revenue, connected, converted, campaign_name, metadata")
-          .eq("client_id", clientId)
-          .gte("call_date", ringbaDayStartUTC(dateRange.from))
-          .lte("call_date", ringbaDayEndUTC(dateRange.to)),
-        supabase
-          .from("ad_daily_metrics")
-          .select("platform, spend")
-          .eq("client_id", clientId)
-          .gte("date", fromStr)
-          .lte("date", toStr),
-      ]);
-
-      if (ringbaResult.error) {
-        console.error("Ringba platform fetch error:", ringbaResult.error);
+      let calls: any[] = [];
+      let spendData: any[] = [];
+      try {
+        const [ringbaCalls, spendResult] = await Promise.all([
+          fetchAllRingbaCalls(
+            clientId,
+            ringbaDayStartUTC(dateRange.from),
+            ringbaDayEndUTC(dateRange.to),
+            "duration_seconds, revenue, connected, converted, campaign_name, metadata"
+          ),
+          supabase
+            .from("ad_daily_metrics")
+            .select("platform, spend")
+            .eq("client_id", clientId)
+            .gte("date", fromStr)
+            .lte("date", toStr),
+        ]);
+        calls = ringbaCalls as any[];
+        if (spendResult.error) throw spendResult.error;
+        spendData = (spendResult.data || []) as any[];
+      } catch (error) {
+        console.error("Ringba platform fetch error:", error);
         return empty();
       }
 
-      const calls = (ringbaResult.data || []) as any[];
 
       // Filter by vertical
       const verticalCalls = calls.filter((c) =>
@@ -102,7 +106,6 @@ export function useRingbaByPlatform(platform: "google" | "meta") {
       }
 
       // No attribution data — split proportionally by ad spend
-      const spendData = (spendResult.data || []) as any[];
       let metaSpend = 0;
       let googleSpend = 0;
       for (const row of spendData) {

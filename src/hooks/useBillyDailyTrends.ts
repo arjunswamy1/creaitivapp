@@ -6,6 +6,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical, getAdPlatforms, getVerticalAccountIds, matchesVerticalAccount } from "@/config/billyVerticals";
 import { format, eachDayOfInterval } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC, ringbaDateKey } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface DailyFunnelRow {
   date: string;
@@ -78,15 +79,16 @@ export function useBillyDailyTrends() {
         return q;
       });
 
-      const [ringbaRes, ...campaignResults] = await Promise.all([
-        supabase
-          .from("ringba_calls")
-          .select("call_date, duration_seconds, revenue, connected, converted, campaign_name")
-          .eq("client_id", clientId)
-          .gte("call_date", ringbaDayStartUTC(dateRange.from))
-          .lte("call_date", ringbaDayEndUTC(dateRange.to)),
+      const [ringbaCalls, ...campaignResults] = await Promise.all([
+        fetchAllRingbaCalls(
+          clientId,
+          ringbaDayStartUTC(dateRange.from),
+          ringbaDayEndUTC(dateRange.to),
+          "call_date, duration_seconds, revenue, connected, converted, campaign_name"
+        ),
         ...campaignQueries,
       ]);
+      const ringbaRes = { data: ringbaCalls, error: null as any };
 
       // Aggregate campaigns by date (filtered by vertical patterns)
       const adByDate = new Map<string, { spend: number; impressions: number; clicks: number; conversions: number }>();
