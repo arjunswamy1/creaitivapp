@@ -6,6 +6,7 @@ import { useVertical } from "@/contexts/VerticalContext";
 import { matchesVertical } from "@/config/billyVerticals";
 import { format } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface VerticalRingbaMetrics {
   totalCalls: number;
