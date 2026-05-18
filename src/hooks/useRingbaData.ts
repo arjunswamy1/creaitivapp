@@ -4,6 +4,7 @@ import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format } from "date-fns";
 import { ringbaDayStartUTC, ringbaDayEndUTC } from "@/lib/ringbaDateRange";
+import { fetchAllRingbaCalls } from "@/lib/ringbaFetch";
 
 export interface RingbaMetrics {
   totalCalls: number;
