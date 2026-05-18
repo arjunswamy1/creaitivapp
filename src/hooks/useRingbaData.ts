@@ -32,19 +32,19 @@ export function useRingbaData() {
     queryFn: async (): Promise<RingbaMetrics> => {
       if (!clientId) return emptyMetrics();
 
-      const { data, error } = await supabase
-        .from("ringba_calls" as any)
-        .select("duration_seconds, revenue, payout, connected, converted")
-        .eq("client_id", clientId)
-        .gte("call_date", ringbaDayStartUTC(dateRange.from))
-        .lte("call_date", ringbaDayEndUTC(dateRange.to));
-
-      if (error) {
+      let calls: any[] = [];
+      try {
+        calls = await fetchAllRingbaCalls(
+          clientId,
+          ringbaDayStartUTC(dateRange.from),
+          ringbaDayEndUTC(dateRange.to),
+          "duration_seconds, revenue, payout, connected, converted"
+        );
+      } catch (error) {
         console.error("Ringba data fetch error:", error);
         return emptyMetrics();
       }
 
-      const calls = (data || []) as any[];
       // Only count calls with actual duration as valid
       const validCalls = calls.filter((c) => c.connected && Number(c.duration_seconds || 0) > 0);
       const totalCalls = calls.length;
