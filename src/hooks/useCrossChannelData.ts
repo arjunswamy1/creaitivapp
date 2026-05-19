@@ -203,6 +203,8 @@ export function useSpendSubsDaily() {
           ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       } else {
+        // Subbly uses fixed US Eastern (UTC-5) for day boundaries — match SubblyKPIs.
+        // Widen fetch window by ~1 day on each side so edge-of-day rows shift into the right local bucket.
         const fromUTC = fromStr + "T00:00:00.000Z";
         const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
         const toUTC = toNextDay + "T23:59:59.999Z";
@@ -217,8 +219,9 @@ export function useSpendSubsDaily() {
         if (subsErr) throw subsErr;
         for (const row of subsData || []) {
           if (!row.subbly_created_at) continue;
-          // Supabase returns timestamps with space separator, not "T"
-          const day = row.subbly_created_at.substring(0, 10);
+          // Shift UTC timestamp back by 5h to get the ET calendar day, matching SubblyKPIs.
+          const utcMs = new Date(row.subbly_created_at).getTime();
+          const day = new Date(utcMs - 5 * 3600 * 1000).toISOString().substring(0, 10);
           ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       }
