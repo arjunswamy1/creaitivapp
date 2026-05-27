@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format, addDays, subDays } from "date-fns";
+import { getNewYorkDateString, isRangeIncludingTodayInNewYork } from "@/lib/newYorkTime";
 
 export interface SubblyKPIs {
   newSubscriptions: number;
@@ -25,13 +26,14 @@ export function useSubblyKPIs() {
   return useQuery({
     queryKey: ["subbly-kpis", clientId, fromStr, toStr],
     enabled: !!clientId && enabled,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<SubblyKPIs> => {
       if (!clientId) throw new Error("No client");
 
-      // Subbly uses US Eastern Time (UTC-5) for date boundaries
-      const fromUTC = fromStr + "T05:00:00.000Z";
+      const fromUTC = fromStr + "T00:00:00.000Z";
       const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-      const toUTC = toNextDay + "T04:59:59.999Z";
+      const toUTC = toNextDay + "T23:59:59.999Z";
 
       // 1. New subscriptions created within date range (all statuses)
       const { data: newSubs, error: newSubErr } = await supabase
@@ -76,12 +78,25 @@ export function useSubblyKPIs() {
 
       if (mrrErr) throw mrrErr;
 
-      const newSubCount = (newSubs || []).length;
+      const newSubCount = (newSubs || []).filter((sub) => {
+        if (!sub.subbly_created_at) return false;
+        const day = getNewYorkDateString(new Date(sub.subbly_created_at));
+        return day >= fromStr && day <= toStr;
+      }).length;
       const activeCount = activeSubCount ?? 0;
-      const cancelledInRange = (newSubs || []).filter((s) => s.status === "cancelled").length;
+      const cancelledInRange = (newSubs || []).filter((sub) => {
+        if (sub.status !== "cancelled" || !sub.subbly_created_at) return false;
+        const day = getNewYorkDateString(new Date(sub.subbly_created_at));
+        return day >= fromStr && day <= toStr;
+      }).length;
 
       // Subbly amounts are in cents, convert to dollars
-      const totalRevenue = (invoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
+      const totalRevenue = (invoices || []).reduce((sum, invoice) => {
+        if (!invoice.invoice_date) return sum;
+        const day = getNewYorkDateString(new Date(invoice.invoice_date));
+        if (day < fromStr || day > toStr) return sum;
+        return sum + Number(invoice.amount);
+      }, 0) / 100;
 
       // MRR = sum of paid invoices in last 30 days (already ~1 month window)
       const mrr = Math.round((mrrInvoices || []).reduce((s, i) => s + Number(i.amount), 0) / 100);
