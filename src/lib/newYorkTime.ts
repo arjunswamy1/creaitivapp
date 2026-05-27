@@ -29,8 +29,8 @@ export function getTodayInNewYork(): string {
 
 export function isRangeIncludingTodayInNewYork(from: Date, to: Date): boolean {
   const today = getTodayInNewYork();
-  const fromNy = getNewYorkDateString(from);
-  const toNy = getNewYorkDateString(to);
+  const fromLocal = from.toLocaleDateString("en-CA");
+  const toLocal = to.toLocaleDateString("en-CA");
 
-  return fromNy <= today && today <= toNy;
+  return fromLocal <= today && today <= toLocal;
 }

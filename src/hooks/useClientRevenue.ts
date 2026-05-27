@@ -47,13 +47,17 @@ async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: stri
 
   if (error) throw error;
   // Subbly amounts are in cents
-  const revenue = (data || []).reduce((sum, invoice) => {
-    if (!invoice.invoice_date) return sum;
+  const matchingInvoices = (data || []).filter((invoice) => {
+    if (!invoice.invoice_date) return false;
     const day = getNewYorkDateString(new Date(invoice.invoice_date));
-    if (day < fromStr || day > toStr) return sum;
+    return day >= fromStr && day <= toStr;
+  });
+
+  const revenue = matchingInvoices.reduce((sum, invoice) => {
+    if (!invoice.invoice_date) return sum;
     return sum + Number(invoice.amount);
   }, 0) / 100;
-  return { revenue, orders: (data || []).length };
+  return { revenue, orders: matchingInvoices.length };
 }
 
 async function fetchShopifyRevenue(clientId: string, fromStr: string, toStr: string) {
