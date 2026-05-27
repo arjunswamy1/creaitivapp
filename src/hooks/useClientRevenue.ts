@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format, addDays } from "date-fns";
+import { getNewYorkDateString, isRangeIncludingTodayInNewYork } from "@/lib/newYorkTime";
 
 /**
  * Unified revenue hook that fetches from the correct source based on client config.
@@ -17,6 +18,8 @@ export function useClientRevenue(fromStr: string, toStr: string, dateRange: { fr
   return useQuery({
     queryKey: ["client-revenue", clientId, fromStr, toStr, revenueSource],
     enabled: !!clientId,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!clientId) return { revenue: 0, orders: 0 };
 
