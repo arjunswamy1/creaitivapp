@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
 import { format, addDays } from "date-fns";
+import { getNewYorkDateString, isRangeIncludingTodayInNewYork } from "@/lib/newYorkTime";
 
 /**
  * Unified revenue hook that fetches from the correct source based on client config.
@@ -17,6 +18,8 @@ export function useClientRevenue(fromStr: string, toStr: string, dateRange: { fr
   return useQuery({
     queryKey: ["client-revenue", clientId, fromStr, toStr, revenueSource],
     enabled: !!clientId,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!clientId) return { revenue: 0, orders: 0 };
 
@@ -30,13 +33,13 @@ export function useClientRevenue(fromStr: string, toStr: string, dateRange: { fr
 }
 
 async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: string, dateRange: { from: Date; to: Date }) {
-  const fromUTC = fromStr + "T05:00:00.000Z";
+  const fromUTC = fromStr + "T00:00:00.000Z";
   const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-  const toUTC = toNextDay + "T04:59:59.999Z";
+  const toUTC = toNextDay + "T23:59:59.999Z";
 
   const { data, error } = await supabase
     .from("subbly_invoices")
-    .select("amount")
+    .select("amount, invoice_date")
     .eq("client_id", clientId)
     .eq("status", "paid")
     .gte("invoice_date", fromUTC)
@@ -44,8 +47,17 @@ async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: stri
 
   if (error) throw error;
   // Subbly amounts are in cents
-  const revenue = (data || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
-  return { revenue, orders: (data || []).length };
+  const matchingInvoices = (data || []).filter((invoice) => {
+    if (!invoice.invoice_date) return false;
+    const day = getNewYorkDateString(new Date(invoice.invoice_date));
+    return day >= fromStr && day <= toStr;
+  });
+
+  const revenue = matchingInvoices.reduce((sum, invoice) => {
+    if (!invoice.invoice_date) return sum;
+    return sum + Number(invoice.amount);
+  }, 0) / 100;
+  return { revenue, orders: matchingInvoices.length };
 }
 
 async function fetchShopifyRevenue(clientId: string, fromStr: string, toStr: string) {
@@ -92,19 +104,22 @@ export async function getClientOrders(
     const result = await fetchShopifyRevenue(clientId, fromStr, toStr);
     return result.orders;
   } else {
-    // Subbly subscriptions count
-    const fromUTC = fromStr + "T05:00:00.000Z";
+    const fromUTC = fromStr + "T00:00:00.000Z";
     const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-    const toUTC = toNextDay + "T04:59:59.999Z";
+    const toUTC = toNextDay + "T23:59:59.999Z";
 
     const { data, error } = await supabase
       .from("subbly_subscriptions")
-      .select("id")
+      .select("id, subbly_created_at")
       .eq("client_id", clientId)
       .gte("subbly_created_at", fromUTC)
       .lte("subbly_created_at", toUTC);
 
     if (error) throw error;
-    return (data || []).length;
+    return (data || []).filter((row) => {
+      if (!row.subbly_created_at) return false;
+      const day = getNewYorkDateString(new Date(row.subbly_created_at));
+      return day >= fromStr && day <= toStr;
+    }).length;
   }
 }

@@ -4,6 +4,7 @@ import { useDateRange } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { format, differenceInDays, subDays, addDays } from "date-fns";
 import { getClientRevenue, getClientOrders } from "@/hooks/useClientRevenue";
+import { getNewYorkDateString, isRangeIncludingTodayInNewYork } from "@/lib/newYorkTime";
 
 function useDateStrings() {
   const { dateRange } = useDateRange();
@@ -91,6 +92,8 @@ export function useCrossChannelKPIs() {
   return useQuery({
     queryKey: ["cross-channel-kpis", fromStr, toStr, clientId, revenueSource],
     enabled: !!clientId,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<CrossChannelKPIs> => {
       if (!clientId) throw new Error("No client");
 
@@ -170,6 +173,8 @@ export function useSpendSubsDaily() {
   return useQuery({
     queryKey: ["spend-subs-daily", fromStr, toStr, clientId, revenueSource],
     enabled: !!clientId,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       if (!clientId) return [];
 
@@ -203,8 +208,6 @@ export function useSpendSubsDaily() {
           ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       } else {
-        // Subbly uses fixed US Eastern (UTC-5) for day boundaries — match SubblyKPIs.
-        // Widen fetch window by ~1 day on each side so edge-of-day rows shift into the right local bucket.
         const fromUTC = fromStr + "T00:00:00.000Z";
         const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
         const toUTC = toNextDay + "T23:59:59.999Z";
@@ -219,9 +222,7 @@ export function useSpendSubsDaily() {
         if (subsErr) throw subsErr;
         for (const row of subsData || []) {
           if (!row.subbly_created_at) continue;
-          // Shift UTC timestamp back by 5h to get the ET calendar day, matching SubblyKPIs.
-          const utcMs = new Date(row.subbly_created_at).getTime();
-          const day = new Date(utcMs - 5 * 3600 * 1000).toISOString().substring(0, 10);
+          const day = getNewYorkDateString(new Date(row.subbly_created_at));
           ordersByDay.set(day, (ordersByDay.get(day) || 0) + 1);
         }
       }
