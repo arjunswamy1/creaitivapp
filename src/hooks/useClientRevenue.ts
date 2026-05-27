@@ -33,13 +33,13 @@ export function useClientRevenue(fromStr: string, toStr: string, dateRange: { fr
 }
 
 async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: string, dateRange: { from: Date; to: Date }) {
-  const fromUTC = fromStr + "T05:00:00.000Z";
+  const fromUTC = fromStr + "T00:00:00.000Z";
   const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-  const toUTC = toNextDay + "T04:59:59.999Z";
+  const toUTC = toNextDay + "T23:59:59.999Z";
 
   const { data, error } = await supabase
     .from("subbly_invoices")
-    .select("amount")
+    .select("amount, invoice_date")
     .eq("client_id", clientId)
     .eq("status", "paid")
     .gte("invoice_date", fromUTC)
@@ -47,7 +47,12 @@ async function fetchSubblyRevenue(clientId: string, fromStr: string, toStr: stri
 
   if (error) throw error;
   // Subbly amounts are in cents
-  const revenue = (data || []).reduce((s, i) => s + Number(i.amount), 0) / 100;
+  const revenue = (data || []).reduce((sum, invoice) => {
+    if (!invoice.invoice_date) return sum;
+    const day = getNewYorkDateString(new Date(invoice.invoice_date));
+    if (day < fromStr || day > toStr) return sum;
+    return sum + Number(invoice.amount);
+  }, 0) / 100;
   return { revenue, orders: (data || []).length };
 }
 
@@ -95,19 +100,22 @@ export async function getClientOrders(
     const result = await fetchShopifyRevenue(clientId, fromStr, toStr);
     return result.orders;
   } else {
-    // Subbly subscriptions count
-    const fromUTC = fromStr + "T05:00:00.000Z";
+    const fromUTC = fromStr + "T00:00:00.000Z";
     const toNextDay = format(addDays(dateRange.to, 1), "yyyy-MM-dd");
-    const toUTC = toNextDay + "T04:59:59.999Z";
+    const toUTC = toNextDay + "T23:59:59.999Z";
 
     const { data, error } = await supabase
       .from("subbly_subscriptions")
-      .select("id")
+      .select("id, subbly_created_at")
       .eq("client_id", clientId)
       .gte("subbly_created_at", fromUTC)
       .lte("subbly_created_at", toUTC);
 
     if (error) throw error;
-    return (data || []).length;
+    return (data || []).filter((row) => {
+      if (!row.subbly_created_at) return false;
+      const day = getNewYorkDateString(new Date(row.subbly_created_at));
+      return day >= fromStr && day <= toStr;
+    }).length;
   }
 }
