@@ -1,10 +1,11 @@
 import { Package } from "lucide-react";
 import KPICard from "@/components/KPICard";
-import { useSubblyKPIs } from "@/hooks/useSubblyData";
+import { useSubblyKPIs, useSubblyRevenueSplit } from "@/hooks/useSubblyData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SubblyKPIRow = () => {
   const { data, isLoading, isError } = useSubblyKPIs();
+  const { data: split, isLoading: splitLoading } = useSubblyRevenueSplit();
 
   if (isError || (!isLoading && !data)) return null;
 
@@ -16,6 +17,7 @@ const SubblyKPIRow = () => {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+
         ) : (
           <>
             <KPICard
