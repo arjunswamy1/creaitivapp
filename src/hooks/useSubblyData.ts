@@ -115,3 +115,41 @@ export function useSubblyKPIs() {
     },
   });
 }
+export interface SubblyRevenueSplit {
+  newRevenue: number;
+  renewalRevenue: number;
+  newInvoices: number;
+  renewalInvoices: number;
+}
+
+/** Splits paid Subbly revenue into first-ever orders (new customers) vs renewals. */
+export function useSubblyRevenueSplit() {
+  const { activeClient, dashboardConfig } = useClient();
+  const { dateRange } = useDateRange();
+  const clientId = activeClient?.id;
+  const enabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+  const fromStr = format(dateRange.from, "yyyy-MM-dd");
+  const toStr = format(dateRange.to, "yyyy-MM-dd");
+
+  return useQuery({
+    queryKey: ["subbly-revenue-split", clientId, fromStr, toStr],
+    enabled: !!clientId && enabled,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<SubblyRevenueSplit> => {
+      const { data, error } = await (supabase as any).rpc("subbly_new_vs_renewal_revenue", {
+        _client_id: clientId,
+        _from: fromStr,
+        _to: toStr,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      return {
+        newRevenue: Math.round(Number(row?.new_revenue || 0) * 100) / 100,
+        renewalRevenue: Math.round(Number(row?.renewal_revenue || 0) * 100) / 100,
+        newInvoices: Number(row?.new_invoices || 0),
+        renewalInvoices: Number(row?.renewal_invoices || 0),
+      };
+    },
+  });
+}
