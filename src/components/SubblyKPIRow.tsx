@@ -44,8 +44,34 @@ const SubblyKPIRow = () => {
           </>
         )}
       </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+        {splitLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+        ) : (
+          <>
+            <KPICard
+              title="New Subscription Revenue"
+              value={`$${(split?.newRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              subtitle={`${split?.newInvoices ?? 0} first-time orders`}
+            />
+            <KPICard
+              title="Renewal Revenue"
+              value={`$${(split?.renewalRevenue ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              subtitle={`${split?.renewalInvoices ?? 0} renewals`}
+            />
+            <KPICard
+              title="% Revenue from New Subs"
+              value={`${(() => {
+                const total = (split?.newRevenue ?? 0) + (split?.renewalRevenue ?? 0);
+                return total > 0 ? Math.round(((split?.newRevenue ?? 0) / total) * 1000) / 10 : 0;
+              })()}%`}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 };
+
 
 export default SubblyKPIRow;
