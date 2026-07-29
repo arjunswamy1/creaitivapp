@@ -66,9 +66,21 @@ const SubblyKPIRow = () => {
                 return total > 0 ? Math.round(((split?.newRevenue ?? 0) / total) * 1000) / 10 : 0;
               })()}%`}
             />
+            <KPICard
+              title={`CPM Commission (${commission?.monthLabel ?? ""})`}
+              value={`$${(commission?.billable ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+              subtitle={
+                commission
+                  ? commission.isMinimum
+                    ? `minimum — 6% = $${commission.commissionOnSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "6% of new customer revenue"
+                  : undefined
+              }
+            />
           </>
         )}
       </div>
+
     </div>
   );
 };
