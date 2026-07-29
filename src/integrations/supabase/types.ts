@@ -1528,6 +1528,15 @@ export type Database = {
         Args: { _client_id: string; _user_id: string }
         Returns: boolean
       }
+      subbly_new_vs_renewal_revenue: {
+        Args: { _client_id: string; _from: string; _to: string }
+        Returns: {
+          new_invoices: number
+          new_revenue: number
+          renewal_invoices: number
+          renewal_revenue: number
+        }[]
+      }
     }
     Enums: {
       client_role: "agency_admin" | "client_admin" | "viewer"
