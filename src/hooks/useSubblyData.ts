@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClient } from "@/contexts/ClientContext";
 import { useDateRange } from "@/contexts/DateRangeContext";
-import { format, addDays, subDays } from "date-fns";
+import { format, addDays, subDays, startOfMonth, endOfMonth } from "date-fns";
 import { getNewYorkDateString, isRangeIncludingTodayInNewYork } from "@/lib/newYorkTime";
 
 export interface SubblyKPIs {
@@ -149,6 +149,55 @@ export function useSubblyRevenueSplit() {
         renewalRevenue: Math.round(Number(row?.renewal_revenue || 0) * 100) / 100,
         newInvoices: Number(row?.new_invoices || 0),
         renewalInvoices: Number(row?.renewal_invoices || 0),
+      };
+    },
+  });
+}
+
+export const CPM_COMMISSION_RATE = 0.06;
+export const CPM_COMMISSION_MINIMUM = 2350;
+
+export interface SubblyCommission {
+  monthLabel: string;
+  newRevenue: number;
+  commissionOnSales: number;
+  billable: number;
+  isMinimum: boolean;
+}
+
+/**
+ * Connect Paid Media commission: 6% of new-customer revenue for the calendar month
+ * of the selected date range, billed at a $2,350 monthly minimum.
+ */
+export function useCPMCommission() {
+  const { activeClient, dashboardConfig } = useClient();
+  const { dateRange } = useDateRange();
+  const clientId = activeClient?.id;
+  const enabled = dashboardConfig?.enabled_platforms?.includes("subbly") ?? false;
+  const monthFrom = format(startOfMonth(dateRange.to), "yyyy-MM-dd");
+  const monthTo = format(endOfMonth(dateRange.to), "yyyy-MM-dd");
+
+  return useQuery({
+    queryKey: ["cpm-commission", clientId, monthFrom, monthTo],
+    enabled: !!clientId && enabled,
+    refetchInterval: isRangeIncludingTodayInNewYork(dateRange.from, dateRange.to) ? 60_000 : false,
+    refetchOnWindowFocus: true,
+    queryFn: async (): Promise<SubblyCommission> => {
+      const { data, error } = await (supabase as any).rpc("subbly_new_vs_renewal_revenue", {
+        _client_id: clientId,
+        _from: monthFrom,
+        _to: monthTo,
+      });
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data;
+      const newRevenue = Number(row?.new_revenue || 0);
+      const commissionOnSales = Math.round(newRevenue * CPM_COMMISSION_RATE * 100) / 100;
+      return {
+        monthLabel: format(dateRange.to, "MMMM yyyy"),
+        newRevenue: Math.round(newRevenue * 100) / 100,
+        commissionOnSales,
+        billable: Math.max(commissionOnSales, CPM_COMMISSION_MINIMUM),
+        isMinimum: commissionOnSales <= CPM_COMMISSION_MINIMUM,
       };
     },
   });
