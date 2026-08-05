@@ -95,6 +95,9 @@ const AccountSelector = () => {
     }
   };
 
+  // Client viewers shouldn't be able to browse/switch agency ad accounts
+  if (!isAgencyAdmin) return null;
+
   if (loading || accounts.length === 0) return null;
 
   return (
