@@ -19,7 +19,7 @@ const AccountSelector = () => {
   const [accounts, setAccounts] = useState<AdAccount[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const { activeClient } = useClient();
+  const { activeClient, isAgencyAdmin } = useClient();
   const clientId = activeClient?.id;
 
   useEffect(() => {
@@ -41,8 +41,29 @@ const AccountSelector = () => {
 
       if (data) {
         const adAccounts: AdAccount[] = (data.metadata as any)?.ad_accounts || [];
-        setAccounts(adAccounts);
         const sel = data.selected_ad_account as unknown as SelectedAccount | null;
+
+        // Only offer accounts that actually have synced data for this client,
+        // plus the currently selected one. Prevents unrelated agency accounts
+        // (e.g. other clients' ad accounts) from appearing in a client's view.
+        let allowedIds: string[] = [];
+        if (clientId) {
+          const { data: rows } = await supabase
+            .from("ad_campaigns")
+            .select("account_id")
+            .eq("client_id", clientId)
+            .eq("platform", "meta")
+            .not("account_id", "is", null)
+            .limit(1000);
+          allowedIds = Array.from(new Set((rows || []).map((r: any) => String(r.account_id))));
+        }
+
+        const filtered = adAccounts.filter((a) => {
+          const bare = String(a.account_id || a.id).replace(/^act_/, "");
+          return a.id === sel?.id || allowedIds.includes(bare);
+        });
+
+        setAccounts(filtered.length > 0 ? filtered : sel ? [{ id: sel.id, name: sel.name }] : []);
         if (sel?.id) {
           setSelected(sel.id);
         }
@@ -51,6 +72,7 @@ const AccountSelector = () => {
     };
     fetchAccounts();
   }, [clientId]);
+
 
   const saveSelection = async (account: AdAccount) => {
     let query = supabase
