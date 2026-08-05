@@ -43,27 +43,34 @@ const AccountSelector = () => {
         const adAccounts: AdAccount[] = (data.metadata as any)?.ad_accounts || [];
         const sel = data.selected_ad_account as unknown as SelectedAccount | null;
 
-        // Only offer accounts that actually have synced data for this client,
-        // plus the currently selected one. Prevents unrelated agency accounts
-        // (e.g. other clients' ad accounts) from appearing in a client's view.
-        let allowedIds: string[] = [];
-        if (clientId) {
-          const { data: rows } = await supabase
-            .from("ad_campaigns")
-            .select("account_id")
-            .eq("client_id", clientId)
-            .eq("platform", "meta")
-            .not("account_id", "is", null)
-            .limit(1000);
-          allowedIds = Array.from(new Set((rows || []).map((r: any) => String(r.account_id))));
+        if (isAgencyAdmin) {
+          // Agency admins can freely filter across every ad account on the connection.
+          setAccounts(adAccounts.length > 0 ? adAccounts : sel ? [{ id: sel.id, name: sel.name }] : []);
+        } else {
+          // Client users only ever see accounts that have synced data for their own client,
+          // so unrelated agency accounts can never appear in their view.
+          let allowedIds: string[] = [];
+          if (clientId) {
+            const { data: rows } = await supabase
+              .from("ad_campaigns")
+              .select("account_id")
+              .eq("client_id", clientId)
+              .eq("platform", "meta")
+              .not("account_id", "is", null)
+              .limit(1000);
+            allowedIds = Array.from(new Set((rows || []).map((r: any) => String(r.account_id))));
+          }
+
+          const filtered = adAccounts.filter((a) => {
+            const bare = String(a.account_id || a.id).replace(/^act_/, "");
+            return allowedIds.includes(bare);
+          });
+
+          setAccounts(
+            filtered.length > 0 ? filtered : sel ? [{ id: sel.id, name: sel.name }] : []
+          );
         }
 
-        const filtered = adAccounts.filter((a) => {
-          const bare = String(a.account_id || a.id).replace(/^act_/, "");
-          return a.id === sel?.id || allowedIds.includes(bare);
-        });
-
-        setAccounts(filtered.length > 0 ? filtered : sel ? [{ id: sel.id, name: sel.name }] : []);
         if (sel?.id) {
           setSelected(sel.id);
         }
@@ -71,7 +78,7 @@ const AccountSelector = () => {
       setLoading(false);
     };
     fetchAccounts();
-  }, [clientId]);
+  }, [clientId, isAgencyAdmin]);
 
 
   const saveSelection = async (account: AdAccount) => {
@@ -88,6 +95,7 @@ const AccountSelector = () => {
   };
 
   const handleChange = async (accountId: string) => {
+    if (!isAgencyAdmin) return;
     setSelected(accountId);
     const account = accounts.find((a) => a.id === accountId);
     if (account) {
@@ -95,10 +103,19 @@ const AccountSelector = () => {
     }
   };
 
-  // Client viewers shouldn't be able to browse/switch agency ad accounts
-  if (!isAgencyAdmin) return null;
-
   if (loading || accounts.length === 0) return null;
+
+  // Client users see their own account as a static label — no switching.
+  if (!isAgencyAdmin) {
+    const current = accounts.find((a) => a.id === selected) || accounts[0];
+    return (
+      <div className="flex items-center gap-1.5 h-8 px-3 text-xs rounded-md bg-card border border-border text-foreground">
+        <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="truncate max-w-[180px]">{current.name}</span>
+      </div>
+    );
+  }
+
 
   return (
     <Select value={selected || undefined} onValueChange={handleChange}>
