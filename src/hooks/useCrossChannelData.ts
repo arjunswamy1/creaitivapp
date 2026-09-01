@@ -26,6 +26,9 @@ export interface CrossChannelKPIs {
   googleSpend: number;
   metaSpend: number;
   newSubscriptions: number;
+  paidConversions: number;
+  organicSubscriptions: number;
+  paidCAC: number;
   totalCAC: number;
   totalRevenue: number;
   blendedROAS: number;
@@ -38,6 +41,9 @@ export interface CrossChannelKPIs {
     googleSpend: number | null;
     metaSpend: number | null;
     newSubscriptions: number | null;
+    paidConversions: number | null;
+    organicSubscriptions: number | null;
+    paidCAC: number | null;
     totalCAC: number | null;
     totalRevenue: number | null;
     blendedROAS: number | null;
@@ -48,7 +54,7 @@ export interface CrossChannelKPIs {
 async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: string, toStr: string) {
   let query = supabase
     .from("ad_daily_metrics")
-    .select("platform, spend")
+    .select("platform, spend, conversions")
     .gte("date", fromStr)
     .lte("date", toStr)
     .neq("platform", "shopify"); // Exclude shopify from ad spend
@@ -57,14 +63,22 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
   const { data, error } = await query;
   if (error) throw error;
 
-  let googleSpend = 0, metaSpend = 0;
+  let googleSpend = 0, metaSpend = 0, conversions = 0;
   for (const row of data || []) {
     const spend = Number(row.spend);
     if (row.platform === "google") googleSpend += spend;
     else if (row.platform === "meta") metaSpend += spend;
+    else continue;
+    conversions += Number((row as any).conversions || 0);
   }
-  return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend) };
+  return {
+    googleSpend: Math.round(googleSpend),
+    metaSpend: Math.round(metaSpend),
+    totalSpend: Math.round(googleSpend + metaSpend),
+    conversions: Math.round(conversions),
+  };
 }
+
 
 async function fetchShopifyCosts(clientId: string, fromStr: string, toStr: string) {
   const { data, error } = await supabase
