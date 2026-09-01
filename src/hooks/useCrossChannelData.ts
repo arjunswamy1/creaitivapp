@@ -26,6 +26,9 @@ export interface CrossChannelKPIs {
   googleSpend: number;
   metaSpend: number;
   newSubscriptions: number;
+  paidConversions: number;
+  organicSubscriptions: number;
+  paidCAC: number;
   totalCAC: number;
   totalRevenue: number;
   blendedROAS: number;
@@ -38,6 +41,9 @@ export interface CrossChannelKPIs {
     googleSpend: number | null;
     metaSpend: number | null;
     newSubscriptions: number | null;
+    paidConversions: number | null;
+    organicSubscriptions: number | null;
+    paidCAC: number | null;
     totalCAC: number | null;
     totalRevenue: number | null;
     blendedROAS: number | null;
@@ -48,7 +54,7 @@ export interface CrossChannelKPIs {
 async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: string, toStr: string) {
   let query = supabase
     .from("ad_daily_metrics")
-    .select("platform, spend")
+    .select("platform, spend, conversions")
     .gte("date", fromStr)
     .lte("date", toStr)
     .neq("platform", "shopify"); // Exclude shopify from ad spend
@@ -57,14 +63,22 @@ async function fetchAdSpendByPlatform(clientId: string | undefined, fromStr: str
   const { data, error } = await query;
   if (error) throw error;
 
-  let googleSpend = 0, metaSpend = 0;
+  let googleSpend = 0, metaSpend = 0, conversions = 0;
   for (const row of data || []) {
     const spend = Number(row.spend);
     if (row.platform === "google") googleSpend += spend;
     else if (row.platform === "meta") metaSpend += spend;
+    else continue;
+    conversions += Number((row as any).conversions || 0);
   }
-  return { googleSpend: Math.round(googleSpend), metaSpend: Math.round(metaSpend), totalSpend: Math.round(googleSpend + metaSpend) };
+  return {
+    googleSpend: Math.round(googleSpend),
+    metaSpend: Math.round(metaSpend),
+    totalSpend: Math.round(googleSpend + metaSpend),
+    conversions: Math.round(conversions),
+  };
 }
+
 
 async function fetchShopifyCosts(clientId: string, fromStr: string, toStr: string) {
   const { data, error } = await supabase
@@ -134,6 +148,14 @@ export function useCrossChannelKPIs() {
       const currentROAS = currentAds.totalSpend > 0 ? Math.round((currentRevenue / currentAds.totalSpend) * 100) / 100 : 0;
       const prevROAS = prevAds.totalSpend > 0 ? Math.round((prevRevenue / prevAds.totalSpend) * 100) / 100 : 0;
 
+      // Paid = platform-reported conversions (Meta + Google). Organic = everything else.
+      const currentPaid = Math.min(currentAds.conversions, currentOrders || currentAds.conversions);
+      const prevPaid = Math.min(prevAds.conversions, prevOrders || prevAds.conversions);
+      const currentOrganic = Math.max(currentOrders - currentPaid, 0);
+      const prevOrganic = Math.max(prevOrders - prevPaid, 0);
+      const currentPaidCAC = currentPaid > 0 ? Math.round((currentAds.totalSpend / currentPaid) * 100) / 100 : 0;
+      const prevPaidCAC = prevPaid > 0 ? Math.round((prevAds.totalSpend / prevPaid) * 100) / 100 : 0;
+
       const currentProfit = Math.round((currentRevenue - currentAds.totalSpend - currentCOGS - currentTaxes - currentDiscounts) * 100) / 100;
       const prevProfit = Math.round((prevRevenue - prevAds.totalSpend - prevCOGS - prevTaxes - prevDiscounts) * 100) / 100;
 
@@ -142,6 +164,9 @@ export function useCrossChannelKPIs() {
         googleSpend: currentAds.googleSpend,
         metaSpend: currentAds.metaSpend,
         newSubscriptions: currentOrders,
+        paidConversions: currentPaid,
+        organicSubscriptions: currentOrganic,
+        paidCAC: currentPaidCAC,
         totalCAC: currentCAC,
         totalRevenue: Math.round(currentRevenue * 100) / 100,
         blendedROAS: currentROAS,
@@ -154,11 +179,15 @@ export function useCrossChannelKPIs() {
           googleSpend: pctChange(currentAds.googleSpend, prevAds.googleSpend),
           metaSpend: pctChange(currentAds.metaSpend, prevAds.metaSpend),
           newSubscriptions: pctChange(currentOrders, prevOrders),
+          paidConversions: pctChange(currentPaid, prevPaid),
+          organicSubscriptions: pctChange(currentOrganic, prevOrganic),
+          paidCAC: pctChange(currentPaidCAC, prevPaidCAC),
           totalCAC: pctChange(currentCAC, prevCAC),
           totalRevenue: pctChange(currentRevenue, prevRevenue),
           blendedROAS: pctChange(currentROAS, prevROAS),
           profit: pctChange(currentProfit, prevProfit),
         },
+
       };
     },
   });
