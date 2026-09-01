@@ -11,6 +11,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestedClientId: string | null = null;
+  try {
+    const body = await req.clone().json();
+    requestedClientId = body?.client_id ?? null;
+  } catch (_) {
+    // no body
+  }
+
   try {
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
