@@ -35,19 +35,40 @@ const CrossChannelView = () => {
     { show: true, title: "Total Spend", value: `$${(kpis?.totalSpend ?? 0).toLocaleString()}`, change: kpis?.changes.totalSpend, invert: true },
     { show: showGoogle, title: "Google Spend", value: `$${(kpis?.googleSpend ?? 0).toLocaleString()}`, change: kpis?.changes.googleSpend, invert: true },
     { show: true, title: "Meta Spend", value: `$${(kpis?.metaSpend ?? 0).toLocaleString()}`, change: kpis?.changes.metaSpend, invert: true },
-    { show: true, title: "Total CAC", value: kpis?.totalCAC ? `$${kpis.totalCAC.toLocaleString()}` : "—", change: kpis?.changes.totalCAC, invert: true },
+    { show: true, title: "Paid CAC", value: kpis?.paidCAC ? `$${kpis.paidCAC.toLocaleString()}` : "—", change: kpis?.changes.paidCAC, invert: true, subtitle: "Spend ÷ paid conversions" },
+    { show: true, title: "Blended CAC", value: kpis?.totalCAC ? `$${kpis.totalCAC.toLocaleString()}` : "—", change: kpis?.changes.totalCAC, invert: true, subtitle: "Spend ÷ all new sales" },
   ].filter(c => c.show);
+
+  const totalNew = kpis?.newSubscriptions ?? 0;
+  const paid = kpis?.paidConversions ?? 0;
+  const organic = kpis?.organicSubscriptions ?? 0;
+  const paidShare = totalNew > 0 ? Math.round((paid / totalNew) * 1000) / 10 : 0;
+  const paidLabel = revenueSource === "shopify" ? "Paid Orders" : "Paid Subscriptions";
+  const organicLabel = revenueSource === "shopify" ? "Organic Orders" : "Organic Subscriptions";
 
   return (
     <>
       {/* Primary KPI Row */}
-      <div className={`grid grid-cols-2 md:grid-cols-${primaryCards.length} gap-4 mb-6`}>
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
         {isLoading ? (
           Array.from({ length: primaryCards.length }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
         ) : (
           primaryCards.map((card) => (
-            <KPICard key={card.title} title={card.title} value={card.value} change={card.change} invertColor={card.invert} />
+            <KPICard key={card.title} title={card.title} value={card.value} change={card.change} invertColor={card.invert} subtitle={(card as any).subtitle} />
           ))
+        )}
+      </div>
+
+      {/* Paid vs Organic */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)
+        ) : (
+          <>
+            <KPICard title={paidLabel} value={paid.toLocaleString()} change={kpis?.changes.paidConversions} subtitle="Meta + Google reported conversions" />
+            <KPICard title={organicLabel} value={organic.toLocaleString()} change={kpis?.changes.organicSubscriptions} subtitle="Total new minus paid" />
+            <KPICard title="Paid Share of New Sales" value={`${paidShare}%`} subtitle={`${paid.toLocaleString()} of ${totalNew.toLocaleString()}`} />
+          </>
         )}
       </div>
 
@@ -73,6 +94,7 @@ const CrossChannelView = () => {
           </>
         )}
       </div>
+
 
       {/* Conversion Rate Trend (TW-enabled clients only) */}
       {twEnabled && (
