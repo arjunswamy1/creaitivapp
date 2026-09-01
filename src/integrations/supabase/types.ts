@@ -1221,8 +1221,57 @@ export type Database = {
           },
         ]
       }
+      subbly_plans: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          is_legacy: boolean
+          kind: string
+          plan_id: number
+          plan_name: string
+          price_cents: number | null
+          term_months: number | null
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          is_legacy?: boolean
+          kind?: string
+          plan_id: number
+          plan_name: string
+          price_cents?: number | null
+          term_months?: number | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          is_legacy?: boolean
+          kind?: string
+          plan_id?: number
+          plan_name?: string
+          price_cents?: number | null
+          term_months?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subbly_plans_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subbly_subscriptions: {
         Row: {
+          ad_id: string | null
+          click_id: string | null
           client_id: string | null
           created_at: string
           currency_code: string | null
@@ -1237,10 +1286,18 @@ export type Database = {
           subbly_created_at: string | null
           subbly_id: number
           successful_charges_count: number | null
+          survey_source: string | null
           synced_at: string
           updated_at: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
+          ad_id?: string | null
+          click_id?: string | null
           client_id?: string | null
           created_at?: string
           currency_code?: string | null
@@ -1255,10 +1312,18 @@ export type Database = {
           subbly_created_at?: string | null
           subbly_id: number
           successful_charges_count?: number | null
+          survey_source?: string | null
           synced_at?: string
           updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
+          ad_id?: string | null
+          click_id?: string | null
           client_id?: string | null
           created_at?: string
           currency_code?: string | null
@@ -1273,8 +1338,14 @@ export type Database = {
           subbly_created_at?: string | null
           subbly_id?: number
           successful_charges_count?: number | null
+          survey_source?: string | null
           synced_at?: string
           updated_at?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: [
           {
@@ -1528,6 +1599,19 @@ export type Database = {
         Args: { _client_id: string; _user_id: string }
         Returns: boolean
       }
+      subbly_ltv_summary: {
+        Args: { _client_id: string; _from: string; _to: string }
+        Returns: {
+          gift_subs: number
+          new_customer_subs: number
+          new_subs: number
+          projected_ltv_per_sub: number
+          projected_revenue: number
+          realized_per_sub: number
+          realized_revenue: number
+          self_pay_subs: number
+        }[]
+      }
       subbly_new_vs_renewal_revenue: {
         Args: { _client_id: string; _from: string; _to: string }
         Returns: {
@@ -1535,6 +1619,22 @@ export type Database = {
           new_revenue: number
           renewal_invoices: number
           renewal_revenue: number
+        }[]
+      }
+      subbly_plan_mix: {
+        Args: { _client_id: string; _from: string; _to: string }
+        Returns: {
+          kind: string
+          new_customer_subs: number
+          new_subs: number
+          plan_id: number
+          plan_name: string
+          price_cents: number
+          projected_ltv_per_sub: number
+          projected_revenue: number
+          realized_per_sub: number
+          realized_revenue: number
+          term_months: number
         }[]
       }
     }
