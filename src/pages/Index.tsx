@@ -8,11 +8,13 @@ import BillyGoogleDashboard from "@/components/BillyGoogleDashboard";
 import BillyDailyTrends from "@/components/BillyDailyTrends";
 import BillyTrendAnalysis from "@/components/BillyTrendAnalysis";
 import CROTestsTab from "@/components/cro/CROTestsTab";
+import ProductMixLTV from "@/components/ProductMixLTV";
 import { DateRangeProvider } from "@/contexts/DateRangeContext";
 import { useClient } from "@/contexts/ClientContext";
 import { VerticalProvider, useVertical } from "@/contexts/VerticalContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Chrome, Facebook, Zap, TrendingUp, LineChart, FlaskConical } from "lucide-react";
+import { BarChart3, Chrome, Facebook, Zap, TrendingUp, LineChart, FlaskConical, Boxes } from "lucide-react";
+
 
 const VerticalSelector = () => {
   const { activeVertical, setActiveVertical, verticals } = useVertical();
@@ -115,6 +117,8 @@ const DashboardContent = () => {
   const platforms = dashboardConfig?.enabled_platforms || ["meta", "google"];
   const showGoogle = platforms.includes("google");
   const showMeta = platforms.includes("meta");
+  const showSubbly = platforms.includes("subbly");
+
   const isBilly = activeClient?.slug === "billy";
 
   if (isBilly) {
@@ -147,6 +151,12 @@ const DashboardContent = () => {
                 Meta Ads
               </TabsTrigger>
             )}
+            {showSubbly && (
+              <TabsTrigger value="product-ltv" className="gap-1.5">
+                <Boxes className="w-3.5 h-3.5" />
+                Product Mix &amp; LTV
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="cross-channel">
             <CrossChannelView />
@@ -161,7 +171,13 @@ const DashboardContent = () => {
               <MetaDashboard />
             </TabsContent>
           )}
+          {showSubbly && (
+            <TabsContent value="product-ltv">
+              <ProductMixLTV />
+            </TabsContent>
+          )}
         </Tabs>
+
       </div>
     </div>
   );

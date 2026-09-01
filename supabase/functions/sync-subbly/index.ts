@@ -248,21 +248,62 @@ async function syncClientData(
   const syncedAt = new Date().toISOString();
 
   if (subs.length > 0) {
-    const subRows = subs.map((s: any) => ({
-      client_id: clientId,
-      subbly_id: s.id,
-      customer_id: s.customer_id,
-      product_id: s.product_id,
-      quantity: s.quantity ?? 1,
-      currency_code: s.currency_code ?? null,
-      status: s.status,
-      next_payment_date: s.next_payment_date ?? null,
-      last_payment_at: s.last_payment_at ?? null,
-      successful_charges_count: s.successful_charges_count ?? 0,
-      past_due: s.past_due ?? false,
-      subbly_created_at: s.created_at ?? null,
-      synced_at: syncedAt,
-    }));
+    // Pull attribution out of whatever the checkout passed through (metadata / survey answers).
+    const pick = (obj: any, keys: string[]): string | null => {
+      if (!obj || typeof obj !== "object") return null;
+      for (const k of keys) {
+        for (const objKey of Object.keys(obj)) {
+          if (objKey.toLowerCase() === k) {
+            const v = obj[objKey];
+            if (v !== null && v !== undefined && String(v).trim() !== "") return String(v).slice(0, 500);
+          }
+        }
+      }
+      return null;
+    };
+
+    const surveyAnswer = (s: any): string | null => {
+      const data = s?.survey?.data ?? s?.preferences?.data;
+      if (!data || typeof data !== "object") return null;
+      for (const q of Object.values<any>(data)) {
+        if (!q?.name || !/hear about/i.test(String(q.name))) continue;
+        const answers = q.answers;
+        if (!answers) continue;
+        if (typeof answers.content === "string") return answers.content.slice(0, 500);
+        for (const a of Object.values<any>(answers)) {
+          if (a?.content) return String(a.content).slice(0, 500);
+        }
+      }
+      return null;
+    };
+
+    const subRows = subs.map((s: any) => {
+      const meta = s.metadata ?? null;
+      return {
+        client_id: clientId,
+        subbly_id: s.id,
+        customer_id: s.customer_id,
+        product_id: s.product_id,
+        quantity: s.quantity ?? 1,
+        currency_code: s.currency_code ?? null,
+        status: s.status,
+        next_payment_date: s.next_payment_date ?? null,
+        last_payment_at: s.last_payment_at ?? null,
+        successful_charges_count: s.successful_charges_count ?? 0,
+        past_due: s.past_due ?? false,
+        subbly_created_at: s.created_at ?? null,
+        utm_source: pick(meta, ["utm_source", "source"]),
+        utm_medium: pick(meta, ["utm_medium", "medium"]),
+        utm_campaign: pick(meta, ["utm_campaign", "campaign"]),
+        utm_content: pick(meta, ["utm_content", "ad_name", "content"]),
+        utm_term: pick(meta, ["utm_term", "keyword", "term"]),
+        ad_id: pick(meta, ["ad_id", "adid", "fb_ad_id", "creative_id"]),
+        click_id: pick(meta, ["click_id", "fbclid", "gclid", "wbraid", "gbraid"]),
+        survey_source: surveyAnswer(s),
+        synced_at: syncedAt,
+      };
+    });
+
 
     for (let i = 0; i < subRows.length; i += 500) {
       const chunk = subRows.slice(i, i + 500);
