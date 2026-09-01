@@ -11,6 +11,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestedClientId: string | null = null;
+  try {
+    const body = await req.clone().json();
+    requestedClientId = body?.client_id ?? null;
+  } catch (_) {
+    // no body
+  }
+
   try {
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -64,23 +72,55 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get Shopify connection using admin client
-    const { data: conn, error: connError } = await adminSupabase
+    // Get Shopify connection using admin client, scoped to the requested client
+    let connQuery = adminSupabase
       .from("platform_connections")
       .select("*")
       .eq("platform", "shopify")
-      .single();
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    if (requestedClientId) connQuery = connQuery.eq("client_id", requestedClientId);
 
-    if (connError || !conn) {
-      return new Response(JSON.stringify({ error: "Shopify not connected" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { data: conn } = await connQuery.maybeSingle();
+
+    if (!conn?.access_token) {
+      // Nothing connected for this client – skip quietly instead of failing the dashboard sync
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: "Shopify not connected", records_synced: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const shopDomain = conn.account_id;
     const accessToken = conn.access_token;
     const clientId = conn.client_id;
+
+    // Verify the stored token before doing any work
+    const shopCheck = await fetch(`https://${shopDomain}/admin/api/2024-01/shop.json`, {
+      headers: { "X-Shopify-Access-Token": accessToken },
+    });
+    if (shopCheck.status === 401 || shopCheck.status === 403) {
+      await adminSupabase
+        .from("platform_connections")
+        .update({
+          metadata: {
+            ...(conn.metadata || {}),
+            validation_error: "Shopify access token is invalid or revoked. Please reconnect Shopify.",
+            validated_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", conn.id);
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          needs_reconnect: true,
+          error: "Shopify access token is invalid or revoked. Please reconnect Shopify in Settings.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
 
     // Reuse adminSupabase from above for sync operations
 
